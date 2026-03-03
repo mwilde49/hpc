@@ -1,2 +1,2 @@
-input: /project/tjp/test_data/numbers.txt
-output: /scratch/USERNAME/addone_output.txt
+input: /work/maw210003/projects/tjp/test_data/numbers.txt
+output: /scratch/juno/maw210003/addone_output.txt

@@ -9,8 +9,11 @@
 # Load module if required by your HPC
 module load apptainer
 
-CONTAINER=/project/tjp/containers/addone_latest.sif
-PIPELINE=/project/tjp/pipelines/addone/addone.py
+PROJECT_ROOT=/work/maw210003/projects/tjp
+SCRATCH_ROOT=/scratch/juno/maw210003
+
+CONTAINER=$PROJECT_ROOT/containers/addone_latest.sif
+PIPELINE=$PROJECT_ROOT/pipelines/addone/addone.py
 
 CONFIG=$1
 
@@ -22,7 +25,8 @@ fi
 mkdir -p logs
 
 apptainer exec \
-    --bind /project/tjp:/project/tjp \
+    --bind $PROJECT_ROOT:$PROJECT_ROOT \
+    --bind $SCRATCH_ROOT:$SCRATCH_ROOT \
     $CONTAINER \
     python $PIPELINE \
     --config $CONFIG
