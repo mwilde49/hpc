@@ -1,0 +1,3 @@
+[submodule "containers/bulkrnaseq"]
+	path = containers/bulkrnaseq
+	url = https://github.com/mwilde49/bulkseq

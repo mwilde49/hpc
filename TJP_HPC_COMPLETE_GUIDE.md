@@ -91,9 +91,15 @@ The HPC has symlinked home directories. The paths you see and the real paths dif
 ```
 ~/work/projects/tjp/              (shared group project root)
 │
+├── .gitmodules                   (tracks git submodules)
+│
 ├── containers/
-│   ├── apptainer.def             (container definition — source controlled)
-│   └── addone_latest.sif         (built container — NOT in git)
+│   ├── apptainer.def             (addone container definition — source controlled)
+│   ├── addone_latest.sif         (built container — NOT in git)
+│   └── bulkrnaseq/               (git submodule → mwilde49/bulkseq @ v1.0.0)
+│       ├── bulkrnaseq.def        (container definition)
+│       ├── build.sh              (build script)
+│       └── bulkrnaseq_v1.0.0.sif (built container — NOT in git)
 │
 ├── pipelines/
 │   └── addone/
@@ -101,11 +107,14 @@ The HPC has symlinked home directories. The paths you see and the real paths dif
 │       ├── run_pipeline.sh       (optional wrapper script)
 │       └── README.md             (pipeline documentation)
 │
+├── Bulk-RNA-Seq-Nextflow-Pipeline/  (cloned separately — NOT in git)
+│
 ├── slurm_templates/
-│   └── addone_slurm_template.sh  (SLURM job template)
+│   ├── addone_slurm_template.sh     (addone SLURM template)
+│   └── bulkrnaseq_slurm_template.sh (bulkrnaseq SLURM template)
 │
 ├── configs/
-│   └── example_config.yaml       (example configuration)
+│   └── example_config.yaml       (addone example configuration)
 │
 └── test_data/
     └── numbers.txt               (sample input data)
@@ -393,12 +402,18 @@ If this works, your container and pipeline are correct. Any failure here will al
 
 ### 7.1 Clone the Repository
 
-SSH into the HPC and clone:
+SSH into the HPC and clone (use `--recurse-submodules` to pull container submodules):
 
 ```bash
 ssh maw210003@<hpc-host>
 cd ~/work/projects/tjp
-git clone https://github.com/<username>/hpc.git .
+git clone --recurse-submodules https://github.com/<username>/hpc.git .
+```
+
+If you already cloned without `--recurse-submodules`, initialize submodules manually:
+
+```bash
+git submodule update --init --recursive
 ```
 
 ### 7.2 Transfer the Container
@@ -604,21 +619,25 @@ readlink -f ~/work/projects/tjp
 
 ## 12. Adding a New Pipeline
 
-To add a new pipeline (e.g., `fastqc`):
+There are two patterns for adding pipelines, depending on whether the pipeline code lives in this repo or in an external repo.
 
-### Step 1: Create pipeline directory
+### Pattern A: Inline Pipeline (code lives in this repo)
+
+Use this for simple pipelines you write yourself (like addone).
+
+#### Step 1: Create pipeline directory
 
 ```bash
 mkdir -p pipelines/fastqc
 ```
 
-### Step 2: Write the pipeline script
+#### Step 2: Write the pipeline script
 
 ```bash
 # pipelines/fastqc/fastqc_pipeline.py
 ```
 
-### Step 3: Update the container definition (if new dependencies are needed)
+#### Step 3: Update the container definition (if new dependencies are needed)
 
 Edit `containers/apptainer.def` to add dependencies, then rebuild:
 
@@ -626,29 +645,79 @@ Edit `containers/apptainer.def` to add dependencies, then rebuild:
 sudo apptainer build containers/fastqc_latest.sif containers/fastqc.def
 ```
 
-### Step 4: Create a SLURM template
+#### Step 4: Create a SLURM template
+
+Copy the addone template as a starting point and adjust resources (time, memory, CPUs):
 
 ```bash
-# slurm_templates/fastqc_slurm_template.sh
+cp slurm_templates/addone_slurm_template.sh slurm_templates/fastqc_slurm_template.sh
 ```
 
-Copy the addone template as a starting point and adjust resources (time, memory, CPUs).
-
-### Step 5: Create an example config
+#### Step 5: Create an example config
 
 ```bash
 # configs/fastqc_example_config.yaml
 ```
 
-### Step 6: Add a README
-
-```bash
-# pipelines/fastqc/README.md
-```
-
-### Step 7: Test locally, then interactively on HPC, then via SLURM
+#### Step 6: Test locally, then interactively on HPC, then via SLURM
 
 Follow the same phased testing approach documented above.
+
+### Pattern B: Submoduled Pipeline (container repo is external)
+
+Use this when the container definition lives in its own repo and/or the pipeline code is third-party (like bulkrnaseq).
+
+#### Step 1: Add the container repo as a submodule
+
+```bash
+git submodule add https://github.com/<org>/<container-repo>.git containers/<name>/
+cd containers/<name> && git checkout v1.0.0
+cd ../..
+git add containers/<name> .gitmodules
+```
+
+#### Step 2: Build the container
+
+```bash
+cd containers/<name>
+sudo ./build.sh   # or: sudo apptainer build <name>.sif <name>.def
+```
+
+#### Step 3: Create a SLURM template with pre-flight checks
+
+Copy the bulkrnaseq template as a starting point. Include checks for the container `.sif` and any external pipeline repos:
+
+```bash
+cp slurm_templates/bulkrnaseq_slurm_template.sh slurm_templates/<name>_slurm_template.sh
+```
+
+#### Step 4: Clone any external pipeline repos on the HPC
+
+```bash
+cd ~/work/projects/tjp
+git clone https://github.com/<org>/<pipeline-repo>.git
+```
+
+#### Step 5: Create an HPC guide
+
+Create a top-level `<NAME>_HPC_GUIDE.md` documenting the multi-repo relationship, setup steps, and troubleshooting.
+
+#### Step 6: Test and submit
+
+Follow the same phased testing approach documented above.
+
+### Updating a Submodule to a New Version
+
+```bash
+cd containers/<name>
+git fetch --tags
+git checkout v2.0.0
+cd ../..
+git add containers/<name>
+git commit -m "Update <name> submodule to v2.0.0"
+```
+
+Then rebuild the container and transfer the new `.sif` to the HPC.
 
 ---
 
@@ -731,6 +800,18 @@ Example configuration with input and output paths. Users should copy this and mo
 
 Sample input file for validating the pipeline works end-to-end.
 
+### containers/bulkrnaseq/ (git submodule)
+
+The `mwilde49/bulkseq` container repo, pinned to a release tag. Contains the Apptainer definition, build script, and test scripts for the Bulk RNA-Seq container. The `.sif` is built here but gitignored.
+
+### slurm_templates/bulkrnaseq_slurm_template.sh
+
+SLURM job submission script for the Bulk RNA-Seq pipeline. Runs Nextflow inside the bulkrnaseq container with `--cleanenv`. Includes pre-flight checks for the container and UTDal pipeline repo.
+
+### BULKRNASEQ_HPC_GUIDE.md
+
+Complete setup and usage guide for running the Bulk RNA-Seq pipeline on the HPC, including the three-repo relationship, first-time setup, and troubleshooting.
+
 ### .gitignore
 
 Excludes `.sif` files (large binaries), logs, and user-specific configs from version control.
@@ -756,9 +837,9 @@ apptainer exec containers/addone_latest.sif python pipelines/addone/addone.py --
 ### Deploy to HPC
 
 ```bash
-# Clone repo on HPC
+# Clone repo on HPC (--recurse-submodules pulls container submodules)
 cd ~/work/projects/tjp
-git clone https://github.com/<username>/hpc.git .
+git clone --recurse-submodules https://github.com/<username>/hpc.git .
 
 # Transfer container from local machine
 scp containers/addone_latest.sif maw210003@<hpc-host>:~/work/projects/tjp/containers/
