@@ -1,0 +1,15 @@
+# Apptainer containers (large binaries)
+*.sif
+
+# SLURM logs
+logs/
+
+# User-specific configs
+my_config.yaml
+
+# Python
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store

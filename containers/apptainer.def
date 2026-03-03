@@ -1,0 +1,12 @@
+Bootstrap: docker
+From: python:3.11-slim
+
+%post
+    pip install pyyaml
+
+%environment
+    export LC_ALL=C
+    export LANG=C
+
+%runscript
+    exec python "$@"
