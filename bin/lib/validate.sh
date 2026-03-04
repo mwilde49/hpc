@@ -64,7 +64,7 @@ _validate_bulkrnaseq() {
     done
 
     # Paths that must exist on disk
-    local path_keys=(fastq_dir samples_file star_index reference_gtf)
+    local path_keys=(fastq_dir samples_file star_index reference_gtf exclude_bed_file_path blacklist_bed_file_path)
     for key in "${path_keys[@]}"; do
         if yaml_has "$config" "$key"; then
             local val

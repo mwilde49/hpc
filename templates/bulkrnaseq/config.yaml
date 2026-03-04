@@ -9,8 +9,12 @@ paired_end: true
 # Data paths (edit these for your project)
 fastq_dir: __SCRATCH__/myproject/fastq
 samples_file: __WORK__/pipelines/bulkrnaseq/samples.txt
-star_index: __SCRATCH__/star_index
-reference_gtf: /path/to/genes.gtf
+
+# Shared reference files (pre-installed, most users won't need to change these)
+star_index: /groups/tprice/pipelines/references/star_index
+reference_gtf: /groups/tprice/pipelines/references/gencode.v48.primary_assembly.annotation.gtf
+exclude_bed_file_path: /groups/tprice/pipelines/references/filter.bed
+blacklist_bed_file_path: /groups/tprice/pipelines/references/blacklist.bed
 
 # Read suffixes (defaults match standard Illumina naming)
 read1_suffix: _R1_001
@@ -31,7 +35,3 @@ fastqc_cores: 20
 # Pipeline steps
 run_fastqc: true
 run_rna_pipeline: true
-
-# Optional BED files (uncomment and set paths if needed)
-# exclude_bed_file_path: /path/to/filter.bed
-# blacklist_bed_file_path: /path/to/blacklist.bed
