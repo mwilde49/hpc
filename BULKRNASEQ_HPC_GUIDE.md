@@ -8,9 +8,9 @@ This guide covers running the UTDal Bulk RNA-Seq Nextflow Pipeline on Juno HPC u
 
 | Repo | Role | Location on HPC |
 |------|------|-----------------|
-| `mwilde49/hpc` | Deployment layer: SLURM templates, configs, docs | `~/work/projects/tjp/` |
-| `mwilde49/bulkseq` | Container definition + build/test scripts (submodule) | `~/work/projects/tjp/containers/bulkrnaseq/` |
-| `utdal/Bulk-RNA-Seq-Nextflow-Pipeline` | Pipeline code (Nextflow workflows) | `~/work/projects/tjp/Bulk-RNA-Seq-Nextflow-Pipeline/` |
+| `mwilde49/hpc` | Deployment layer: SLURM templates, configs, docs | `/groups/tprice/pipelines` |
+| `mwilde49/bulkseq` | Container definition + build/test scripts (submodule) | `/groups/tprice/pipelines/containers/bulkrnaseq/` |
+| `utdal/Bulk-RNA-Seq-Nextflow-Pipeline` | Pipeline code (Nextflow workflows) | `/groups/tprice/pipelines/Bulk-RNA-Seq-Nextflow-Pipeline/` |
 
 The HPC repo pins `bulkseq` as a git submodule. The UTDal pipeline repo is cloned separately on the HPC (it is not a submodule).
 
@@ -23,8 +23,8 @@ This walks through everything from a fresh start to a validated test run.
 ### 1.1 Clone the HPC repo with submodules
 
 ```bash
-ssh maw210003@<hpc-host>
-cd ~/work/projects/tjp
+ssh <username>@<hpc-host>
+cd /groups/tprice/pipelines
 git clone --recurse-submodules https://github.com/mwilde49/hpc.git .
 ```
 
@@ -49,7 +49,7 @@ The `.sif` file is too large for git. Either build it on the HPC (if `--fakeroot
 
 ```bash
 module load apptainer
-cd ~/work/projects/tjp/containers/bulkrnaseq
+cd /groups/tprice/pipelines/containers/bulkrnaseq
 apptainer build --fakeroot bulkrnaseq_v1.0.0.sif bulkrnaseq.def
 ```
 
@@ -61,19 +61,19 @@ cd containers/bulkrnaseq
 sudo ./build.sh
 
 # Transfer to HPC:
-scp bulkrnaseq_v1.0.0.sif maw210003@<hpc-host>:~/work/projects/tjp/containers/bulkrnaseq/
+scp bulkrnaseq_v1.0.0.sif <username>@<hpc-host>:/groups/tprice/pipelines/containers/bulkrnaseq/
 ```
 
 Verify on HPC:
 
 ```bash
-ls -lh ~/work/projects/tjp/containers/bulkrnaseq/bulkrnaseq_v1.0.0.sif
+ls -lh /groups/tprice/pipelines/containers/bulkrnaseq/bulkrnaseq_v1.0.0.sif
 ```
 
 ### 1.3 Clone the UTDal pipeline repo
 
 ```bash
-cd ~/work/projects/tjp
+cd /groups/tprice/pipelines
 git clone https://github.com/utdal/Bulk-RNA-Seq-Nextflow-Pipeline.git
 ```
 
@@ -90,13 +90,13 @@ Note: the main Nextflow file is `bulk_rna_seq_nextflow_pipeline.nf`, **not** `ma
 The bulkseq repo includes a test data generator. You must bind-mount the project root so the container can see the script:
 
 ```bash
-cd ~/work/projects/tjp/containers/bulkrnaseq
+cd /groups/tprice/pipelines/containers/bulkrnaseq
 module load apptainer
 
 apptainer exec \
-  --bind /work/maw210003/projects/tjp:/work/maw210003/projects/tjp \
+  --bind /groups/tprice/pipelines:/groups/tprice/pipelines \
   bulkrnaseq_v1.0.0.sif \
-  python3 /work/maw210003/projects/tjp/containers/bulkrnaseq/generate_test_data.py
+  python3 /groups/tprice/pipelines/containers/bulkrnaseq/generate_test_data.py
 ```
 
 Verify:
@@ -118,7 +118,7 @@ This creates:
 The pipeline needs a file listing sample names (one per line):
 
 ```bash
-echo "sample1" > /work/maw210003/projects/tjp/Bulk-RNA-Seq-Nextflow-Pipeline/rna_seq_samples.txt
+echo "sample1" > /groups/tprice/pipelines/Bulk-RNA-Seq-Nextflow-Pipeline/rna_seq_samples.txt
 ```
 
 ### 1.6 Configure the pipeline for test data
@@ -126,18 +126,18 @@ echo "sample1" > /work/maw210003/projects/tjp/Bulk-RNA-Seq-Nextflow-Pipeline/rna
 Edit the UTDal pipeline config:
 
 ```bash
-vi ~/work/projects/tjp/Bulk-RNA-Seq-Nextflow-Pipeline/pipeline.config
+vi /groups/tprice/pipelines/Bulk-RNA-Seq-Nextflow-Pipeline/pipeline.config
 ```
 
 Set these values (use full real paths, no `~`):
 
 ```
-params.config_directory = '/work/maw210003/projects/tjp/Bulk-RNA-Seq-Nextflow-Pipeline'
-params.fastq_files = '/work/maw210003/projects/tjp/containers/bulkrnaseq/test_data'
-params.samples_file = '/work/maw210003/projects/tjp/Bulk-RNA-Seq-Nextflow-Pipeline/rna_seq_samples.txt'
+params.config_directory = '/groups/tprice/pipelines/Bulk-RNA-Seq-Nextflow-Pipeline'
+params.fastq_files = '/groups/tprice/pipelines/containers/bulkrnaseq/test_data'
+params.samples_file = '/groups/tprice/pipelines/Bulk-RNA-Seq-Nextflow-Pipeline/rna_seq_samples.txt'
 
-params.star_index = '/work/maw210003/projects/tjp/containers/bulkrnaseq/test_data'
-params.reference_gtf = '/work/maw210003/projects/tjp/containers/bulkrnaseq/test_data/genes.gtf'
+params.star_index = '/groups/tprice/pipelines/containers/bulkrnaseq/test_data'
+params.reference_gtf = '/groups/tprice/pipelines/containers/bulkrnaseq/test_data/genes.gtf'
 ```
 
 **Important**: The `run_fastqc` and `run_rna_pipeline` flags at the bottom of the config must use the `params.` prefix or Nextflow won't see them. Change them to:
@@ -154,7 +154,7 @@ Save and exit vim: press `Esc`, type `:wq`, press `Enter`.
 ### 1.7 Submit the test job
 
 ```bash
-cd ~/work/projects/tjp
+cd /groups/tprice/pipelines
 mkdir -p logs
 sbatch slurm_templates/bulkrnaseq_slurm_template.sh
 ```
@@ -200,22 +200,22 @@ From your local machine or data source, transfer FASTQs to a directory on the HP
 
 ```bash
 # Create a directory for your project's data
-mkdir -p /scratch/juno/maw210003/myproject/fastq
+mkdir -p /scratch/juno/<username>/myproject/fastq
 
 # Transfer from local machine
-scp /path/to/your/*.fastq.gz maw210003@<hpc-host>:/scratch/juno/maw210003/myproject/fastq/
+scp /path/to/your/*.fastq.gz <username>@<hpc-host>:/scratch/juno/<username>/myproject/fastq/
 ```
 
 Or if copying from another location on the HPC:
 
 ```bash
-cp /path/to/shared/data/*.fastq.gz /scratch/juno/maw210003/myproject/fastq/
+cp /path/to/shared/data/*.fastq.gz /scratch/juno/<username>/myproject/fastq/
 ```
 
 Verify your files landed and look right:
 
 ```bash
-ls -lh /scratch/juno/maw210003/myproject/fastq/
+ls -lh /scratch/juno/<username>/myproject/fastq/
 ```
 
 Files should follow the naming pattern: `<samplename>_R1_001.fastq.gz` and `<samplename>_R2_001.fastq.gz` for paired-end data. If your files use a different suffix, you'll update `params.read1_suffix` and `params.read2_suffix` in the config.
@@ -225,16 +225,16 @@ Files should follow the naming pattern: `<samplename>_R1_001.fastq.gz` and `<sam
 If you don't already have a STAR index for your reference genome, you'll need to generate one. This is a one-time step per genome/annotation version.
 
 ```bash
-mkdir -p /scratch/juno/maw210003/star_index
+mkdir -p /scratch/juno/<username>/star_index
 
 apptainer exec \
   --cleanenv \
   --env PYTHONNOUSERSITE=1 \
-  --bind /work/maw210003/projects/tjp:/work/maw210003/projects/tjp \
-  --bind /scratch/juno/maw210003:/scratch/juno/maw210003 \
-  /work/maw210003/projects/tjp/containers/bulkrnaseq/bulkrnaseq_v1.0.0.sif \
+  --bind /groups/tprice/pipelines:/groups/tprice/pipelines \
+  --bind /scratch/juno/<username>:/scratch/juno/<username> \
+  /groups/tprice/pipelines/containers/bulkrnaseq/bulkrnaseq_v1.0.0.sif \
   STAR --runMode genomeGenerate \
-  --genomeDir /scratch/juno/maw210003/star_index \
+  --genomeDir /scratch/juno/<username>/star_index \
   --genomeFastaFiles /path/to/genome.fa \
   --sjdbGTFfile /path/to/annotation.gtf \
   --runThreadN 20
@@ -269,28 +269,28 @@ Patient02_S2
 Create it:
 
 ```bash
-vi /work/maw210003/projects/tjp/Bulk-RNA-Seq-Nextflow-Pipeline/rna_seq_samples.txt
+vi /groups/tprice/pipelines/Bulk-RNA-Seq-Nextflow-Pipeline/rna_seq_samples.txt
 ```
 
 Or generate it from your FASTQ filenames:
 
 ```bash
-ls /scratch/juno/maw210003/myproject/fastq/*_R1_001.fastq.gz \
+ls /scratch/juno/<username>/myproject/fastq/*_R1_001.fastq.gz \
   | xargs -n1 basename \
   | sed 's/_R1_001.fastq.gz//' \
-  > /work/maw210003/projects/tjp/Bulk-RNA-Seq-Nextflow-Pipeline/rna_seq_samples.txt
+  > /groups/tprice/pipelines/Bulk-RNA-Seq-Nextflow-Pipeline/rna_seq_samples.txt
 ```
 
 Verify:
 
 ```bash
-cat /work/maw210003/projects/tjp/Bulk-RNA-Seq-Nextflow-Pipeline/rna_seq_samples.txt
+cat /groups/tprice/pipelines/Bulk-RNA-Seq-Nextflow-Pipeline/rna_seq_samples.txt
 ```
 
 ### 2.4 Edit the pipeline config
 
 ```bash
-vi ~/work/projects/tjp/Bulk-RNA-Seq-Nextflow-Pipeline/pipeline.config
+vi /groups/tprice/pipelines/Bulk-RNA-Seq-Nextflow-Pipeline/pipeline.config
 ```
 
 Update these fields for your data:
@@ -299,11 +299,11 @@ Update these fields for your data:
 params.proj_name = 'My-Project-Name'
 params.species = 'Human'  // or 'Mouse', 'Rattus'
 
-params.config_directory = '/work/maw210003/projects/tjp/Bulk-RNA-Seq-Nextflow-Pipeline'
-params.fastq_files = '/scratch/juno/maw210003/myproject/fastq'
-params.samples_file = '/work/maw210003/projects/tjp/Bulk-RNA-Seq-Nextflow-Pipeline/rna_seq_samples.txt'
+params.config_directory = '/groups/tprice/pipelines/Bulk-RNA-Seq-Nextflow-Pipeline'
+params.fastq_files = '/scratch/juno/<username>/myproject/fastq'
+params.samples_file = '/groups/tprice/pipelines/Bulk-RNA-Seq-Nextflow-Pipeline/rna_seq_samples.txt'
 
-params.star_index = '/scratch/juno/maw210003/star_index'
+params.star_index = '/scratch/juno/<username>/star_index'
 params.reference_gtf = '/path/to/annotation.gtf'
 
 params.paired_end = true   // false for single-end
@@ -328,7 +328,7 @@ If not, leave them as-is — Nextflow will warn but continue.
 The default template requests 20 CPUs, 64G RAM, and 12 hours. For a real human dataset you may need more:
 
 ```bash
-vi ~/work/projects/tjp/slurm_templates/bulkrnaseq_slurm_template.sh
+vi /groups/tprice/pipelines/slurm_templates/bulkrnaseq_slurm_template.sh
 ```
 
 Typical adjustments:
@@ -345,7 +345,7 @@ STAR alignment is the memory bottleneck — human genomes need ~32G just for the
 ### 2.6 Submit
 
 ```bash
-cd ~/work/projects/tjp
+cd /groups/tprice/pipelines
 mkdir -p logs
 sbatch slurm_templates/bulkrnaseq_slurm_template.sh
 ```
@@ -370,7 +370,7 @@ Outputs will be in the directories specified in your `pipeline.config`.
 Nextflow's work directory can be very large (intermediate BAMs for every process step). Clean it once you've verified your results:
 
 ```bash
-rm -rf /scratch/juno/maw210003/nextflow_work
+rm -rf /scratch/juno/<username>/nextflow_work
 ```
 
 ---
@@ -392,10 +392,10 @@ git push
 # Build and transfer
 cd containers/bulkrnaseq
 sudo ./build.sh
-scp bulkrnaseq_v2.0.0.sif maw210003@<hpc-host>:~/work/projects/tjp/containers/bulkrnaseq/
+scp bulkrnaseq_v2.0.0.sif <username>@<hpc-host>:/groups/tprice/pipelines/containers/bulkrnaseq/
 
 # On HPC: pull and update the SLURM template .sif filename
-cd ~/work/projects/tjp
+cd /groups/tprice/pipelines
 git pull
 git submodule update --init --recursive
 # Edit slurm_templates/bulkrnaseq_slurm_template.sh to reference new .sif
@@ -414,7 +414,7 @@ The SLURM template expects the container at `$PROJECT_ROOT/containers/bulkrnaseq
 Clone the UTDal repo:
 
 ```bash
-cd ~/work/projects/tjp
+cd /groups/tprice/pipelines
 git clone https://github.com/utdal/Bulk-RNA-Seq-Nextflow-Pipeline.git
 ```
 
@@ -424,9 +424,9 @@ Apptainer can't see host files unless their directories are bind-mounted. Use `-
 
 ```bash
 apptainer exec \
-  --bind /work/maw210003/projects/tjp:/work/maw210003/projects/tjp \
+  --bind /groups/tprice/pipelines:/groups/tprice/pipelines \
   bulkrnaseq_v1.0.0.sif \
-  python3 /work/maw210003/projects/tjp/containers/bulkrnaseq/generate_test_data.py
+  python3 /groups/tprice/pipelines/containers/bulkrnaseq/generate_test_data.py
 ```
 
 ### `run_fastqc` / `run_rna_pipeline` not recognized
@@ -443,7 +443,7 @@ params.run_fastqc = true
 
 ### Bind mount errors
 
-Apptainer needs real paths, not symlinks. The SLURM template uses hardcoded real paths (`/work/maw210003/projects/tjp` and `/scratch/juno/maw210003`). If your paths differ, edit the template. Resolve symlinks with `readlink -f ~/work`.
+Apptainer needs real paths, not symlinks. The SLURM template uses `/groups/tprice/pipelines` for the project root and auto-detects user paths via `$USER` (`/scratch/juno/$USER`, `/work/$USER`). If your paths differ, edit the template. Resolve symlinks with `readlink -f ~/work`.
 
 ### `--cleanenv` flag
 
@@ -462,7 +462,7 @@ STAR requires ~32G for human genome indexing/alignment. Increase `--mem` in the 
 If a resumed run behaves unexpectedly, clear the work directory and resubmit:
 
 ```bash
-rm -rf /scratch/juno/maw210003/nextflow_work
+rm -rf /scratch/juno/<username>/nextflow_work
 sbatch slurm_templates/bulkrnaseq_slurm_template.sh
 ```
 

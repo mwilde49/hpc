@@ -9,8 +9,9 @@
 # Load module if required by your HPC
 module load apptainer
 
-PROJECT_ROOT=/work/maw210003/projects/tjp
-SCRATCH_ROOT=/scratch/juno/maw210003
+PROJECT_ROOT=/groups/tprice/pipelines
+SCRATCH_ROOT=/scratch/juno/$USER
+WORK_ROOT=/work/$USER
 
 CONTAINER=$PROJECT_ROOT/containers/bulkrnaseq/bulkrnaseq_v1.0.0.sif
 PIPELINE_REPO=$PROJECT_ROOT/Bulk-RNA-Seq-Nextflow-Pipeline
@@ -38,6 +39,7 @@ apptainer exec \
     --env PYTHONNOUSERSITE=1 \
     --bind $PROJECT_ROOT:$PROJECT_ROOT \
     --bind $SCRATCH_ROOT:$SCRATCH_ROOT \
+    --bind $WORK_ROOT:$WORK_ROOT \
     $CONTAINER \
     nextflow run $PIPELINE_REPO/bulk_rna_seq_nextflow_pipeline.nf \
     -c $PIPELINE_REPO/pipeline.config \

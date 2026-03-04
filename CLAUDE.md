@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HPC pipeline framework for the TJP group on Juno HPC. Uses Apptainer containers + SLURM scheduling + config-driven YAML execution. Has two pipelines: AddOne (inline demo) and BulkRNASeq (submoduled container + external Nextflow pipeline). Designed to scale horizontally by adding new pipeline directories or container submodules.
+HPC pipeline framework for the TJP group on Juno HPC, deployed to the shared group location `/groups/tprice/pipelines`. Uses Apptainer containers + SLURM scheduling + config-driven YAML execution. Has two pipelines: AddOne (inline demo) and BulkRNASeq (submoduled container + external Nextflow pipeline). Designed to scale horizontally by adding new pipeline directories or container submodules.
 
 ## Build and Run Commands
 
@@ -20,7 +20,7 @@ apptainer exec containers/addone_latest.sif python pipelines/addone/addone.py --
 
 ### Submit on HPC
 ```bash
-cd ~/work/projects/tjp
+cd /groups/tprice/pipelines
 mkdir -p logs
 sbatch slurm_templates/addone_slurm_template.sh configs/example_config.yaml
 ```
@@ -47,14 +47,17 @@ Pipelines can be **inline** (code in `pipelines/<name>/`, e.g., addone) or **sub
 
 ## HPC Path Conventions (Juno-Specific)
 
-Juno uses symlinked home directories. Apptainer bind mounts require **real paths**:
+The repo lives at a shared group location. Each user's data stays on their own work/scratch directories:
 
-| Symlink | Real Path |
-|---------|-----------|
-| `~/work/` | `/work/maw210003/` |
-| `~/scratch/` | `/scratch/juno/maw210003/` |
+| What | Path |
+|------|------|
+| Shared pipelines repo | `/groups/tprice/pipelines` |
+| User work directory | `/work/$USER` |
+| User scratch directory | `/scratch/juno/$USER` |
 
-Always resolve with `readlink -f` before passing to Apptainer. The SLURM template and config files use hardcoded real paths (`PROJECT_ROOT=/work/maw210003/projects/tjp`, `SCRATCH_ROOT=/scratch/juno/maw210003`).
+Juno uses symlinked home directories. Apptainer bind mounts require **real paths** — always resolve with `readlink -f` before passing to Apptainer.
+
+The SLURM templates auto-detect user paths via `$USER` (`PROJECT_ROOT=/groups/tprice/pipelines`, `SCRATCH_ROOT=/scratch/juno/$USER`, `WORK_ROOT=/work/$USER`).
 
 ## BulkRNASeq Pipeline
 
@@ -78,7 +81,7 @@ cd containers/bulkrnaseq && ./test_container.sh
 
 ### Submit on HPC
 ```bash
-cd ~/work/projects/tjp
+cd /groups/tprice/pipelines
 mkdir -p logs
 sbatch slurm_templates/bulkrnaseq_slurm_template.sh
 ```
@@ -112,5 +115,5 @@ For pipelines with their own container repo:
 
 - `.sif` container files are excluded from git (large binaries) — must be transferred separately to HPC
 - Pipelines must support `--config <yaml>` for config-driven execution
-- SLURM templates must bind both `PROJECT_ROOT` and `SCRATCH_ROOT` into the container
+- SLURM templates must bind `PROJECT_ROOT`, `SCRATCH_ROOT`, and `WORK_ROOT` into the container
 - Outputs go to scratch space, never to the project directory

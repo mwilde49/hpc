@@ -78,12 +78,15 @@ See [BULKRNASEQ_HPC_GUIDE.md](BULKRNASEQ_HPC_GUIDE.md) for full setup and usage.
 
 ## HPC Path Conventions (Juno)
 
-Apptainer bind mounts require real paths, not symlinks:
+The repo is deployed to a shared group location. Each user's data stays on their own directories:
 
-| Symlink | Real Path |
-|---------|-----------|
-| `~/work/` | `/work/maw210003/` |
-| `~/scratch/` | `/scratch/juno/maw210003/` |
+| What | Path |
+|------|------|
+| Shared pipelines repo | `/groups/tprice/pipelines` |
+| User work directory | `/work/<username>` |
+| User scratch directory | `/scratch/juno/<username>` |
+
+SLURM templates auto-detect user paths via `$USER`. Apptainer bind mounts require real paths, not symlinks.
 
 ## Adding a New Pipeline
 

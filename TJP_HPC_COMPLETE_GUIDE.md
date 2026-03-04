@@ -76,20 +76,20 @@ Each layer has a single responsibility. SLURM doesn't know about your code. Appt
 
 ### Juno HPC Path Structure
 
-The HPC has symlinked home directories. The paths you see and the real paths differ:
+The shared pipelines repo lives at `/groups/tprice/pipelines`. Each user's data stays on their own work and scratch directories:
 
-| What You See | Real Path |
-|-------------|-----------|
-| `~/work/` | `/work/maw210003/` |
-| `~/scratch/` | `/scratch/juno/maw210003/` |
-| `~/work/projects/tjp/` | `/work/maw210003/projects/tjp/` |
+| What | Path |
+|------|------|
+| Shared pipelines repo | `/groups/tprice/pipelines` |
+| User work directory | `/work/<username>` |
+| User scratch directory | `/scratch/juno/<username>` |
 
-**This matters for Apptainer.** Bind mounts require the real (resolved) path, not the symlinked path. Always use `readlink -f` to resolve paths before passing them to Apptainer.
+Juno uses symlinked home directories (`~/work` → `/work/<username>`, `~/scratch` → `/scratch/juno/<username>`). **Apptainer bind mounts require the real (resolved) path**, not the symlinked path. Always use `readlink -f` to resolve paths before passing them to Apptainer.
 
 ### Project Directory Structure
 
 ```
-~/work/projects/tjp/              (shared group project root)
+/groups/tprice/pipelines/             (shared group project root)
 │
 ├── .gitmodules                   (tracks git submodules)
 │
@@ -124,8 +124,8 @@ The HPC has symlinked home directories. The paths you see and the real paths dif
 
 | Directory | Purpose | Persistence | Access |
 |-----------|---------|-------------|--------|
-| `~/work/projects/tjp/` | Shared code, containers, templates | Persistent | Group read, restricted write |
-| `~/scratch/` | Job outputs, temporary large files | Temporary (purged periodically) | User only |
+| `/groups/tprice/pipelines/` | Shared code, containers, templates | Persistent | Group read, restricted write |
+| `/scratch/juno/<username>/` | Job outputs, temporary large files | Temporary (purged periodically) | User only |
 | `logs/` (in working dir) | SLURM stdout/stderr logs | User-managed | User only |
 
 ---
@@ -244,11 +244,11 @@ What each section does:
 Create `configs/example_config.yaml`:
 
 ```yaml
-input: /work/maw210003/projects/tjp/test_data/numbers.txt
-output: /scratch/juno/maw210003/addone_output.txt
+input: /groups/tprice/pipelines/test_data/numbers.txt
+output: /scratch/juno/<username>/addone_output.txt  # Replace <username> with your HPC username
 ```
 
-**Important**: Use the real resolved HPC paths here, not symlinked paths.
+**Important**: Use real resolved HPC paths here, not symlinked paths.
 
 ### 4.6 Write the SLURM Template
 
@@ -266,8 +266,9 @@ Create `slurm_templates/addone_slurm_template.sh`:
 # Load module if required by your HPC
 module load apptainer
 
-PROJECT_ROOT=/work/maw210003/projects/tjp
-SCRATCH_ROOT=/scratch/juno/maw210003
+PROJECT_ROOT=/groups/tprice/pipelines
+SCRATCH_ROOT=/scratch/juno/$USER
+WORK_ROOT=/work/$USER
 
 CONTAINER=$PROJECT_ROOT/containers/addone_latest.sif
 PIPELINE=$PROJECT_ROOT/pipelines/addone/addone.py
@@ -284,6 +285,7 @@ mkdir -p logs
 apptainer exec \
     --bind $PROJECT_ROOT:$PROJECT_ROOT \
     --bind $SCRATCH_ROOT:$SCRATCH_ROOT \
+    --bind $WORK_ROOT:$WORK_ROOT \
     $CONTAINER \
     python $PIPELINE \
     --config $CONFIG
@@ -405,8 +407,8 @@ If this works, your container and pipeline are correct. Any failure here will al
 SSH into the HPC and clone (use `--recurse-submodules` to pull container submodules):
 
 ```bash
-ssh maw210003@<hpc-host>
-cd ~/work/projects/tjp
+ssh <username>@<hpc-host>
+cd /groups/tprice/pipelines
 git clone --recurse-submodules https://github.com/<username>/hpc.git .
 ```
 
@@ -422,14 +424,14 @@ The `.sif` file is not in git (it's a large binary). Transfer it separately from
 
 ```bash
 # Run this from your LOCAL machine, not the HPC
-scp containers/addone_latest.sif maw210003@<hpc-host>:~/work/projects/tjp/containers/
+scp containers/addone_latest.sif <username>@<hpc-host>:/groups/tprice/pipelines/containers/
 ```
 
 ### 7.3 Verify on HPC
 
 ```bash
-ls -la ~/work/projects/tjp/containers/addone_latest.sif
-ls ~/work/projects/tjp/pipelines/addone/
+ls -la /groups/tprice/pipelines/containers/addone_latest.sif
+ls /groups/tprice/pipelines/pipelines/addone/
 ```
 
 ---
@@ -451,23 +453,20 @@ This gives you a shell on a compute node (not the login node).
 The HPC uses symlinks. Apptainer needs real paths for bind mounts:
 
 ```bash
-export REAL_PROJECT=$(readlink -f ~/work/projects/tjp)
 export REAL_SCRATCH=$(readlink -f ~/scratch)
-echo "Project: $REAL_PROJECT"
+echo "Project: /groups/tprice/pipelines"
 echo "Scratch: $REAL_SCRATCH"
 ```
 
-On Juno, this resolves to:
-- Project: `/work/maw210003/projects/tjp`
-- Scratch: `/scratch/juno/maw210003`
+On Juno, scratch resolves to `/scratch/juno/<username>`. The project root `/groups/tprice/pipelines` is already a real path (no symlink).
 
 ### 8.3 Run the Pipeline
 
 ```bash
-cd ~/work/projects/tjp
+cd /groups/tprice/pipelines
 module load apptainer
 
-apptainer exec --bind $REAL_PROJECT:$REAL_PROJECT --bind $REAL_SCRATCH:$REAL_SCRATCH containers/addone_latest.sif python $REAL_PROJECT/pipelines/addone/addone.py --input $REAL_PROJECT/test_data/numbers.txt --output $REAL_SCRATCH/addone_output.txt
+apptainer exec --bind /groups/tprice/pipelines:/groups/tprice/pipelines --bind $REAL_SCRATCH:$REAL_SCRATCH containers/addone_latest.sif python /groups/tprice/pipelines/pipelines/addone/addone.py --input /groups/tprice/pipelines/test_data/numbers.txt --output $REAL_SCRATCH/addone_output.txt
 ```
 
 ### 8.4 Verify Output
@@ -497,7 +496,7 @@ Once interactive testing passes, submit as a scheduled job.
 ### 9.1 Prepare
 
 ```bash
-cd ~/work/projects/tjp
+cd /groups/tprice/pipelines
 mkdir -p logs
 ```
 
@@ -575,22 +574,23 @@ It runs the same way everywhere, every time.
 Containers are isolated — they can't see the host filesystem by default. Bind mounts map host directories into the container:
 
 ```
---bind /work/maw210003/projects/tjp:/work/maw210003/projects/tjp
+--bind /groups/tprice/pipelines:/groups/tprice/pipelines
 ```
 
-This means: "Make the host path `/work/.../tjp` visible inside the container at the same path."
+This means: "Make the host path `/groups/tprice/pipelines` visible inside the container at the same path."
 
 You need bind mounts for:
 - Your project directory (so the container can read your pipeline code and input data)
 - Your scratch directory (so the container can write output)
+- Your work directory (so the container can see your input data)
 
 ### 11.3 Why Config-Driven?
 
 Hardcoding paths in your pipeline means everyone has to edit the code to run it. Config files separate "what the code does" from "where things are":
 
 ```yaml
-input: /work/maw210003/projects/tjp/test_data/numbers.txt
-output: /scratch/juno/maw210003/addone_output.txt
+input: /groups/tprice/pipelines/test_data/numbers.txt
+output: /scratch/juno/<username>/addone_output.txt
 ```
 
 Users copy the config, change their paths, and submit. The pipeline code stays untouched.
@@ -600,20 +600,22 @@ Users copy the config, change their paths, and submit. The pipeline code stays u
 On Juno, `~/work` is a symlink:
 
 ```
-~/work → /home/maw210003/work → /work/maw210003
+~/work → /home/<username>/work → /work/<username>
 ```
 
 And `~/scratch` is:
 
 ```
-~/scratch → /home/maw210003/scratch → /scratch/juno/maw210003
+~/scratch → /home/<username>/scratch → /scratch/juno/<username>
 ```
 
 Apptainer needs the **real** path for bind mounts. Always resolve with:
 
 ```bash
-readlink -f ~/work/projects/tjp
+readlink -f ~/work
 ```
+
+The shared project root `/groups/tprice/pipelines` is a real path and doesn't need resolution.
 
 ---
 
@@ -694,7 +696,7 @@ cp slurm_templates/bulkrnaseq_slurm_template.sh slurm_templates/<name>_slurm_tem
 #### Step 4: Clone any external pipeline repos on the HPC
 
 ```bash
-cd ~/work/projects/tjp
+cd /groups/tprice/pipelines
 git clone https://github.com/<org>/<pipeline-repo>.git
 ```
 
@@ -838,18 +840,18 @@ apptainer exec containers/addone_latest.sif python pipelines/addone/addone.py --
 
 ```bash
 # Clone repo on HPC (--recurse-submodules pulls container submodules)
-cd ~/work/projects/tjp
+cd /groups/tprice/pipelines
 git clone --recurse-submodules https://github.com/<username>/hpc.git .
 
 # Transfer container from local machine
-scp containers/addone_latest.sif maw210003@<hpc-host>:~/work/projects/tjp/containers/
+scp containers/addone_latest.sif <username>@<hpc-host>:/groups/tprice/pipelines/containers/
 ```
 
 ### Run on HPC
 
 ```bash
 # Submit job
-cd ~/work/projects/tjp
+cd /groups/tprice/pipelines
 mkdir -p logs
 sbatch slurm_templates/addone_slurm_template.sh configs/example_config.yaml
 
@@ -871,7 +873,7 @@ cat logs/addone_*.err
 git add -A && git commit -m "Update pipeline" && git push
 
 # HPC: pull updates
-cd ~/work/projects/tjp && git pull
+cd /groups/tprice/pipelines && git pull
 
 # If container definition changed, rebuild and re-transfer the .sif
 ```

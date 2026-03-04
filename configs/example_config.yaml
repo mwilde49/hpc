@@ -1,2 +1,2 @@
-input: /work/maw210003/projects/tjp/test_data/numbers.txt
-output: /scratch/juno/maw210003/addone_output.txt
+input: /groups/tprice/pipelines/test_data/numbers.txt
+output: /scratch/juno/<username>/addone_output.txt  # Replace <username> with your HPC username
