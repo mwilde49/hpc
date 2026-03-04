@@ -68,17 +68,14 @@ _generate_nextflow_config() {
     run_fastqc=$(yaml_get "$yaml_config" "run_fastqc")
     run_rna_pipeline=$(yaml_get "$yaml_config" "run_rna_pipeline")
 
-    # Build BED params (provide empty defaults to suppress Nextflow warnings)
-    local optional_bed=""
-    local exclude_val="" blacklist_val=""
+    # BED file paths (empty string if not set)
+    local exclude_bed="" blacklist_bed=""
     if yaml_has "$yaml_config" "exclude_bed_file_path"; then
-        exclude_val=$(yaml_get "$yaml_config" "exclude_bed_file_path") || true
+        exclude_bed=$(yaml_get "$yaml_config" "exclude_bed_file_path") || true
     fi
     if yaml_has "$yaml_config" "blacklist_bed_file_path"; then
-        blacklist_val=$(yaml_get "$yaml_config" "blacklist_bed_file_path") || true
+        blacklist_bed=$(yaml_get "$yaml_config" "blacklist_bed_file_path") || true
     fi
-    optional_bed="params.exclude_bed_file_path = '${exclude_val}'"$'\n'
-    optional_bed="${optional_bed}params.blacklist_bed_file_path = '${blacklist_val}'"
 
     # config_directory is always the UTDal repo path
     local config_directory="$REPO_ROOT/Bulk-RNA-Seq-Nextflow-Pipeline"
@@ -101,9 +98,10 @@ _generate_nextflow_config() {
         -e "s|@@STRAND_HTS@@|${strand_hts}|g" \
         -e "s|@@PAIRED_HTS@@|${paired_hts}|g" \
         -e "s|@@FASTQC_CORES@@|${fastqc_cores}|g" \
+        -e "s|@@EXCLUDE_BED@@|${exclude_bed}|g" \
+        -e "s|@@BLACKLIST_BED@@|${blacklist_bed}|g" \
         -e "s|@@RUN_FASTQC@@|${run_fastqc}|g" \
         -e "s|@@RUN_RNA_PIPELINE@@|${run_rna_pipeline}|g" \
-        -e "s|@@OPTIONAL_BED_PARAMS@@|${optional_bed}|g" \
         "$template" > "$output"
 
     info "Generated: $output"

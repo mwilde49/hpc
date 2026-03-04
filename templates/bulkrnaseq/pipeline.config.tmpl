@@ -29,7 +29,8 @@ params.strand_hts = '@@STRAND_HTS@@'
 params.paired_hts = '@@PAIRED_HTS@@'
 
 // BED files
-@@OPTIONAL_BED_PARAMS@@
+params.exclude_bed_file_path = '@@EXCLUDE_BED@@'
+params.blacklist_bed_file_path = '@@BLACKLIST_BED@@'
 
 // Process management
 params.run_fastqc = @@RUN_FASTQC@@
