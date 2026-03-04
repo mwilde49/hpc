@@ -1,0 +1,8 @@
+# AddOne Pipeline Configuration
+# Edit the paths below, then launch with: tjp-launch addone
+
+# Input file: one number per line
+input: /groups/tprice/pipelines/test_data/numbers.txt
+
+# Output file (uses your scratch directory)
+output: __SCRATCH__/addone_output.txt

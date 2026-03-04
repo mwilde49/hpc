@@ -1,0 +1,226 @@
+#!/usr/bin/env bash
+# tjp-launch — launch a TJP pipeline with automatic run tracking
+# Creates a timestamped run directory, snapshots config, generates
+# reproducibility manifest, and submits the SLURM job.
+#
+# Usage: tjp-launch <pipeline> [--config <path>]
+#
+# Examples:
+#   tjp-launch addone
+#   tjp-launch bulkrnaseq
+#   tjp-launch addone --config /path/to/custom_config.yaml
+
+set -euo pipefail
+
+# Source shared libraries
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
+source "$SCRIPT_DIR/lib/validate.sh"
+source "$SCRIPT_DIR/lib/manifest.sh"
+
+# ── Helper functions ─────────────────────────────────────────────────────────
+
+usage() {
+    cat <<EOF
+Usage: tjp-launch <pipeline> [--config <path>]
+
+Pipelines: ${KNOWN_PIPELINES[*]}
+
+Options:
+  --config <path>   Path to config YAML (default: $USER_PIPELINES/<pipeline>/config.yaml)
+  --help            Show this help message
+EOF
+    exit "${1:-0}"
+}
+
+# _generate_nextflow_config <yaml_config> <output_path>
+# Converts simplified user YAML into Nextflow pipeline.config using sed template.
+_generate_nextflow_config() {
+    local yaml_config="$1"
+    local output="$2"
+    local template="$REPO_ROOT/templates/bulkrnaseq/pipeline.config.tmpl"
+
+    if [[ ! -f "$template" ]]; then
+        die "Nextflow config template not found: $template"
+    fi
+
+    # Read values from YAML
+    local project_name species paired_end fastq_dir samples_file
+    local star_index reference_gtf read1_suffix read2_suffix
+    local run_fastqc run_rna_pipeline
+
+    project_name=$(yaml_get "$yaml_config" "project_name")
+    species=$(yaml_get "$yaml_config" "species")
+    paired_end=$(yaml_get "$yaml_config" "paired_end")
+    fastq_dir=$(yaml_get "$yaml_config" "fastq_dir")
+    samples_file=$(yaml_get "$yaml_config" "samples_file")
+    star_index=$(yaml_get "$yaml_config" "star_index")
+    reference_gtf=$(yaml_get "$yaml_config" "reference_gtf")
+    read1_suffix=$(yaml_get "$yaml_config" "read1_suffix" 2>/dev/null || echo "_R1_001")
+    read2_suffix=$(yaml_get "$yaml_config" "read2_suffix" 2>/dev/null || echo "_R2_001")
+    run_fastqc=$(yaml_get "$yaml_config" "run_fastqc")
+    run_rna_pipeline=$(yaml_get "$yaml_config" "run_rna_pipeline")
+
+    # Build optional BED params
+    local optional_bed=""
+    if yaml_has "$yaml_config" "exclude_bed_file_path"; then
+        local val
+        val=$(yaml_get "$yaml_config" "exclude_bed_file_path") || true
+        if [[ -n "$val" ]]; then
+            optional_bed="${optional_bed}params.exclude_bed_file_path = '${val}'"$'\n'
+        fi
+    fi
+    if yaml_has "$yaml_config" "blacklist_bed_file_path"; then
+        local val
+        val=$(yaml_get "$yaml_config" "blacklist_bed_file_path") || true
+        if [[ -n "$val" ]]; then
+            optional_bed="${optional_bed}params.blacklist_bed_file_path = '${val}'"$'\n'
+        fi
+    fi
+
+    # config_directory is always the UTDal repo path
+    local config_directory="$REPO_ROOT/Bulk-RNA-Seq-Nextflow-Pipeline"
+
+    # Perform sed substitution on template
+    sed \
+        -e "s|@@PROJECT_NAME@@|${project_name}|g" \
+        -e "s|@@SPECIES@@|${species}|g" \
+        -e "s|@@PAIRED_END@@|${paired_end}|g" \
+        -e "s|@@CONFIG_DIRECTORY@@|${config_directory}|g" \
+        -e "s|@@FASTQ_DIR@@|${fastq_dir}|g" \
+        -e "s|@@SAMPLES_FILE@@|${samples_file}|g" \
+        -e "s|@@STAR_INDEX@@|${star_index}|g" \
+        -e "s|@@REFERENCE_GTF@@|${reference_gtf}|g" \
+        -e "s|@@READ1_SUFFIX@@|${read1_suffix}|g" \
+        -e "s|@@READ2_SUFFIX@@|${read2_suffix}|g" \
+        -e "s|@@RUN_FASTQC@@|${run_fastqc}|g" \
+        -e "s|@@RUN_RNA_PIPELINE@@|${run_rna_pipeline}|g" \
+        -e "s|@@OPTIONAL_BED_PARAMS@@|${optional_bed}|g" \
+        "$template" > "$output"
+
+    info "Generated: $output"
+}
+
+# ── Argument parsing ─────────────────────────────────────────────────────────
+PIPELINE=""
+CONFIG_PATH=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --config)
+            [[ $# -lt 2 ]] && die "--config requires a path argument"
+            CONFIG_PATH="$2"
+            shift 2
+            ;;
+        --help|-h)
+            usage 0
+            ;;
+        -*)
+            die "Unknown option: $1"
+            ;;
+        *)
+            if [[ -z "$PIPELINE" ]]; then
+                PIPELINE="$1"
+            else
+                die "Unexpected argument: $1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+[[ -z "$PIPELINE" ]] && usage 1
+
+# ── Validate pipeline name ───────────────────────────────────────────────────
+if ! is_known_pipeline "$PIPELINE"; then
+    die "Unknown pipeline: $PIPELINE (known: ${KNOWN_PIPELINES[*]})"
+fi
+
+# ── Resolve config path ─────────────────────────────────────────────────────
+if [[ -z "$CONFIG_PATH" ]]; then
+    CONFIG_PATH="$USER_PIPELINES/$PIPELINE/config.yaml"
+fi
+
+if [[ ! -f "$CONFIG_PATH" ]]; then
+    die "Config file not found: $CONFIG_PATH
+  Run 'tjp-setup' first, or specify a config with --config <path>"
+fi
+
+header "Launching $PIPELINE pipeline"
+
+# ── Validate config ──────────────────────────────────────────────────────────
+info "Validating config: $CONFIG_PATH"
+validate_config "$PIPELINE" "$CONFIG_PATH"
+info "Config validation passed."
+
+# ── Resolve paths ────────────────────────────────────────────────────────────
+CONTAINER=$(get_container_path "$PIPELINE")
+SLURM_TEMPLATE=$(get_slurm_template "$PIPELINE")
+
+if [[ ! -f "$CONTAINER" ]]; then
+    die "Container not found: $CONTAINER
+  Build and transfer it to HPC first."
+fi
+
+if [[ ! -f "$SLURM_TEMPLATE" ]]; then
+    die "SLURM template not found: $SLURM_TEMPLATE"
+fi
+
+# ── Create timestamped run directory ─────────────────────────────────────────
+TS=$(timestamp)
+RUN_DIR="$USER_PIPELINES/$PIPELINE/runs/$TS"
+mkdir -p "$RUN_DIR"
+info "Run directory: $RUN_DIR"
+
+# ── Snapshot config ──────────────────────────────────────────────────────────
+cp "$CONFIG_PATH" "$RUN_DIR/config.yaml"
+
+# ── Pipeline-specific dispatch ───────────────────────────────────────────────
+SBATCH_CONFIG_ARG=""
+
+case "$PIPELINE" in
+    addone)
+        # AddOne: pass config.yaml directly as $1 to SLURM template
+        SBATCH_CONFIG_ARG="$RUN_DIR/config.yaml"
+        ;;
+    bulkrnaseq)
+        # BulkRNASeq: generate Nextflow pipeline.config from simplified YAML
+        info "Generating Nextflow pipeline.config..."
+        _generate_nextflow_config "$RUN_DIR/config.yaml" "$RUN_DIR/pipeline.config"
+        SBATCH_CONFIG_ARG="$RUN_DIR/pipeline.config"
+        ;;
+esac
+
+# ── Generate manifest (pre-submission) ───────────────────────────────────────
+generate_manifest "$RUN_DIR" "$PIPELINE" "$RUN_DIR/config.yaml" "$CONTAINER" "$SLURM_TEMPLATE"
+
+# ── Submit SLURM job ─────────────────────────────────────────────────────────
+info "Submitting job..."
+SBATCH_OUTPUT=$(sbatch \
+    --output="$RUN_DIR/slurm_%j.out" \
+    --error="$RUN_DIR/slurm_%j.err" \
+    "$SLURM_TEMPLATE" \
+    "$SBATCH_CONFIG_ARG" \
+    2>&1)
+
+# Parse job ID from "Submitted batch job 123456"
+JOB_ID=$(echo "$SBATCH_OUTPUT" | grep -oP '\d+$' || echo "unknown")
+
+if [[ "$JOB_ID" == "unknown" ]]; then
+    error "sbatch output: $SBATCH_OUTPUT"
+    die "Failed to parse job ID from sbatch output."
+fi
+
+# ── Update manifest with job ID ─────────────────────────────────────────────
+update_manifest_job_id "$RUN_DIR" "$JOB_ID"
+
+# ── Print summary ────────────────────────────────────────────────────────────
+header "Job submitted"
+
+cat <<EOF
+  Pipeline:   $PIPELINE
+  Job ID:     $JOB_ID
+  Run dir:    $RUN_DIR/
+  Monitor:    tail -f $RUN_DIR/slurm_${JOB_ID}.out
+  Cancel:     scancel $JOB_ID
+EOF

@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# tjp-setup — one-time workspace setup for TJP pipeline users
+# Creates user pipeline directories under /work/$USER/pipelines/
+# and copies template configs with placeholder substitution.
+#
+# Usage: /groups/tprice/pipelines/bin/tjp-setup
+
+set -euo pipefail
+
+# Source shared library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
+
+# ── Pre-flight checks ───────────────────────────────────────────────────────
+header "TJP Pipeline Setup"
+
+info "Checking HPC environment..."
+
+# Check apptainer is available
+if ! command -v apptainer &>/dev/null; then
+    if command -v module &>/dev/null; then
+        module load apptainer 2>/dev/null || true
+    fi
+fi
+if ! command -v apptainer &>/dev/null; then
+    warn "Apptainer not found. You may need to run 'module load apptainer' before launching pipelines."
+fi
+
+# Check containers exist
+local_errors=()
+for pipeline in "${KNOWN_PIPELINES[@]}"; do
+    local container_path
+    container_path=$(get_container_path "$pipeline")
+    if [[ ! -f "$container_path" ]]; then
+        warn "Container not found: $container_path"
+        warn "  → It may not have been transferred to HPC yet."
+    fi
+done
+
+# Check UTDal pipeline repo for bulkrnaseq
+PIPELINE_REPO="$REPO_ROOT/Bulk-RNA-Seq-Nextflow-Pipeline"
+if [[ ! -d "$PIPELINE_REPO" ]]; then
+    warn "UTDal Bulk-RNA-Seq pipeline repo not found at $PIPELINE_REPO"
+    warn "  → Clone it: cd $REPO_ROOT && git clone https://github.com/utdal/Bulk-RNA-Seq-Nextflow-Pipeline.git"
+fi
+
+# Check work directory exists
+if [[ ! -d "$WORK_ROOT" ]]; then
+    die "Work directory $WORK_ROOT does not exist. Contact your HPC administrator."
+fi
+
+# ── Create workspace ────────────────────────────────────────────────────────
+header "Creating workspace"
+
+for pipeline in "${KNOWN_PIPELINES[@]}"; do
+    pipeline_dir="$USER_PIPELINES/$pipeline"
+
+    if [[ -d "$pipeline_dir" ]]; then
+        info "Directory already exists: $pipeline_dir"
+    else
+        mkdir -p "$pipeline_dir"
+        info "Created: $pipeline_dir"
+    fi
+
+    # Create runs directory
+    mkdir -p "$pipeline_dir/runs"
+done
+
+# ── Copy template configs ───────────────────────────────────────────────────
+header "Setting up config files"
+
+_substitute_placeholders() {
+    sed \
+        -e "s|__USER__|$USER|g" \
+        -e "s|__SCRATCH__|$SCRATCH_ROOT|g" \
+        -e "s|__WORK__|$WORK_ROOT|g" \
+        "$1"
+}
+
+# AddOne config
+addone_config="$USER_PIPELINES/addone/config.yaml"
+if [[ -f "$addone_config" ]]; then
+    warn "Config already exists, skipping: $addone_config"
+else
+    _substitute_placeholders "$REPO_ROOT/templates/addone/config.yaml" > "$addone_config"
+    info "Created: $addone_config"
+fi
+
+# BulkRNASeq config
+bulkrnaseq_config="$USER_PIPELINES/bulkrnaseq/config.yaml"
+if [[ -f "$bulkrnaseq_config" ]]; then
+    warn "Config already exists, skipping: $bulkrnaseq_config"
+else
+    _substitute_placeholders "$REPO_ROOT/templates/bulkrnaseq/config.yaml" > "$bulkrnaseq_config"
+    info "Created: $bulkrnaseq_config"
+fi
+
+# BulkRNASeq samples example
+bulkrnaseq_samples="$USER_PIPELINES/bulkrnaseq/samples.txt"
+if [[ -f "$bulkrnaseq_samples" ]]; then
+    warn "Samples file already exists, skipping: $bulkrnaseq_samples"
+else
+    cp "$REPO_ROOT/templates/bulkrnaseq/samples_example.txt" "$bulkrnaseq_samples"
+    info "Created: $bulkrnaseq_samples"
+fi
+
+# ── Print next steps ────────────────────────────────────────────────────────
+header "Setup complete"
+
+cat <<EOF
+Your workspace is ready at: $USER_PIPELINES/
+
+Next steps:
+
+  1. Add tjp tools to your PATH (optional, for this session):
+
+     export PATH="$REPO_ROOT/bin:\$PATH"
+
+  2. Edit a pipeline config:
+
+     vi $USER_PIPELINES/addone/config.yaml      # simple demo
+     vi $USER_PIPELINES/bulkrnaseq/config.yaml   # RNA-seq analysis
+
+  3. Launch a pipeline:
+
+     tjp-launch addone
+     tjp-launch bulkrnaseq
+
+See ONBOARDING.md for detailed documentation.
+EOF

@@ -39,11 +39,33 @@ Four-layer stack where each layer has a single responsibility:
 1. **SLURM** (`slurm_templates/`) — resource allocation and job scheduling
 2. **Apptainer** (`containers/`) — reproducible execution environment (.def defines it, .sif is the built binary)
 3. **Pipeline** (`pipelines/<name>/`) — domain logic (Python scripts)
-4. **Config** (`configs/`) — YAML files parameterizing input/output paths
+4. **Config** (`configs/`) — YAML files parameterizing input/output paths (legacy); `templates/` for user-facing config templates
+
+Supporting layers:
+
+- **`bin/`** — user-facing CLI tools (`tjp-setup`, `tjp-launch`) and shared libraries (`bin/lib/`)
+- **`templates/`** — per-pipeline config templates with `__USER__`/`__SCRATCH__`/`__WORK__` placeholders, plus the Nextflow config template (`pipeline.config.tmpl`)
 
 Execution flow: `sbatch template.sh config.yaml` → SLURM allocates node → Apptainer runs container → pipeline executes → writes to scratch.
 
 Pipelines can be **inline** (code in `pipelines/<name>/`, e.g., addone) or **submoduled** (container repo in `containers/<name>/` with external pipeline code, e.g., bulkrnaseq).
+
+## User Workflow (Recommended)
+
+New users should use the automated tooling instead of manual setup:
+
+```bash
+# One-time setup (creates workspace with template configs)
+/groups/tprice/pipelines/bin/tjp-setup
+
+# Edit config with your paths
+vi /work/$USER/pipelines/addone/config.yaml
+
+# Launch (creates timestamped run, snapshots config, submits job)
+tjp-launch addone
+```
+
+Each launch creates a timestamped run directory under `/work/$USER/pipelines/<pipeline>/runs/` containing a config snapshot, reproducibility manifest (`manifest.json`), and SLURM logs. See `ONBOARDING.md` for full details.
 
 ## HPC Path Conventions (Juno-Specific)
 

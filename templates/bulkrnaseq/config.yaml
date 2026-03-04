@@ -1,0 +1,25 @@
+# BulkRNASeq Pipeline Configuration
+# Edit the paths below, then launch with: tjp-launch bulkrnaseq
+# See ONBOARDING.md for detailed field descriptions.
+
+project_name: My-Experiment
+species: Human              # Human, Mouse, or Rattus
+paired_end: true
+
+# Data paths (edit these for your project)
+fastq_dir: __SCRATCH__/myproject/fastq
+samples_file: __WORK__/pipelines/bulkrnaseq/samples.txt
+star_index: __SCRATCH__/star_index
+reference_gtf: /path/to/genes.gtf
+
+# Read suffixes (defaults match standard Illumina naming)
+read1_suffix: _R1_001
+read2_suffix: _R2_001
+
+# Pipeline steps
+run_fastqc: true
+run_rna_pipeline: true
+
+# Optional BED files (uncomment and set paths if needed)
+# exclude_bed_file_path: /path/to/filter.bed
+# blacklist_bed_file_path: /path/to/blacklist.bed
