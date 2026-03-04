@@ -29,7 +29,6 @@ fi
 # Check containers exist
 local_errors=()
 for pipeline in "${KNOWN_PIPELINES[@]}"; do
-    local container_path
     container_path=$(get_container_path "$pipeline")
     if [[ ! -f "$container_path" ]]; then
         warn "Container not found: $container_path"
