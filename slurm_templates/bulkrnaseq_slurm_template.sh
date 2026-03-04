@@ -39,6 +39,6 @@ apptainer exec \
     --bind $PROJECT_ROOT:$PROJECT_ROOT \
     --bind $SCRATCH_ROOT:$SCRATCH_ROOT \
     $CONTAINER \
-    nextflow run $PIPELINE_REPO/main.nf \
+    nextflow run $PIPELINE_REPO/bulk_rna_seq_nextflow_pipeline.nf \
     -c $PIPELINE_REPO/pipeline.config \
     -w $SCRATCH_ROOT/nextflow_work
