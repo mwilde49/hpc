@@ -16,6 +16,18 @@ reference_gtf: /path/to/genes.gtf
 read1_suffix: _R1_001
 read2_suffix: _R2_001
 
+# Read clipping (number of bases to trim)
+clip5_num: 11
+clip3_num: 5
+
+# Strandedness settings
+strand_st: --rf              # StringTie: --rf (reverse) or --fr (forward) or empty for unstranded
+strand_hts: reverse          # HTSeq: yes, no, or reverse
+paired_hts: pos              # HTSeq sort order: pos or name
+
+# FastQC cores (match your SLURM --cpus-per-task)
+fastqc_cores: 20
+
 # Pipeline steps
 run_fastqc: true
 run_rna_pipeline: true

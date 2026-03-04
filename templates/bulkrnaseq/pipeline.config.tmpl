@@ -9,13 +9,28 @@ params.config_directory = '@@CONFIG_DIRECTORY@@'
 params.fastq_files = '@@FASTQ_DIR@@'
 params.samples_file = '@@SAMPLES_FILE@@'
 
+// FastQC
+params.fastqc_cores = @@FASTQC_CORES@@
+
+// STAR Genome directories
 params.star_index = '@@STAR_INDEX@@'
 params.reference_gtf = '@@REFERENCE_GTF@@'
 
 params.read1_suffix = '@@READ1_SUFFIX@@'
 params.read2_suffix = '@@READ2_SUFFIX@@'
 
+// Clipping reads
+params.clip5_num = @@CLIP5_NUM@@
+params.clip3_num = @@CLIP3_NUM@@
+
+// Strandedness and sorting
+params.strand_st = '@@STRAND_ST@@'
+params.strand_hts = '@@STRAND_HTS@@'
+params.paired_hts = '@@PAIRED_HTS@@'
+
+// BED files
+@@OPTIONAL_BED_PARAMS@@
+
+// Process management
 params.run_fastqc = @@RUN_FASTQC@@
 params.run_rna_pipeline = @@RUN_RNA_PIPELINE@@
-
-@@OPTIONAL_BED_PARAMS@@
