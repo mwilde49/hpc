@@ -1,0 +1,214 @@
+#!/usr/bin/env bash
+# tjp-test — smoke-test a TJP RNA-Seq pipeline with subsampled data
+# Copies test FASTQs to scratch, generates a test config, and delegates
+# to tjp-launch --dev for submission to the dev partition.
+#
+# Usage: tjp-test <pipeline> [--clean]
+#
+# Supported pipelines: psoma, bulkrnaseq
+#
+# Examples:
+#   tjp-test psoma              # run psoma smoke test
+#   tjp-test bulkrnaseq         # run bulkrnaseq smoke test
+#   tjp-test psoma --clean      # wipe previous test data first
+
+set -euo pipefail
+
+# Source shared libraries
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
+
+# ── Constants ────────────────────────────────────────────────────────────────
+TEST_DATA_SRC="$REPO_ROOT/test_data/rnaseq"
+SUPPORTED_PIPELINES=(psoma bulkrnaseq)
+
+# ── Usage ────────────────────────────────────────────────────────────────────
+usage() {
+    cat <<EOF
+Usage: tjp-test <pipeline> [--clean]
+
+Smoke-test a pipeline with 2 subsampled samples on the dev partition.
+
+Pipelines: ${SUPPORTED_PIPELINES[*]}
+
+Options:
+  --clean   Wipe previous test data in scratch before copying
+  --help    Show this help message
+
+Workflow:
+  1. tjp-test psoma              # submit smoke test
+  2. squeue -u \$USER             # monitor job
+  3. tjp-test-validate psoma     # validate outputs after completion
+EOF
+    exit "${1:-0}"
+}
+
+# ── Argument parsing ─────────────────────────────────────────────────────────
+PIPELINE=""
+CLEAN=false
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --clean)  CLEAN=true; shift ;;
+        --help|-h) usage 0 ;;
+        -*)       die "Unknown option: $1" ;;
+        *)
+            if [[ -z "$PIPELINE" ]]; then
+                PIPELINE="$1"
+            else
+                die "Unexpected argument: $1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+[[ -z "$PIPELINE" ]] && usage 1
+
+# ── Validate pipeline ────────────────────────────────────────────────────────
+is_supported=false
+for p in "${SUPPORTED_PIPELINES[@]}"; do
+    [[ "$p" == "$PIPELINE" ]] && is_supported=true
+done
+$is_supported || die "Unsupported pipeline: $PIPELINE (supported: ${SUPPORTED_PIPELINES[*]})"
+
+# ── Paths ────────────────────────────────────────────────────────────────────
+SCRATCH_TEST_DIR="$SCRATCH_ROOT/pipelines/$PIPELINE/test_data"
+SCRATCH_FASTQ_DIR="$SCRATCH_TEST_DIR/fastq"
+SRC_FASTQ_DIR="$TEST_DATA_SRC/fastq"
+SRC_SAMPLES="$TEST_DATA_SRC/$PIPELINE/samples.txt"
+
+header "Smoke test: $PIPELINE"
+
+# ── Pre-flight checks ────────────────────────────────────────────────────────
+if [[ ! -d "$SRC_FASTQ_DIR" ]]; then
+    die "Test FASTQ directory not found: $SRC_FASTQ_DIR
+  Run subsample_from_real.sh first to generate test data."
+fi
+
+if [[ ! -f "$SRC_SAMPLES" ]]; then
+    die "Samples file not found: $SRC_SAMPLES"
+fi
+
+# Check test FASTQs exist (at least one file)
+shopt -s nullglob
+src_files=("$SRC_FASTQ_DIR"/*.fastq.gz)
+shopt -u nullglob
+if [[ ${#src_files[@]} -eq 0 ]]; then
+    die "No .fastq.gz files found in $SRC_FASTQ_DIR
+  Run subsample_from_real.sh first to generate test data."
+fi
+
+# ── Clean if requested ────────────────────────────────────────────────────────
+if $CLEAN && [[ -d "$SCRATCH_TEST_DIR" ]]; then
+    info "Cleaning previous test data: $SCRATCH_TEST_DIR"
+    rm -rf "$SCRATCH_TEST_DIR"
+fi
+
+# ── Copy test FASTQs to scratch ──────────────────────────────────────────────
+mkdir -p "$SCRATCH_FASTQ_DIR"
+
+if [[ "$PIPELINE" == "psoma" ]]; then
+    # Psoma uses _1/_2 suffixes — copy files as-is
+    for f in "$SRC_FASTQ_DIR"/*_1.fastq.gz "$SRC_FASTQ_DIR"/*_2.fastq.gz; do
+        [[ -f "$f" ]] || continue
+        dest="$SCRATCH_FASTQ_DIR/$(basename "$f")"
+        if [[ ! -f "$dest" ]]; then
+            info "Copying $(basename "$f") to scratch..."
+            cp "$f" "$dest"
+        fi
+    done
+elif [[ "$PIPELINE" == "bulkrnaseq" ]]; then
+    # BulkRNASeq uses _R1_001/_R2_001 suffixes — create renamed copies/symlinks
+    for f in "$SRC_FASTQ_DIR"/*_1.fastq.gz; do
+        [[ -f "$f" ]] || continue
+        base=$(basename "$f")
+        # Sample_19_1.fastq.gz -> Sample_19_R1_001.fastq.gz
+        newname="${base/_1.fastq.gz/_R1_001.fastq.gz}"
+        dest="$SCRATCH_FASTQ_DIR/$newname"
+        if [[ ! -f "$dest" ]]; then
+            info "Copying $base -> $newname"
+            cp "$f" "$dest"
+        fi
+    done
+    for f in "$SRC_FASTQ_DIR"/*_2.fastq.gz; do
+        [[ -f "$f" ]] || continue
+        base=$(basename "$f")
+        # Sample_19_2.fastq.gz -> Sample_19_R2_001.fastq.gz
+        newname="${base/_2.fastq.gz/_R2_001.fastq.gz}"
+        dest="$SCRATCH_FASTQ_DIR/$newname"
+        if [[ ! -f "$dest" ]]; then
+            info "Copying $base -> $newname"
+            cp "$f" "$dest"
+        fi
+    done
+fi
+
+# ── Copy samples file ────────────────────────────────────────────────────────
+cp "$SRC_SAMPLES" "$SCRATCH_TEST_DIR/samples.txt"
+info "Samples file: $SCRATCH_TEST_DIR/samples.txt"
+
+# ── Generate test config YAML ────────────────────────────────────────────────
+TEST_CONFIG="$SCRATCH_TEST_DIR/config.yaml"
+
+if [[ "$PIPELINE" == "psoma" ]]; then
+    cat > "$TEST_CONFIG" <<YAML
+project_name: Psoma-Test-2samples
+species: Human
+paired_end: true
+fastq_dir: $SCRATCH_FASTQ_DIR
+samples_file: $SCRATCH_TEST_DIR/samples.txt
+hisat2_index: /groups/tprice/pipelines/references/hisat2_index/gencode48
+reference_gtf: /groups/tprice/pipelines/references/gencode.v48.primary_assembly.annotation.gtf
+exclude_bed_file_path: /groups/tprice/pipelines/references/filter.bed
+blacklist_bed_file_path: /groups/tprice/pipelines/references/blacklist.bed
+read1_suffix: _1
+read2_suffix: _2
+headcrop: 10
+leading: 3
+trailing: 3
+slidingwindow: "4:15"
+minlen: 36
+illuminaclip_params: "2:30:10:5:true"
+strand_st: --rf
+strand_hts: reverse
+paired_hts: pos
+fastqc_cores: 40
+run_fastqc: true
+run_rna_pipeline: true
+YAML
+elif [[ "$PIPELINE" == "bulkrnaseq" ]]; then
+    cat > "$TEST_CONFIG" <<YAML
+project_name: BulkRNASeq-Test-2samples
+species: Human
+paired_end: true
+fastq_dir: $SCRATCH_FASTQ_DIR
+samples_file: $SCRATCH_TEST_DIR/samples.txt
+star_index: /groups/tprice/pipelines/references/star_index
+reference_gtf: /groups/tprice/pipelines/references/gencode.v48.primary_assembly.annotation.gtf
+exclude_bed_file_path: /groups/tprice/pipelines/references/filter.bed
+blacklist_bed_file_path: /groups/tprice/pipelines/references/blacklist.bed
+read1_suffix: _R1_001
+read2_suffix: _R2_001
+clip5_num: 11
+clip3_num: 5
+strand_st: --rf
+strand_hts: reverse
+paired_hts: pos
+fastqc_cores: 40
+run_fastqc: true
+run_rna_pipeline: true
+YAML
+fi
+
+info "Generated test config: $TEST_CONFIG"
+
+# ── Delegate to tjp-launch ───────────────────────────────────────────────────
+info "Delegating to tjp-launch $PIPELINE --dev --config $TEST_CONFIG"
+echo ""
+"$SCRIPT_DIR/tjp-launch" "$PIPELINE" --dev --config "$TEST_CONFIG"
+
+# ── Post-launch instructions ─────────────────────────────────────────────────
+echo ""
+info "After job completes, validate outputs with:"
+echo "  tjp-test-validate $PIPELINE"

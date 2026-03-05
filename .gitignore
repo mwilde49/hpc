@@ -16,3 +16,6 @@ __pycache__/
 
 # Local data files for HPC transfer
 files_for_hpc/
+
+# Subsampled test FASTQs (generated on HPC, too large for git)
+test_data/rnaseq/fastq/
