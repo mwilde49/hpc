@@ -13,3 +13,6 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# Local data files for HPC transfer
+files_for_hpc/
