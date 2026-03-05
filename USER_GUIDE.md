@@ -1,6 +1,6 @@
 # TJP Next Generation Bulk RNA-Seq Pipelines, High Performance Computing Edition — User Guide
 
-This guide covers how to configure and run the two bulk RNA-seq pipelines available on the TJP HPC system (Juno). You do **not** need admin access, any special training, or to build anything — containers and references are already installed. All you need is this guide. 
+This guide covers how to configure and run the two bulk RNA-seq pipelines available on the TJP HPC system (Juno). You do **not** need admin access, any special training, or to build anything — containers and references are already installed. All you need is this guide. Feel free to reach out to me (Michael) with any questions.
 
 |    **Component**       |    **BulkRNASeq (UTDal)**          |    **Psoma (Psomagen)**         |
 |------------------------|------------------------------------|---------------------------------|
@@ -102,13 +102,13 @@ You should see paired files like:
 - BulkRNASeq: `SampleA_R1_001.fastq.gz`, `SampleA_R2_001.fastq.gz`
 - Psoma: `SampleA_1.fastq.gz`, `SampleA_2.fastq.gz`
 
-NOTE: If not running paired, we'll need to reconfigure some settings; find a member of the compute team
+NOTE: If not running paired, we'll need to reconfigure some settings; find a member of the compute team. Making this something you can do is on the to-do list :)
 
 ---
 
 ## 4. BulkRNASeq Pipeline (UTDal/STAR)
 
-Use this pipeline for standard Illumina-sequenced bulk RNA-seq data.
+Use this pipeline for standard Illumina-sequenced bulk RNA-seq data from the UTD Core
 
 ### Step 1: Create your samples file
 
@@ -123,7 +123,7 @@ or
 ```bash
 nono /work/$USER/pipelines/bulkrnaseq/samples.txt
 ```
-(Michael would suggest nano)
+(I would suggest nano)
 
 Example — if your files are:
 
@@ -157,8 +157,8 @@ The fields you **must** edit:
 
 ```yaml
 project_name: My-Experiment                              # give it a name
-fastq_dir: /scratch/juno/YOUR_NETID/myproject/fastq      # where your FASTQs are
-samples_file: /work/YOUR_NETID/pipelines/bulkrnaseq/samples.txt
+fastq_dir: /scratch/juno/YOUR_NETID/myproject/fastq      # the path to where your FASTQs are
+samples_file: /work/YOUR_NETID/pipelines/bulkrnaseq/samples.txt   # the path to the text file containing the list of samples being run 
 ```
 
 Fields you **may** need to change:
@@ -183,12 +183,12 @@ exclude_bed_file_path: /groups/tprice/pipelines/references/filter.bed
 blacklist_bed_file_path: /groups/tprice/pipelines/references/blacklist.bed
 ```
 
-(Alternatively, you can create this file on your own work station and then ship it in with a scp command; this is easiest, will add later)
+Alternatively, you can create these file on your own work station and then ship it in with a scp command
 
-(add command here)
-
-
-
+```bash
+scp config.yaml NETID@juno.hpcre.utdallas.edu:/work/NETID/pipelines/bulkrnaseq/config.yaml
+scp samples.txt NETID@juno.hpcre.utdallas.edu:/work/NETID/pipelines/bulkrnaseq/samples.txt
+```
 
 ### Step 3: Launch
 
@@ -224,9 +224,6 @@ Sample_19
 Sample_20
 ```
 
-(Alternatively, you can create this file on your own work station and then ship it in with a scp command; this is easiest, will add later)
-
-(add command here)
 
 
 ### Step 2: Edit your config
@@ -274,11 +271,12 @@ exclude_bed_file_path: /groups/tprice/pipelines/references/filter.bed
 blacklist_bed_file_path: /groups/tprice/pipelines/references/blacklist.bed
 ```
 
-(Alternatively, you can create this file on your own work station and then ship it in with a scp command; this is easiest, will add later)
+Alternatively, you can create these files on your own computer and then ship it in with an scp command
 
-(add command here)
-
-
+```bash
+scp config.yaml NETID@juno.hpcre.utdallas.edu:/work/NETID/pipelines/psoma/config.yaml
+scp samples.txt NETID@juno.hpcre.utdallas.edu:/work/NETID/pipelines/psoma/samples.txt
+```
 
 ### Step 3: Launch
 
@@ -326,6 +324,7 @@ tjp-launch psoma --config /path/to/my_custom_config.yaml
 ---
 
 ## 7. Monitoring Your Job
+You will want to monitor the tail of 99% of jobs to ensure they have launched properly.
 
 ### Check job status
 
@@ -358,8 +357,6 @@ scancel <JOBID>
 ## 8. Finding Your Results
 
 Pipeline outputs are written to your **scratch** directory:
-
-
 
 ```
 /scratch/juno/$USER/pipelines/<pipeline>/runs/<timestamp>/
@@ -440,4 +437,9 @@ tjp-launch psoma --config /work/$USER/pipelines/psoma/runs/2026-03-04_14-30-00/c
 
 ### Getting help
 
-Contact the pipeline administrator or open an issue at the project repository.
+You can contact me or another member of Price Lab's Compute Team for help with any of this. We're happy to troubleshoot or teach.
+
+
+Michael Wilde
+281-793-3180
+maw210003@utdalls.edu
