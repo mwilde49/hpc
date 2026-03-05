@@ -21,8 +21,9 @@ This guide covers how to configure and run the two bulk RNA-seq pipelines availa
 6. [Launching a Pipeline](#6-launching-a-pipeline)
 7. [Monitoring Your Job](#7-monitoring-your-job)
 8. [Finding Your Results](#8-finding-your-results)
-9. [Re-running and Reproducibility](#9-re-running-and-reproducibility)
-10. [Troubleshooting](#10-troubleshooting)
+9. [Smoke Testing](#9-smoke-testing)
+10. [Re-running and Reproducibility](#10-re-running-and-reproducibility)
+11. [Troubleshooting](#11-troubleshooting)
 
 ---
 
@@ -410,7 +411,35 @@ Logs and reproducibility info are in your **work** directory:
 
 ---
 
-## 9. Re-running and Reproducibility
+## 9. Smoke Testing
+
+You can quickly verify that a pipeline works end-to-end using pre-configured test data (2 samples submitted to the dev partition):
+
+```bash
+tjp-test psoma              # submit smoke test
+squeue -u $USER             # monitor job
+tjp-test-validate psoma     # validate outputs after completion
+```
+
+Supported pipelines: `psoma` and `bulkrnaseq`.
+
+`tjp-test` copies shared test FASTQs from the repo to your scratch directory, generates a test config with the correct reference paths, and delegates to `tjp-launch --dev`. After the job completes, `tjp-test-validate` checks that all expected output directories and key files (BAMs, count matrices) were produced.
+
+Use `--clean` to wipe previous test data and start fresh:
+
+```bash
+tjp-test psoma --clean
+```
+
+To validate a specific run (instead of the most recent):
+
+```bash
+tjp-test-validate psoma --run 2026-03-05_14-00-55
+```
+
+---
+
+## 10. Re-running and Reproducibility
 
 - Each launch creates a **new** timestamped run directory. Previous runs are never overwritten.
 - The `manifest.json` file records the exact git commit, container checksum, config, and paths used — so any run can be reproduced.
@@ -422,7 +451,7 @@ tjp-launch psoma --config /work/$USER/pipelines/psoma/runs/2026-03-04_14-30-00/c
 
 ---
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 |         Problem                     |                                 Solution                                                           |
 |-------------------------------------|----------------------------------------------------------------------------------------------------|

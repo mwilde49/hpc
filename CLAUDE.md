@@ -43,7 +43,7 @@ Four-layer stack where each layer has a single responsibility:
 
 Supporting layers:
 
-- **`bin/`** — user-facing CLI tools (`tjp-setup`, `tjp-launch`) and shared libraries (`bin/lib/`)
+- **`bin/`** — user-facing CLI tools (`tjp-setup`, `tjp-launch`, `tjp-test`, `tjp-test-validate`) and shared libraries (`bin/lib/`)
 - **`templates/`** — per-pipeline config templates with `__USER__`/`__SCRATCH__`/`__WORK__` placeholders, plus the Nextflow config template (`pipeline.config.tmpl`)
 
 Execution flow: `sbatch template.sh config.yaml` → SLURM allocates node → Apptainer runs container → pipeline executes → writes to scratch.
@@ -66,6 +66,18 @@ tjp-launch addone
 ```
 
 Each launch creates a timestamped run directory under `/work/$USER/pipelines/<pipeline>/runs/` containing a config snapshot, reproducibility manifest (`manifest.json`), and SLURM logs. See `ONBOARDING.md` for full details.
+
+### Smoke Testing
+
+Verify a pipeline works end-to-end with 2 pre-configured test samples on the dev partition:
+
+```bash
+tjp-test psoma              # copies test FASTQs to scratch, generates config, submits to dev
+squeue -u $USER             # monitor
+tjp-test-validate psoma     # check outputs after completion
+```
+
+Supports `psoma` and `bulkrnaseq`. Test FASTQs live at `$REPO_ROOT/test_data/rnaseq/fastq/` (gitignored, generated on HPC). Use `--clean` to wipe previous test data.
 
 ## HPC Path Conventions (Juno-Specific)
 
