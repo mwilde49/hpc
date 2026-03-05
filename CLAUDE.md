@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HPC pipeline framework for the TJP group on Juno HPC, deployed to the shared group location `/groups/tprice/pipelines`. Uses Apptainer containers + SLURM scheduling + config-driven YAML execution. Has two pipelines: AddOne (inline demo) and BulkRNASeq (submoduled container + external Nextflow pipeline). Designed to scale horizontally by adding new pipeline directories or container submodules.
+HPC pipeline framework for the TJP group on Juno HPC, deployed to the shared group location `/groups/tprice/pipelines`. Uses Apptainer containers + SLURM scheduling + config-driven YAML execution. Has three pipelines: AddOne (inline demo), BulkRNASeq (submoduled container + external Nextflow pipeline), and Psoma (submoduled combined container+pipeline repo). Designed to scale horizontally by adding new pipeline directories or container submodules.
 
 ## Build and Run Commands
 
@@ -109,6 +109,37 @@ sbatch slurm_templates/bulkrnaseq_slurm_template.sh
 ```
 
 See `BULKRNASEQ_HPC_GUIDE.md` for full setup and usage details.
+
+## Psoma Pipeline
+
+### Submodule
+
+Container repo `mwilde49/psoma` is a git submodule at `containers/psoma/`, pinned to `v1.0.0`. Unlike bulkrnaseq, psoma is a combined repo — both the pipeline scripts and container definition live in the submodule (no separate clone needed).
+
+### Key differences from BulkRNASeq
+- Uses **HISAT2** aligner instead of STAR
+- Adds **Trimmomatic** adapter/quality trimming (Nextera adapters)
+- `config_directory` points to `$PROJECT_ROOT/containers/psoma` (the submodule itself)
+- Psomagen naming convention: `sample_1.fastq.gz` / `sample_2.fastq.gz`
+- HISAT2 index is a **prefix path** (e.g., `/path/to/gencode48`, not a directory)
+- SLURM template uses `--env HOME=/tmp` so Nextflow can write to `~/.nextflow`
+
+### Build container (local, requires sudo)
+```bash
+cd containers/psoma/container && sudo ./build.sh
+```
+
+### Submit on HPC
+```bash
+cd /groups/tprice/pipelines
+mkdir -p logs
+sbatch slurm_templates/psoma_slurm_template.sh
+```
+
+### References
+- Shared Gencode v48 GTF, filter.bed, blacklist.bed from `/groups/tprice/pipelines/references/`
+- HISAT2 index at `/groups/tprice/pipelines/references/hisat2_index/`
+- NexteraPE-PE.fa adapter file lives in the psoma submodule (auto-referenced)
 
 ## Adding a New Pipeline
 

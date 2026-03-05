@@ -16,16 +16,18 @@ USER_PIPELINES="$WORK_ROOT/pipelines"
 declare -A PIPELINE_CONTAINERS=(
     [addone]="containers/addone_latest.sif"
     [bulkrnaseq]="containers/bulkrnaseq/bulkrnaseq_v1.0.0.sif"
+    [psoma]="containers/psoma/psomagen_v1.0.0.sif"
 )
 
 # Maps pipeline name → SLURM template path (relative to REPO_ROOT)
 declare -A PIPELINE_TEMPLATES=(
     [addone]="slurm_templates/addone_slurm_template.sh"
     [bulkrnaseq]="slurm_templates/bulkrnaseq_slurm_template.sh"
+    [psoma]="slurm_templates/psoma_slurm_template.sh"
 )
 
 # Ordered list of known pipelines (bash 3 compat for iteration)
-KNOWN_PIPELINES=(addone bulkrnaseq)
+KNOWN_PIPELINES=(addone bulkrnaseq psoma)
 
 # ── Color output ─────────────────────────────────────────────────────────────
 if [[ -t 1 ]]; then

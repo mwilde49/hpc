@@ -107,6 +107,91 @@ _generate_nextflow_config() {
     info "Generated: $output"
 }
 
+# _generate_psoma_config <yaml_config> <output_path>
+# Converts simplified user YAML into Nextflow pipeline.config using sed template.
+_generate_psoma_config() {
+    local yaml_config="$1"
+    local output="$2"
+    local template="$REPO_ROOT/templates/psoma/pipeline.config.tmpl"
+
+    if [[ ! -f "$template" ]]; then
+        die "Psoma Nextflow config template not found: $template"
+    fi
+
+    # Read values from YAML
+    local project_name species paired_end fastq_dir samples_file
+    local hisat2_index reference_gtf read1_suffix read2_suffix
+    local run_fastqc run_rna_pipeline
+    local headcrop leading trailing slidingwindow minlen illuminaclip_params
+    local strand_st strand_hts paired_hts fastqc_cores
+
+    project_name=$(yaml_get "$yaml_config" "project_name")
+    species=$(yaml_get "$yaml_config" "species")
+    paired_end=$(yaml_get "$yaml_config" "paired_end")
+    fastq_dir=$(yaml_get "$yaml_config" "fastq_dir")
+    samples_file=$(yaml_get "$yaml_config" "samples_file")
+    hisat2_index=$(yaml_get "$yaml_config" "hisat2_index")
+    reference_gtf=$(yaml_get "$yaml_config" "reference_gtf")
+    read1_suffix=$(yaml_get "$yaml_config" "read1_suffix" 2>/dev/null || echo "_1")
+    read2_suffix=$(yaml_get "$yaml_config" "read2_suffix" 2>/dev/null || echo "_2")
+    headcrop=$(yaml_get "$yaml_config" "headcrop" 2>/dev/null || echo "10")
+    leading=$(yaml_get "$yaml_config" "leading" 2>/dev/null || echo "3")
+    trailing=$(yaml_get "$yaml_config" "trailing" 2>/dev/null || echo "3")
+    slidingwindow=$(yaml_get "$yaml_config" "slidingwindow" 2>/dev/null || echo "4:15")
+    minlen=$(yaml_get "$yaml_config" "minlen" 2>/dev/null || echo "36")
+    illuminaclip_params=$(yaml_get "$yaml_config" "illuminaclip_params" 2>/dev/null || echo "2:30:10:5:true")
+    strand_st=$(yaml_get "$yaml_config" "strand_st" 2>/dev/null || echo "--rf")
+    strand_hts=$(yaml_get "$yaml_config" "strand_hts" 2>/dev/null || echo "reverse")
+    paired_hts=$(yaml_get "$yaml_config" "paired_hts" 2>/dev/null || echo "pos")
+    fastqc_cores=$(yaml_get "$yaml_config" "fastqc_cores" 2>/dev/null || echo "20")
+    run_fastqc=$(yaml_get "$yaml_config" "run_fastqc")
+    run_rna_pipeline=$(yaml_get "$yaml_config" "run_rna_pipeline")
+
+    # BED file paths (empty string if not set)
+    local exclude_bed="" blacklist_bed=""
+    if yaml_has "$yaml_config" "exclude_bed_file_path"; then
+        exclude_bed=$(yaml_get "$yaml_config" "exclude_bed_file_path") || true
+    fi
+    if yaml_has "$yaml_config" "blacklist_bed_file_path"; then
+        blacklist_bed=$(yaml_get "$yaml_config" "blacklist_bed_file_path") || true
+    fi
+
+    # config_directory and illumina_clip_file are auto-set (not user-editable)
+    local config_directory="$REPO_ROOT/containers/psoma"
+    local illumina_clip_file="$REPO_ROOT/containers/psoma/NexteraPE-PE.fa"
+
+    # Perform sed substitution on template
+    sed \
+        -e "s|@@PROJECT_NAME@@|${project_name}|g" \
+        -e "s|@@SPECIES@@|${species}|g" \
+        -e "s|@@PAIRED_END@@|${paired_end}|g" \
+        -e "s|@@CONFIG_DIRECTORY@@|${config_directory}|g" \
+        -e "s|@@FASTQ_DIR@@|${fastq_dir}|g" \
+        -e "s|@@SAMPLES_FILE@@|${samples_file}|g" \
+        -e "s|@@HISAT2_INDEX@@|${hisat2_index}|g" \
+        -e "s|@@REFERENCE_GTF@@|${reference_gtf}|g" \
+        -e "s|@@READ1_SUFFIX@@|${read1_suffix}|g" \
+        -e "s|@@READ2_SUFFIX@@|${read2_suffix}|g" \
+        -e "s|@@ILLUMINA_CLIP_FILE@@|${illumina_clip_file}|g" \
+        -e "s|@@HEADCROP@@|${headcrop}|g" \
+        -e "s|@@LEADING@@|${leading}|g" \
+        -e "s|@@TRAILING@@|${trailing}|g" \
+        -e "s|@@SLIDINGWINDOW@@|${slidingwindow}|g" \
+        -e "s|@@MINLEN@@|${minlen}|g" \
+        -e "s|@@ILLUMINACLIP_PARAMS@@|${illuminaclip_params}|g" \
+        -e "s|@@EXCLUDE_BED@@|${exclude_bed}|g" \
+        -e "s|@@BLACKLIST_BED@@|${blacklist_bed}|g" \
+        -e "s|@@STRAND_ST@@|${strand_st}|g" \
+        -e "s|@@STRAND_HTS@@|${strand_hts}|g" \
+        -e "s|@@PAIRED_HTS@@|${paired_hts}|g" \
+        -e "s|@@FASTQC_CORES@@|${fastqc_cores}|g" \
+        -e "s|@@RUN_FASTQC@@|${run_fastqc}|g" \
+        -e "s|@@RUN_RNA_PIPELINE@@|${run_rna_pipeline}|g" \
+        "$template" > "$output"
+
+    info "Generated: $output"
+}
+
 # ── Argument parsing ─────────────────────────────────────────────────────────
 PIPELINE=""
 CONFIG_PATH=""
@@ -193,6 +278,12 @@ case "$PIPELINE" in
         # BulkRNASeq: generate Nextflow pipeline.config from simplified YAML
         info "Generating Nextflow pipeline.config..."
         _generate_nextflow_config "$RUN_DIR/config.yaml" "$RUN_DIR/pipeline.config"
+        SBATCH_CONFIG_ARG="$RUN_DIR/pipeline.config"
+        ;;
+    psoma)
+        # Psoma: generate Nextflow pipeline.config from simplified YAML
+        info "Generating Nextflow pipeline.config..."
+        _generate_psoma_config "$RUN_DIR/config.yaml" "$RUN_DIR/pipeline.config"
         SBATCH_CONFIG_ARG="$RUN_DIR/pipeline.config"
         ;;
 esac

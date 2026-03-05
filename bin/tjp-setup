@@ -103,6 +103,24 @@ else
     info "Created: $bulkrnaseq_samples"
 fi
 
+# Psoma config
+psoma_config="$USER_PIPELINES/psoma/config.yaml"
+if [[ -f "$psoma_config" ]]; then
+    warn "Config already exists, skipping: $psoma_config"
+else
+    _substitute_placeholders "$REPO_ROOT/templates/psoma/config.yaml" > "$psoma_config"
+    info "Created: $psoma_config"
+fi
+
+# Psoma samples example
+psoma_samples="$USER_PIPELINES/psoma/samples.txt"
+if [[ -f "$psoma_samples" ]]; then
+    warn "Samples file already exists, skipping: $psoma_samples"
+else
+    cp "$REPO_ROOT/templates/psoma/samples_example.txt" "$psoma_samples"
+    info "Created: $psoma_samples"
+fi
+
 # ── Print next steps ────────────────────────────────────────────────────────
 header "Setup complete"
 
@@ -118,12 +136,14 @@ Next steps:
   2. Edit a pipeline config:
 
      vi $USER_PIPELINES/addone/config.yaml      # simple demo
-     vi $USER_PIPELINES/bulkrnaseq/config.yaml   # RNA-seq analysis
+     vi $USER_PIPELINES/bulkrnaseq/config.yaml   # RNA-seq (STAR aligner)
+     vi $USER_PIPELINES/psoma/config.yaml        # RNA-seq (HISAT2/Trimmomatic)
 
   3. Launch a pipeline:
 
      tjp-launch addone
      tjp-launch bulkrnaseq
+     tjp-launch psoma
 
 See ONBOARDING.md for detailed documentation.
 EOF

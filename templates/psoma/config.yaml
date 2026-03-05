@@ -1,0 +1,41 @@
+# Psoma (Psomagen) Bulk RNA-Seq Pipeline Configuration
+# Edit the paths below, then launch with: tjp-launch psoma
+# See ONBOARDING.md for detailed field descriptions.
+
+project_name: My-Psomagen-Experiment
+species: Human              # Human, Mouse, or Rattus
+paired_end: true
+
+# Data paths (edit these for your project)
+fastq_dir: __SCRATCH__/myproject/fastq
+samples_file: __WORK__/pipelines/psoma/samples.txt
+
+# Shared reference files (pre-installed, most users won't need to change these)
+hisat2_index: /groups/tprice/pipelines/references/hisat2_index/gencode48
+reference_gtf: /groups/tprice/pipelines/references/gencode.v48.primary_assembly.annotation.gtf
+exclude_bed_file_path: /groups/tprice/pipelines/references/filter.bed
+blacklist_bed_file_path: /groups/tprice/pipelines/references/blacklist.bed
+
+# Read suffixes (Psomagen naming: sample_1.fastq.gz / sample_2.fastq.gz)
+read1_suffix: _1
+read2_suffix: _2
+
+# Trimmomatic parameters
+headcrop: 10
+leading: 3
+trailing: 3
+slidingwindow: "4:15"
+minlen: 36
+illuminaclip_params: "2:30:10:5:true"
+
+# Strandedness settings
+strand_st: --rf              # StringTie: --rf (reverse) or --fr (forward) or empty for unstranded
+strand_hts: reverse          # HTSeq: yes, no, or reverse
+paired_hts: pos              # HTSeq sort order: pos or name
+
+# FastQC cores (match your SLURM --cpus-per-task)
+fastqc_cores: 20
+
+# Pipeline steps
+run_fastqc: true
+run_rna_pipeline: true

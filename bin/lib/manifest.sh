@@ -48,6 +48,10 @@ generate_manifest() {
             input_paths=$(yaml_get "$config" "fastq_dir" 2>/dev/null || echo "")
             output_paths="$SCRATCH_ROOT/nextflow_work"
             ;;
+        psoma)
+            input_paths=$(yaml_get "$config" "fastq_dir" 2>/dev/null || echo "")
+            output_paths="$REPO_ROOT/containers/psoma"
+            ;;
     esac
 
     cat > "$run_dir/manifest.json" <<MANIFEST_EOF

@@ -1,0 +1,15 @@
+# Sample names — one per line, without read suffix or .fastq.gz extension.
+#
+# Psomagen naming convention: files are named with _1 / _2 suffixes.
+# Example: if your FASTQ files are:
+#   SampleA_1.fastq.gz
+#   SampleA_2.fastq.gz
+#   SampleB_1.fastq.gz
+#   SampleB_2.fastq.gz
+#
+# Then list:
+#   SampleA
+#   SampleB
+#
+# Remove these comment lines and add your sample names below:
+sample1

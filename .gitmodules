@@ -1,3 +1,6 @@
 [submodule "containers/bulkrnaseq"]
 	path = containers/bulkrnaseq
 	url = https://github.com/mwilde49/bulkseq
+[submodule "containers/psoma"]
+	path = containers/psoma
+	url = https://github.com/mwilde49/psoma.git
