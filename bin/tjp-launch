@@ -22,12 +22,13 @@ source "$SCRIPT_DIR/lib/manifest.sh"
 
 usage() {
     cat <<EOF
-Usage: tjp-launch <pipeline> [--config <path>]
+Usage: tjp-launch <pipeline> [--config <path>] [--dev]
 
 Pipelines: ${KNOWN_PIPELINES[*]}
 
 Options:
   --config <path>   Path to config YAML (default: $USER_PIPELINES/<pipeline>/config.yaml)
+  --dev             Submit to dev partition (2-hour limit, for quick testing)
   --help            Show this help message
 EOF
     exit "${1:-0}"
@@ -65,7 +66,7 @@ _generate_nextflow_config() {
     strand_st=$(yaml_get "$yaml_config" "strand_st" 2>/dev/null || echo "--rf")
     strand_hts=$(yaml_get "$yaml_config" "strand_hts" 2>/dev/null || echo "reverse")
     paired_hts=$(yaml_get "$yaml_config" "paired_hts" 2>/dev/null || echo "pos")
-    fastqc_cores=$(yaml_get "$yaml_config" "fastqc_cores" 2>/dev/null || echo "20")
+    fastqc_cores=$(yaml_get "$yaml_config" "fastqc_cores" 2>/dev/null || echo "40")
     run_fastqc=$(yaml_get "$yaml_config" "run_fastqc")
     run_rna_pipeline=$(yaml_get "$yaml_config" "run_rna_pipeline")
 
@@ -145,7 +146,7 @@ _generate_psoma_config() {
     strand_st=$(yaml_get "$yaml_config" "strand_st" 2>/dev/null || echo "--rf")
     strand_hts=$(yaml_get "$yaml_config" "strand_hts" 2>/dev/null || echo "reverse")
     paired_hts=$(yaml_get "$yaml_config" "paired_hts" 2>/dev/null || echo "pos")
-    fastqc_cores=$(yaml_get "$yaml_config" "fastqc_cores" 2>/dev/null || echo "20")
+    fastqc_cores=$(yaml_get "$yaml_config" "fastqc_cores" 2>/dev/null || echo "40")
     run_fastqc=$(yaml_get "$yaml_config" "run_fastqc")
     run_rna_pipeline=$(yaml_get "$yaml_config" "run_rna_pipeline")
 
@@ -199,6 +200,7 @@ _generate_psoma_config() {
 # ── Argument parsing ─────────────────────────────────────────────────────────
 PIPELINE=""
 CONFIG_PATH=""
+DEV_MODE=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -206,6 +208,10 @@ while [[ $# -gt 0 ]]; do
             [[ $# -lt 2 ]] && die "--config requires a path argument"
             CONFIG_PATH="$2"
             shift 2
+            ;;
+        --dev)
+            DEV_MODE=true
+            shift
             ;;
         --help|-h)
             usage 0
@@ -314,10 +320,17 @@ esac
 generate_manifest "$RUN_DIR" "$PIPELINE" "$RUN_DIR/config.yaml" "$CONTAINER" "$SLURM_TEMPLATE"
 
 # ── Submit SLURM job ─────────────────────────────────────────────────────────
+SBATCH_DEV_FLAGS=()
+if [[ "$DEV_MODE" == true ]]; then
+    SBATCH_DEV_FLAGS=(--partition=dev --time=02:00:00)
+    info "Dev mode: submitting to dev partition (2-hour limit)"
+fi
+
 info "Submitting job..."
 SBATCH_OUTPUT=$(sbatch \
     --output="$RUN_DIR/slurm_%j.out" \
     --error="$RUN_DIR/slurm_%j.err" \
+    "${SBATCH_DEV_FLAGS[@]}" \
     "$SLURM_TEMPLATE" \
     "$SBATCH_CONFIG_ARG" \
     2>&1)

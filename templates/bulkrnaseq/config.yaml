@@ -30,7 +30,7 @@ strand_hts: reverse          # HTSeq: yes, no, or reverse
 paired_hts: pos              # HTSeq sort order: pos or name
 
 # FastQC cores (match your SLURM --cpus-per-task)
-fastqc_cores: 20
+fastqc_cores: 40
 
 # Pipeline steps
 run_fastqc: true

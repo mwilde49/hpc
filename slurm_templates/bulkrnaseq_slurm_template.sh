@@ -3,8 +3,8 @@
 #SBATCH --output=logs/bulkrnaseq_%j.out
 #SBATCH --error=logs/bulkrnaseq_%j.err
 #SBATCH --time=12:00:00
-#SBATCH --cpus-per-task=20
-#SBATCH --mem=64G
+#SBATCH --cpus-per-task=40
+#SBATCH --mem=128G
 
 # Load module if required by your HPC
 module load apptainer
