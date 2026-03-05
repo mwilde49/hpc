@@ -51,6 +51,7 @@ apptainer exec \
     --cleanenv \
     --env PYTHONNOUSERSITE=1 \
     --env HOME=/tmp \
+    --env _JAVA_OPTIONS=-Xmx16g \
     --bind $PROJECT_ROOT:$PROJECT_ROOT \
     --bind $SCRATCH_ROOT:$SCRATCH_ROOT \
     --bind $WORK_ROOT:$WORK_ROOT \
