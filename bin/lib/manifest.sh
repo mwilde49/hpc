@@ -38,6 +38,9 @@ generate_manifest() {
     checksum=$(compute_sif_checksum "$container")
 
     # Extract input/output paths from config based on pipeline type
+    # Extract timestamp from run_dir (last path component)
+    local run_ts
+    run_ts=$(basename "$run_dir")
     local input_paths="" output_paths=""
     case "$pipeline" in
         addone)
@@ -46,11 +49,11 @@ generate_manifest() {
             ;;
         bulkrnaseq)
             input_paths=$(yaml_get "$config" "fastq_dir" 2>/dev/null || echo "")
-            output_paths="$SCRATCH_ROOT/nextflow_work"
+            output_paths="$SCRATCH_ROOT/pipelines/bulkrnaseq/runs/$run_ts"
             ;;
         psoma)
             input_paths=$(yaml_get "$config" "fastq_dir" 2>/dev/null || echo "")
-            output_paths="$REPO_ROOT/containers/psoma"
+            output_paths="$SCRATCH_ROOT/pipelines/psoma/runs/$run_ts"
             ;;
     esac
 

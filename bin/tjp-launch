@@ -33,11 +33,12 @@ EOF
     exit "${1:-0}"
 }
 
-# _generate_nextflow_config <yaml_config> <output_path>
+# _generate_nextflow_config <yaml_config> <output_path> <scratch_output_dir>
 # Converts simplified user YAML into Nextflow pipeline.config using sed template.
 _generate_nextflow_config() {
     local yaml_config="$1"
     local output="$2"
+    local scratch_output_dir="$3"
     local template="$REPO_ROOT/templates/bulkrnaseq/pipeline.config.tmpl"
 
     if [[ ! -f "$template" ]]; then
@@ -77,8 +78,8 @@ _generate_nextflow_config() {
         blacklist_bed=$(yaml_get "$yaml_config" "blacklist_bed_file_path") || true
     fi
 
-    # config_directory is always the UTDal repo path
-    local config_directory="$REPO_ROOT/Bulk-RNA-Seq-Nextflow-Pipeline"
+    # config_directory points to scratch output dir (UTDal scripts symlinked there)
+    local config_directory="$scratch_output_dir"
 
     # Perform sed substitution on template
     sed \
@@ -107,11 +108,12 @@ _generate_nextflow_config() {
     info "Generated: $output"
 }
 
-# _generate_psoma_config <yaml_config> <output_path>
+# _generate_psoma_config <yaml_config> <output_path> <scratch_output_dir>
 # Converts simplified user YAML into Nextflow pipeline.config using sed template.
 _generate_psoma_config() {
     local yaml_config="$1"
     local output="$2"
+    local scratch_output_dir="$3"
     local template="$REPO_ROOT/templates/psoma/pipeline.config.tmpl"
 
     if [[ ! -f "$template" ]]; then
@@ -159,6 +161,7 @@ _generate_psoma_config() {
     # config_directory and illumina_clip_file are auto-set (not user-editable)
     local config_directory="$REPO_ROOT/containers/psoma"
     local illumina_clip_file="$REPO_ROOT/containers/psoma/NexteraPE-PE.fa"
+    local output_directory="$scratch_output_dir"
 
     # Perform sed substitution on template
     sed \
@@ -166,6 +169,7 @@ _generate_psoma_config() {
         -e "s|@@SPECIES@@|${species}|g" \
         -e "s|@@PAIRED_END@@|${paired_end}|g" \
         -e "s|@@CONFIG_DIRECTORY@@|${config_directory}|g" \
+        -e "s|@@OUTPUT_DIRECTORY@@|${output_directory}|g" \
         -e "s|@@FASTQ_DIR@@|${fastq_dir}|g" \
         -e "s|@@SAMPLES_FILE@@|${samples_file}|g" \
         -e "s|@@HISAT2_INDEX@@|${hisat2_index}|g" \
@@ -268,6 +272,7 @@ cp "$CONFIG_PATH" "$RUN_DIR/config.yaml"
 
 # ── Pipeline-specific dispatch ───────────────────────────────────────────────
 SBATCH_CONFIG_ARG=""
+SCRATCH_OUTPUT_DIR=""
 
 case "$PIPELINE" in
     addone)
@@ -275,15 +280,32 @@ case "$PIPELINE" in
         SBATCH_CONFIG_ARG="$RUN_DIR/config.yaml"
         ;;
     bulkrnaseq)
-        # BulkRNASeq: generate Nextflow pipeline.config from simplified YAML
+        # BulkRNASeq: create scratch output dir, symlink UTDal repo files into it
+        SCRATCH_OUTPUT_DIR="$SCRATCH_ROOT/pipelines/$PIPELINE/runs/$TS"
+        mkdir -p "$SCRATCH_OUTPUT_DIR"
+        info "Scratch output dir: $SCRATCH_OUTPUT_DIR"
+
+        # Symlink UTDal pipeline files so Nextflow finds scripts via config_directory
+        utdal_repo="$REPO_ROOT/Bulk-RNA-Seq-Nextflow-Pipeline"
+        for f in "$utdal_repo"/*; do
+            [[ -e "$f" ]] && ln -sf "$f" "$SCRATCH_OUTPUT_DIR/"
+        done
+        info "Symlinked UTDal pipeline files into scratch output dir"
+
+        # Generate Nextflow pipeline.config with config_directory pointing to scratch
         info "Generating Nextflow pipeline.config..."
-        _generate_nextflow_config "$RUN_DIR/config.yaml" "$RUN_DIR/pipeline.config"
+        _generate_nextflow_config "$RUN_DIR/config.yaml" "$RUN_DIR/pipeline.config" "$SCRATCH_OUTPUT_DIR"
         SBATCH_CONFIG_ARG="$RUN_DIR/pipeline.config"
         ;;
     psoma)
-        # Psoma: generate Nextflow pipeline.config from simplified YAML
+        # Psoma: create scratch output dir for pipeline outputs
+        SCRATCH_OUTPUT_DIR="$SCRATCH_ROOT/pipelines/$PIPELINE/runs/$TS"
+        mkdir -p "$SCRATCH_OUTPUT_DIR"
+        info "Scratch output dir: $SCRATCH_OUTPUT_DIR"
+
+        # Generate Nextflow pipeline.config with output_directory pointing to scratch
         info "Generating Nextflow pipeline.config..."
-        _generate_psoma_config "$RUN_DIR/config.yaml" "$RUN_DIR/pipeline.config"
+        _generate_psoma_config "$RUN_DIR/config.yaml" "$RUN_DIR/pipeline.config" "$SCRATCH_OUTPUT_DIR"
         SBATCH_CONFIG_ARG="$RUN_DIR/pipeline.config"
         ;;
 esac
@@ -314,6 +336,16 @@ update_manifest_job_id "$RUN_DIR" "$JOB_ID"
 # ── Print summary ────────────────────────────────────────────────────────────
 header "Job submitted"
 
+if [[ -n "$SCRATCH_OUTPUT_DIR" ]]; then
+cat <<EOF
+  Pipeline:   $PIPELINE
+  Job ID:     $JOB_ID
+  Run dir:    $RUN_DIR/
+  Output dir: $SCRATCH_OUTPUT_DIR/
+  Monitor:    tail -f $RUN_DIR/slurm_${JOB_ID}.out
+  Cancel:     scancel $JOB_ID
+EOF
+else
 cat <<EOF
   Pipeline:   $PIPELINE
   Job ID:     $JOB_ID
@@ -321,3 +353,4 @@ cat <<EOF
   Monitor:    tail -f $RUN_DIR/slurm_${JOB_ID}.out
   Cancel:     scancel $JOB_ID
 EOF
+fi
