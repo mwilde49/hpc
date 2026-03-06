@@ -247,7 +247,7 @@ if [[ ! -f "$CONFIG_PATH" ]]; then
   Run 'tjp-setup' first, or specify a config with --config <path>"
 fi
 
-header "Launching $PIPELINE pipeline"
+hyperion_banner "LAUNCH"
 
 # ── Validate config ──────────────────────────────────────────────────────────
 info "Validating config: $CONFIG_PATH"
@@ -356,7 +356,7 @@ fi
 update_manifest_job_id "$RUN_DIR" "$JOB_ID"
 
 # ── Print summary ────────────────────────────────────────────────────────────
-header "Job submitted"
+hyperion_milestone "Warp Drive Engaged — $PIPELINE job $JOB_ID submitted"
 
 if [[ -n "$SCRATCH_OUTPUT_DIR" ]]; then
 cat <<EOF

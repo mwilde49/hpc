@@ -78,7 +78,7 @@ SCRATCH_FASTQ_DIR="$SCRATCH_TEST_DIR/fastq"
 SRC_FASTQ_DIR="$TEST_DATA_SRC/fastq"
 SRC_SAMPLES="$TEST_DATA_SRC/$PIPELINE/samples.txt"
 
-header "Smoke test: $PIPELINE"
+hyperion_banner "SMOKE TEST"
 
 # ── Pre-flight checks ────────────────────────────────────────────────────────
 if [[ ! -d "$SRC_FASTQ_DIR" ]]; then

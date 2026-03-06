@@ -50,6 +50,10 @@ fi
 
 # --- Run pipeline ---
 
+echo "====================================================================="
+echo "  HYPERION BIOCRUISER — Psoma Pipeline Executing"
+echo "====================================================================="
+
 mkdir -p logs
 
 apptainer exec \
@@ -74,7 +78,7 @@ fi
 # --- Stage-out: archive results from scratch to work ---
 
 if [ -n "$RUN_DIR" ] && [ -n "$SCRATCH_OUTPUT_DIR" ]; then
-    echo "=== Archiving results to work ==="
+    echo "[HYPERION] Data Relays Synchronizing — Archiving results to work"
 
     echo "Copying outputs: $SCRATCH_OUTPUT_DIR/ -> $RUN_DIR/outputs/"
     mkdir -p "$RUN_DIR/outputs"
@@ -96,9 +100,9 @@ if [ -n "$RUN_DIR" ] && [ -n "$SCRATCH_OUTPUT_DIR" ]; then
     fi
 
     if [ $VERIFY_FAIL -eq 0 ]; then
-        echo "Archive verification PASSED."
+        echo "[HYPERION] Data Relays Synchronized — Archive verification PASSED"
     else
-        echo "WARNING: Archive verification detected differences."
+        echo "[HYPERION] WARNING: Archive verification detected differences."
         [ -n "${OUTPUT_DIFF:-}" ] && echo "$OUTPUT_DIFF"
         [ -n "${INPUT_DIFF:-}" ] && echo "$INPUT_DIFF"
     fi

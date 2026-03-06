@@ -80,7 +80,8 @@ else
     RUN_TS=$(basename "$RUN_DIR")
 fi
 
-header "Validating $PIPELINE run: $RUN_TS"
+hyperion_banner "VALIDATION"
+info "Run: $RUN_TS"
 info "Output dir: $RUN_DIR"
 echo ""
 
@@ -163,9 +164,10 @@ done
 echo ""
 TOTAL=$((PASS + FAIL))
 if [[ $FAIL -eq 0 ]]; then
-    printf "${_GREEN}${_BOLD}All %d checks passed.${_RESET}\n" "$TOTAL"
+    hyperion_milestone "Mission Complete — All $TOTAL checks passed"
+    hyperion_sign_off
     exit 0
 else
-    printf "${_RED}${_BOLD}%d/%d checks failed.${_RESET}\n" "$FAIL" "$TOTAL"
+    hyperion_milestone "Mission Incomplete — $FAIL/$TOTAL checks failed"
     exit 1
 fi

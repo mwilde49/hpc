@@ -87,3 +87,6 @@ get_slurm_template() {
     local name="$1"
     printf '%s' "$REPO_ROOT/${PIPELINE_TEMPLATES[$name]}"
 }
+
+# ── Branding ────────────────────────────────────────────────────────────────
+source "$(dirname "${BASH_SOURCE[0]}")/branding.sh"
