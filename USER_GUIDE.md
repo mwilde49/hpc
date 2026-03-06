@@ -1,6 +1,10 @@
-# TJP Next Generation Bulk RNA-Seq Pipelines, High Performance Computing Edition — User Guide
+# Hyperion Compute — User Guide
+
+### TJP Next Generation Bulk RNA-Seq Pipelines, High Performance Computing Edition
 
 This guide covers how to configure and run the two bulk RNA-seq pipelines available on the TJP HPC system (Juno). You do **not** need admin access, any special training, or to build anything — containers and references are already installed. All you need is this guide. Feel free to reach out to me (Michael) with any questions.
+
+> **Note:** The CLI tools are available as `tjp-*`, `hyperion-*`, or `biocruiser-*` — they're all identical. Use whichever you prefer. This guide uses `tjp-*` throughout, but you can substitute freely (e.g., `hyperion-launch psoma` instead of `tjp-launch psoma`).
 
 |    **Component**       |    **BulkRNASeq (UTDal)**          |    **Psoma (Psomagen)**         |
 |------------------------|------------------------------------|---------------------------------|
@@ -296,24 +300,34 @@ tjp-launch bulkrnaseq    # UTDal/STAR pipeline
 tjp-launch psoma          # Psomagen/HISAT2 pipeline
 ```
 
-You'll see output like:
+You'll see the Hyperion banner followed by timestamped output:
 
 ```
-=== Launching psoma pipeline ===
+============================================================
+            H Y P E R I O N   C O M P U T E
+------------------------------------------------------------
+  Distributed Bioinformatics Execution Framework
+  SLURM Orchestration • Pipeline Automation • HPC Scale
+============================================================
 
-[INFO]  Validating config: /work/jsmith/pipelines/psoma/config.yaml
-[INFO]  Config validation passed.
-[INFO]  Run directory: /work/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00
-[INFO]  Scratch output dir: /scratch/juno/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00
+  Mode: LAUNCH
 
-=== Job submitted ===
+Initializing Hyperion Pipeline Engine...
+Cluster nodes detected: 86
+SLURM scheduler online.
 
+[14:30:00] [INFO]  Validating config: /work/jsmith/pipelines/psoma/config.yaml
+[14:30:00] [INFO]  Config validation passed.
+[14:30:00] [INFO]  Run directory: /work/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00
+[14:30:00] [INFO]  Scratch output dir: /scratch/juno/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00
+
+[HYPERION] Warp Drive Engaged — psoma job 151456 submitted
   Pipeline:   psoma
   Job ID:     151456
   Run dir:    /work/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00/
   Output dir: /scratch/juno/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00/
-  Archive:    Results will be copied to /work/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00/{inputs,outputs}/ after completion
-  Monitor:    tail -f /work/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00/slurm_151456.out
+  Archive:    Results will be copied to .../{inputs,outputs}/ after completion
+  Monitor:    tail -f .../slurm_151456.out
   Cancel:     scancel 151456
 ```
 

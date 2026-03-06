@@ -1,6 +1,8 @@
-# TJP Pipeline Onboarding Guide
+# Hyperion Compute — Onboarding Guide
 
 Quick start for running pipelines on Juno HPC.
+
+> **Note:** The CLI tools are available as `tjp-*`, `hyperion-*`, or `biocruiser-*` — they're all identical. Use whichever you prefer.
 
 ---
 
@@ -120,21 +122,28 @@ tjp-launch psoma --dev
 Output:
 
 ```
-=== Launching psoma pipeline ===
+============================================================
+            H Y P E R I O N   C O M P U T E
+------------------------------------------------------------
+  Distributed Bioinformatics Execution Framework
+  SLURM Orchestration • Pipeline Automation • HPC Scale
+============================================================
 
-[INFO]  Validating config: /work/jsmith/pipelines/psoma/config.yaml
-[INFO]  Config validation passed.
-[INFO]  Run directory: /work/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00
-[INFO]  Scratch output dir: /scratch/juno/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00
+  Mode: LAUNCH
 
-=== Job submitted ===
+Initializing Hyperion Pipeline Engine...
+Cluster nodes detected: 86
+SLURM scheduler online.
 
+[14:30:00] [INFO]  Validating config: /work/jsmith/pipelines/psoma/config.yaml
+[14:30:00] [INFO]  Config validation passed.
+[14:30:00] [INFO]  Run directory: /work/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00
+
+[HYPERION] Warp Drive Engaged — psoma job 151456 submitted
   Pipeline:   psoma
   Job ID:     151456
   Run dir:    /work/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00/
-  Output dir: /scratch/juno/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00/
-  Archive:    Results will be copied to /work/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00/{inputs,outputs}/ after completion
-  Monitor:    tail -f /work/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00/slurm_151456.out
+  Monitor:    tail -f .../slurm_151456.out
   Cancel:     scancel 151456
 ```
 
