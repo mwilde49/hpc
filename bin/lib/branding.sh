@@ -1,67 +1,34 @@
 #!/usr/bin/env bash
-# branding.sh — Hyperion Biocruiser themed output for TJP pipeline tools
+# branding.sh — Hyperion Compute themed output for TJP pipeline tools
 # Sourced by common.sh; never executed directly.
 
 # hyperion_banner [mode_label]
-# Prints the full ASCII banner with system status readout.
-# Only prints when stdout is a terminal. Optional $1 is a mode label
-# (e.g., "LAUNCH", "SETUP", "SMOKE TEST", "VALIDATION").
+# Prints the Hyperion Compute banner with dynamic system status.
+# Optional $1 is a mode label (e.g., "LAUNCH", "SETUP").
 hyperion_banner() {
     local mode="${1:-}"
-    local mode_line=""
+    local nodes
+    nodes=$(sinfo -h -o '%D' 2>/dev/null | awk '{s+=$1} END {print s}') 2>/dev/null || nodes="N/A"
+
+    printf "${_BOLD}${_CYAN}"
+    cat <<'BANNER'
+============================================================
+            H Y P E R I O N   C O M P U T E
+------------------------------------------------------------
+  Distributed Bioinformatics Execution Framework
+  SLURM Orchestration • Pipeline Automation • HPC Scale
+============================================================
+BANNER
+    printf "${_RESET}"
+    echo ""
+
     if [[ -n "$mode" ]]; then
-        mode_line="  Mode: ${_BOLD}${_CYAN}${mode}${_RESET}"
+        printf "  ${_BOLD}${_CYAN}Mode:${_RESET} %s\n\n" "$mode"
     fi
 
-    printf "${_BOLD}${_CYAN}"
-    cat <<'BANNER'
-=====================================================================
-        H Y P E R I O N   B I O C R U I S E R   S Y S T E M
-=====================================================================
-BANNER
-    printf "${_RESET}"
-
-    cat <<'BANNER'
-
-██╗  ██╗██╗   ██╗██████╗ ███████╗██████╗ ██╗ ██████╗ ███╗   ██╗
-██║  ██║╚██╗ ██╔╝██╔══██╗██╔════╝██╔══██╗██║██╔═══██╗████╗  ██║
-███████║ ╚████╔╝ ██████╔╝█████╗  ██████╔╝██║██║   ██║██╔██╗ ██║
-██╔══██║  ╚██╔╝  ██╔═══╝ ██╔══╝  ██╔══██╗██║██║   ██║██║╚██╗██║
-██║  ██║   ██║   ██║     ███████╗██║  ██║██║╚██████╔╝██║ ╚████║
-╚═╝  ╚═╝   ╚═╝   ╚═╝     ╚══════╝╚═╝  ╚═╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝
-
-BANNER
-
-    printf "${_CYAN}"
-    cat <<'BANNER'
----------------------------------------------------------------------
- Biocruiser-Class Computational Engine
- Distributed Bioinformatics Orchestration Platform
----------------------------------------------------------------------
-BANNER
-    printf "${_RESET}"
-
-    echo ""
-    echo "[CORE SYSTEMS]"
-    echo " SLURM Scheduler............ ACTIVE"
-    echo " Pipeline Execution......... READY"
-    echo ""
-    echo "[MISSION CONTROL]"
-    echo " Center for Advanced Pain Studies"
-    echo " UT Dallas"
-    if [[ -n "$mode_line" ]]; then
-        echo ""
-        printf '%s\n' "$mode_line"
-    fi
-
-    printf "${_BOLD}${_CYAN}"
-    cat <<'BANNER'
-
-=====================================================================
-   Biocruiser Operational. Awaiting Execution Orders.
-=====================================================================
-BANNER
-    printf "${_RESET}"
+    echo "Initializing Hyperion Pipeline Engine..."
+    echo "Cluster nodes detected: $nodes"
+    echo "SLURM scheduler online."
     echo ""
 }
 
@@ -77,9 +44,9 @@ hyperion_sign_off() {
     echo ""
     printf "${_BOLD}${_CYAN}"
     cat <<'BANNER'
-=====================================================================
-    Biocruiser Operational. Mission Complete.
-=====================================================================
+============================================================
+    Hyperion Compute — Mission Complete.
+============================================================
 BANNER
     printf "${_RESET}"
 }

@@ -41,9 +41,10 @@ else
     _RED='' _YELLOW='' _GREEN='' _CYAN='' _BOLD='' _RESET=''
 fi
 
-info()   { printf "${_GREEN}[INFO]${_RESET}  %s\n" "$*"; }
-warn()   { printf "${_YELLOW}[WARN]${_RESET}  %s\n" "$*" >&2; }
-error()  { printf "${_RED}[ERROR]${_RESET} %s\n" "$*" >&2; }
+_ts()    { date '+%H:%M:%S'; }
+info()   { printf "${_CYAN}[%s]${_RESET} ${_GREEN}[INFO]${_RESET}  %s\n" "$(_ts)" "$*"; }
+warn()   { printf "${_CYAN}[%s]${_RESET} ${_YELLOW}[WARN]${_RESET}  %s\n" "$(_ts)" "$*" >&2; }
+error()  { printf "${_CYAN}[%s]${_RESET} ${_RED}[ERROR]${_RESET} %s\n" "$(_ts)" "$*" >&2; }
 die()    { error "$@"; exit 1; }
 header() { printf "\n${_BOLD}${_CYAN}=== %s ===${_RESET}\n\n" "$*"; }
 
