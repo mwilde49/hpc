@@ -128,10 +128,10 @@ for dir in "${CHECK_DIRS[@]}"; do
         # Count files in directory
         file_count=$(find "$full_path" -type f | wc -l)
         printf "  ${_GREEN}PASS${_RESET}  %-40s (%d files)\n" "$dir/" "$file_count"
-        ((PASS++))
+        PASS=$((PASS + 1))
     else
         printf "  ${_RED}FAIL${_RESET}  %-40s (directory missing)\n" "$dir/"
-        ((FAIL++))
+        FAIL=$((FAIL + 1))
     fi
 done
 
@@ -149,10 +149,10 @@ for pattern in "${CHECK_FILES[@]}"; do
             rel_path="${f#$RUN_DIR/}"
             printf "  ${_GREEN}PASS${_RESET}  %-40s (%s)\n" "$rel_path" "$size"
         done
-        ((PASS++))
+        PASS=$((PASS + 1))
     else
         printf "  ${_RED}FAIL${_RESET}  %-40s (no matches)\n" "$pattern"
-        ((FAIL++))
+        FAIL=$((FAIL + 1))
     fi
 done
 
