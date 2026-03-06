@@ -92,33 +92,29 @@ declare -a CHECK_FILES
 if [[ "$PIPELINE" == "psoma" ]]; then
     CHECK_DIRS=(
         "2_trim_output"
-        "3_map_output"
+        "3_hisat2_mapping_output"
         "4_filter_output"
         "5_stringtie_counts_output"
         "6_raw_counts_output"
-        "7_featurecount_output"
     )
     CHECK_FILES=(
-        "3_map_output/*.sorted.bam"
+        "3_hisat2_mapping_output/*.sorted.bam"
         "4_filter_output/*.filt.bam"
         "5_stringtie_counts_output/genes.tpm.txt"
-        "7_featurecount_output/featureCounts_final.txt"
         "6_raw_counts_output/htseq_raw_counts.txt"
     )
 elif [[ "$PIPELINE" == "bulkrnaseq" ]]; then
     CHECK_DIRS=(
-        "map_output"
-        "filter_output"
-        "stringtie_counts_output"
-        "featurecount_output"
-        "raw_counts_output"
+        "2_star_mapping_output"
+        "3_filter_output"
+        "4_stringtie_counts_output"
+        "5_raw_counts_output"
     )
     CHECK_FILES=(
-        "map_output/*.sorted.bam"
-        "filter_output/*.filt.bam"
-        "stringtie_counts_output/genes.tpm.txt"
-        "featurecount_output/featureCounts_final.txt"
-        "raw_counts_output/htseq_raw_counts.txt"
+        "2_star_mapping_output/*.sorted.bam"
+        "3_filter_output/*.filt.bam"
+        "4_stringtie_counts_output/genes.tpm.txt"
+        "5_raw_counts_output/htseq_raw_counts.txt"
     )
 fi
 

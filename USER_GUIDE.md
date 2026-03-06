@@ -390,12 +390,12 @@ Pipeline outputs are written to your **scratch** directory during execution, the
 |        Directory                 |         Contents                   |
 |----------------------------------|------------------------------------|
 | `1_fastqc_and_multiqc_reports/`  | FastQC and MultiQC quality reports |
-| `3_star_mapping_output/`         | STAR-aligned BAM files             |
-| `3_1_map_metrics_output_qc/`     | Alignment statistics               |
-| `4_filter_output/`               | Filtered/deduplicated BAMs         |
-| `4_1_qualimap_filter_output_qc/` | Post-filter QC reports             |
-| `5_stringtie_counts_output/`     | StringTie transcript counts        |
-| `6_raw_counts_output/`           | HTSeq + featureCounts raw counts   |
+| `2_star_mapping_output/`         | STAR-aligned BAM files             |
+| `2_1_map_metrics_output_qc/`     | Alignment statistics               |
+| `3_filter_output/`               | Filtered/deduplicated BAMs         |
+| `3_1_qualimap_filter_output_qc/` | Post-filter QC reports             |
+| `4_stringtie_counts_output/`     | StringTie transcript counts        |
+| `5_raw_counts_output/`           | HTSeq + featureCounts raw counts   |
 
 ### Psoma output directories
 
