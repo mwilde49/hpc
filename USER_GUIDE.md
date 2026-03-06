@@ -312,6 +312,7 @@ You'll see output like:
   Job ID:     151456
   Run dir:    /work/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00/
   Output dir: /scratch/juno/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00/
+  Archive:    Results will be copied to /work/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00/{inputs,outputs}/ after completion
   Monitor:    tail -f /work/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00/slurm_151456.out
   Cancel:     scancel 151456
 ```
@@ -357,10 +358,17 @@ scancel <JOBID>
 
 ## 8. Finding Your Results
 
-Pipeline outputs are written to your **scratch** directory:
+Pipeline outputs are written to your **scratch** directory during execution, then automatically **archived to your work directory** after a successful run. Scratch is fast but wiped every 45 days — the work archive is durable.
 
+**Scratch** (pipeline execution, wiped every 45 days):
 ```
 /scratch/juno/$USER/pipelines/<pipeline>/runs/<timestamp>/
+```
+
+**Work** (durable archive, created automatically after success):
+```
+/work/$USER/pipelines/<pipeline>/runs/<timestamp>/outputs/
+/work/$USER/pipelines/<pipeline>/runs/<timestamp>/inputs/
 ```
 
 ### BulkRNASeq output directories
@@ -396,9 +404,9 @@ Pipeline outputs are written to your **scratch** directory:
 - **`6_raw_counts_output/raw_feature_counts.csv`** — featureCounts gene counts
 - **`5_stringtie_counts_output/genes_tpm.txt`** — TPM-normalized expression values
 
-### Run metadata
+### Run directory (work)
 
-Logs and reproducibility info are in your **work** directory:
+Each run is fully self-contained in your **work** directory — metadata, logs, and archived results:
 
 ```
 /work/$USER/pipelines/<pipeline>/runs/<timestamp>/
@@ -406,7 +414,9 @@ Logs and reproducibility info are in your **work** directory:
 ├── pipeline.config    ← generated Nextflow config
 ├── manifest.json      ← full reproducibility record
 ├── slurm_<JOBID>.out  ← job stdout
-└── slurm_<JOBID>.err  ← job stderr
+├── slurm_<JOBID>.err  ← job stderr
+├── inputs/            ← archived copy of your FASTQs
+└── outputs/           ← archived pipeline outputs (all stages)
 ```
 
 ---

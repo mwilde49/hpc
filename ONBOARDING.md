@@ -133,6 +133,7 @@ Output:
   Job ID:     151456
   Run dir:    /work/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00/
   Output dir: /scratch/juno/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00/
+  Archive:    Results will be copied to /work/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00/{inputs,outputs}/ after completion
   Monitor:    tail -f /work/jsmith/pipelines/psoma/runs/2026-03-04_14-30-00/slurm_151456.out
   Cancel:     scancel 151456
 ```
@@ -181,7 +182,9 @@ Each launch creates a timestamped run directory with everything needed to reprod
         ├── pipeline.config        ← generated Nextflow config
         ├── manifest.json          ← reproducibility metadata
         ├── slurm_123456.out       ← SLURM stdout
-        └── slurm_123456.err       ← SLURM stderr
+        ├── slurm_123456.err       ← SLURM stderr
+        ├── inputs/                ← archived copy of your FASTQs
+        └── outputs/               ← archived pipeline outputs (all stages)
 ```
 
 ### manifest.json
@@ -216,7 +219,7 @@ A: The `.sif` container file must be built and transferred to the HPC. See `BULK
 A: Yes. Each launch creates a new timestamped run directory, so previous runs are preserved.
 
 **Q: Where do pipeline outputs go?**
-A: Pipeline outputs go to scratch: `/scratch/juno/$USER/pipelines/<pipeline>/runs/<timestamp>/`. The work run directory holds only metadata and logs.
+A: Pipeline outputs are written to scratch during execution: `/scratch/juno/$USER/pipelines/<pipeline>/runs/<timestamp>/`. After a successful run, inputs and outputs are automatically archived to your work run directory under `inputs/` and `outputs/`. Scratch is fast but wiped every 45 days — the work archive is durable.
 
 **Q: How do I use the tools without modifying my PATH?**
 A: Use the full path: `/groups/tprice/pipelines/bin/tjp-launch addone`

@@ -46,7 +46,7 @@ Supporting layers:
 - **`bin/`** — user-facing CLI tools (`tjp-setup`, `tjp-launch`, `tjp-test`, `tjp-test-validate`) and shared libraries (`bin/lib/`)
 - **`templates/`** — per-pipeline config templates with `__USER__`/`__SCRATCH__`/`__WORK__` placeholders, plus the Nextflow config template (`pipeline.config.tmpl`)
 
-Execution flow: `sbatch template.sh config.yaml` → SLURM allocates node → Apptainer runs container → pipeline executes → writes to scratch.
+Execution flow: `sbatch template.sh config.yaml` → SLURM allocates node → Apptainer runs container → pipeline executes → writes to scratch → archives inputs/outputs to work run directory.
 
 Pipelines can be **inline** (code in `pipelines/<name>/`, e.g., addone) or **submoduled** (container repo in `containers/<name>/` with external pipeline code, e.g., bulkrnaseq).
 
@@ -65,7 +65,7 @@ vi /work/$USER/pipelines/addone/config.yaml
 tjp-launch addone
 ```
 
-Each launch creates a timestamped run directory under `/work/$USER/pipelines/<pipeline>/runs/` containing a config snapshot, reproducibility manifest (`manifest.json`), and SLURM logs. See `ONBOARDING.md` for full details.
+Each launch creates a timestamped run directory under `/work/$USER/pipelines/<pipeline>/runs/` containing a config snapshot, reproducibility manifest (`manifest.json`), and SLURM logs. After a successful pipeline run, inputs (FASTQs) and outputs are automatically archived from scratch to `inputs/` and `outputs/` subdirectories in the run directory via rsync with checksum verification. See `ONBOARDING.md` for full details.
 
 ### Smoke Testing
 
