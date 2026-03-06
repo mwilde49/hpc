@@ -19,6 +19,11 @@ PIPELINE_REPO=$PROJECT_ROOT/Bulk-RNA-Seq-Nextflow-Pipeline
 # Accept pipeline config as $1 (used by tjp-launch), fall back to default
 PIPELINE_CONFIG=${1:-$PIPELINE_REPO/pipeline.config}
 
+# Stage-out args (passed by tjp-launch for archiving results to work)
+RUN_DIR=${2:-}
+SCRATCH_OUTPUT_DIR=${3:-}
+FASTQ_DIR=${4:-}
+
 # --- Pre-flight checks ---
 
 if [ ! -f "$CONTAINER" ]; then
@@ -52,3 +57,42 @@ apptainer exec \
     nextflow run $PIPELINE_REPO/bulk_rna_seq_nextflow_pipeline.nf \
     -c $PIPELINE_CONFIG \
     -w $SCRATCH_ROOT/nextflow_work
+PIPELINE_EXIT=$?
+
+if [ $PIPELINE_EXIT -ne 0 ]; then
+    echo "ERROR: Pipeline failed (exit $PIPELINE_EXIT). Skipping archive."
+    exit $PIPELINE_EXIT
+fi
+
+# --- Stage-out: archive results from scratch to work ---
+
+if [ -n "$RUN_DIR" ] && [ -n "$SCRATCH_OUTPUT_DIR" ]; then
+    echo "=== Archiving results to work ==="
+
+    echo "Copying outputs: $SCRATCH_OUTPUT_DIR/ -> $RUN_DIR/outputs/"
+    mkdir -p "$RUN_DIR/outputs"
+    rsync -a --checksum "$SCRATCH_OUTPUT_DIR/" "$RUN_DIR/outputs/"
+
+    if [ -n "$FASTQ_DIR" ]; then
+        echo "Copying inputs: $FASTQ_DIR/ -> $RUN_DIR/inputs/"
+        mkdir -p "$RUN_DIR/inputs"
+        rsync -a --checksum "$FASTQ_DIR/" "$RUN_DIR/inputs/"
+    fi
+
+    echo "Verifying archive integrity..."
+    VERIFY_FAIL=0
+    OUTPUT_DIFF=$(rsync -a --checksum --dry-run "$SCRATCH_OUTPUT_DIR/" "$RUN_DIR/outputs/" 2>&1)
+    [ -n "$OUTPUT_DIFF" ] && VERIFY_FAIL=1
+    if [ -n "$FASTQ_DIR" ]; then
+        INPUT_DIFF=$(rsync -a --checksum --dry-run "$FASTQ_DIR/" "$RUN_DIR/inputs/" 2>&1)
+        [ -n "$INPUT_DIFF" ] && VERIFY_FAIL=1
+    fi
+
+    if [ $VERIFY_FAIL -eq 0 ]; then
+        echo "Archive verification PASSED."
+    else
+        echo "WARNING: Archive verification detected differences."
+        [ -n "${OUTPUT_DIFF:-}" ] && echo "$OUTPUT_DIFF"
+        [ -n "${INPUT_DIFF:-}" ] && echo "$INPUT_DIFF"
+    fi
+fi

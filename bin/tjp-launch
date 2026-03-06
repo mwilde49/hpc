@@ -276,6 +276,12 @@ info "Run directory: $RUN_DIR"
 # ── Snapshot config ──────────────────────────────────────────────────────────
 cp "$CONFIG_PATH" "$RUN_DIR/config.yaml"
 
+# ── Read fastq_dir for RNA-seq pipelines (used for stage-out) ────────────────
+FASTQ_DIR=""
+if [[ "$PIPELINE" == "psoma" || "$PIPELINE" == "bulkrnaseq" ]]; then
+    FASTQ_DIR=$(yaml_get "$RUN_DIR/config.yaml" "fastq_dir")
+fi
+
 # ── Pipeline-specific dispatch ───────────────────────────────────────────────
 SBATCH_CONFIG_ARG=""
 SCRATCH_OUTPUT_DIR=""
@@ -333,6 +339,9 @@ SBATCH_OUTPUT=$(sbatch \
     "${SBATCH_DEV_FLAGS[@]}" \
     "$SLURM_TEMPLATE" \
     "$SBATCH_CONFIG_ARG" \
+    "$RUN_DIR" \
+    "$SCRATCH_OUTPUT_DIR" \
+    "$FASTQ_DIR" \
     2>&1)
 
 # Parse job ID from "Submitted batch job 123456"
@@ -355,6 +364,7 @@ cat <<EOF
   Job ID:     $JOB_ID
   Run dir:    $RUN_DIR/
   Output dir: $SCRATCH_OUTPUT_DIR/
+  Archive:    Results will be copied to $RUN_DIR/{inputs,outputs}/ after completion
   Monitor:    tail -f $RUN_DIR/slurm_${JOB_ID}.out
   Cancel:     scancel $JOB_ID
 EOF
