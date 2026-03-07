@@ -414,9 +414,9 @@ Pipeline outputs are written to your **scratch** directory during execution, the
 
 ### Key output files for downstream analysis
 
-- **`6_raw_counts_output/raw_htseq_counts.csv`** — Raw gene counts (for DESeq2, edgeR)
-- **`6_raw_counts_output/raw_feature_counts.csv`** — featureCounts gene counts
-- **`5_stringtie_counts_output/genes_tpm.txt`** — TPM-normalized expression values
+- **`raw_htseq_counts.csv`** — Raw gene counts (for DESeq2, edgeR) — in `6_raw_counts_output/` (psoma) or `5_raw_counts_output/` (bulkrnaseq)
+- **`raw_feature_counts.csv`** — featureCounts gene counts (same directory)
+- **`genes.tpm.txt`** — TPM-normalized expression values — in `5_stringtie_counts_output/` (psoma) or `4_stringtie_counts_output/` (bulkrnaseq)
 
 ### Run directory (work)
 

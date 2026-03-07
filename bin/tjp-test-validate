@@ -101,7 +101,7 @@ if [[ "$PIPELINE" == "psoma" ]]; then
         "3_hisat2_mapping_output/*.sorted.bam"
         "4_filter_output/*.filt.bam"
         "5_stringtie_counts_output/genes.tpm.txt"
-        "6_raw_counts_output/htseq_raw_counts.txt"
+        "6_raw_counts_output/raw_htseq_counts.csv"
     )
 elif [[ "$PIPELINE" == "bulkrnaseq" ]]; then
     CHECK_DIRS=(
@@ -111,10 +111,10 @@ elif [[ "$PIPELINE" == "bulkrnaseq" ]]; then
         "5_raw_counts_output"
     )
     CHECK_FILES=(
-        "2_star_mapping_output/*.sorted.bam"
+        "2_star_mapping_output/*Aligned.sortedByCoord.out.bam"
         "3_filter_output/*.filt.bam"
         "4_stringtie_counts_output/genes.tpm.txt"
-        "5_raw_counts_output/htseq_raw_counts.txt"
+        "5_raw_counts_output/raw_htseq_counts.csv"
     )
 fi
 
