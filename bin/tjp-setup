@@ -121,6 +121,20 @@ else
     info "Created: $psoma_samples"
 fi
 
+# ── Add to PATH ────────────────────────────────────────────────────────────
+PATH_LINE="export PATH=\"$REPO_ROOT/bin:\$PATH\""
+BASHRC="$HOME/.bashrc"
+
+if grep -qF "$REPO_ROOT/bin" "$BASHRC" 2>/dev/null; then
+    info "PATH already configured in $BASHRC"
+else
+    echo "" >> "$BASHRC"
+    echo "# Hyperion Compute — TJP pipeline tools" >> "$BASHRC"
+    echo "$PATH_LINE" >> "$BASHRC"
+    info "Added pipeline tools to PATH in $BASHRC"
+    export PATH="$REPO_ROOT/bin:$PATH"
+fi
+
 # ── Print next steps ────────────────────────────────────────────────────────
 hyperion_sign_off
 
@@ -129,21 +143,17 @@ Your workspace is ready at: $USER_PIPELINES/
 
 Next steps:
 
-  1. Add tjp tools to your PATH (optional, for this session):
-
-     export PATH="$REPO_ROOT/bin:\$PATH"
-
-  2. Edit a pipeline config:
+  1. Edit a pipeline config:
 
      vi $USER_PIPELINES/addone/config.yaml      # simple demo
      vi $USER_PIPELINES/bulkrnaseq/config.yaml   # RNA-seq (STAR aligner)
      vi $USER_PIPELINES/psoma/config.yaml        # RNA-seq (HISAT2/Trimmomatic)
 
-  3. Launch a pipeline:
+  2. Launch a pipeline:
 
      tjp-launch addone
      tjp-launch bulkrnaseq
      tjp-launch psoma
 
-See ONBOARDING.md for detailed documentation.
+See USER_GUIDE.md for detailed documentation.
 EOF
