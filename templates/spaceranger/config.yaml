@@ -9,7 +9,7 @@
 sample_id: my_sample                    # ID for the Space Ranger run (used as output directory name)
 sample_name: MySample                   # Sample name matching FASTQ filenames
 fastq_dir: __SCRATCH__/myproject/fastq  # Directory containing FASTQ files
-transcriptome: /groups/tprice/pipelines/references/spaceranger/refdata-gex-GRCh38-2024-A  # Reference transcriptome
+transcriptome: /groups/tprice/opt/cellranger_references/refdata-gex-GRCh38-2024-A  # Reference transcriptome
 image: __SCRATCH__/myproject/image.tif  # Brightfield or fluorescence microscope image
 slide: V19J25-123                       # Visium slide serial number
 area: A1                                # Capture area on the slide (A1, B1, C1, or D1)
@@ -18,8 +18,8 @@ area: A1                                # Capture area on the slide (A1, B1, C1,
 localcores: 16
 localmem: 120                           # GB — leave headroom below SLURM --mem
 
-# Optional: override tool path (default: /groups/tprice/software/spaceranger)
-# tool_path: /groups/tprice/software/spaceranger
+# Optional: override tool path (default: /groups/tprice/opt/spaceranger-4.0.1)
+# tool_path: /groups/tprice/opt/spaceranger-4.0.1
 
 # Optional parameters (uncomment to use)
 # cytaimage: /path/to/cytassist_image.tif    # CytAssist image

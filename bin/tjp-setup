@@ -44,7 +44,7 @@ for tool in cellranger spaceranger xeniumranger; do
     tool_dir=$(get_tool_path "$tool")
     if [[ ! -d "$tool_dir" ]]; then
         warn "10x tool not found: $tool_dir"
-        warn "  → Extract tarball to /groups/tprice/software/"
+        warn "  → Extract tarball to /groups/tprice/opt/"
     fi
 done
 

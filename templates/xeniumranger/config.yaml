@@ -14,8 +14,8 @@ xenium_bundle: __SCRATCH__/myproject/xenium_bundle  # Path to Xenium output bund
 localcores: 16
 localmem: 120                           # GB — leave headroom below SLURM --mem
 
-# Optional: override tool path (default: /groups/tprice/software/xeniumranger)
-# tool_path: /groups/tprice/software/xeniumranger
+# Optional: override tool path (default: /groups/tprice/opt/xeniumranger-xenium4.0)
+# tool_path: /groups/tprice/opt/xeniumranger-xenium4.0
 
 # Command-specific optional parameters:
 #

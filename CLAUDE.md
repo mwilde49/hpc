@@ -178,9 +178,9 @@ The `mwilde49/10x` repo is a git submodule at `containers/10x/`. It contains:
 ### Tool paths
 | Tool | Install path | SLURM resources |
 |------|-------------|-----------------|
-| Cell Ranger | `/groups/tprice/software/cellranger` | 24h, 16 CPU, 128GB, exclusive |
-| Space Ranger | `/groups/tprice/software/spaceranger` | 24h, 16 CPU, 128GB, exclusive |
-| Xenium Ranger | `/groups/tprice/software/xeniumranger` | 12h, 16 CPU, 128GB, exclusive |
+| Cell Ranger 10.0.0 | `/groups/tprice/opt/cellranger-10.0.0` | 24h, 16 CPU, 128GB, exclusive |
+| Space Ranger 4.0.1 | `/groups/tprice/opt/spaceranger-4.0.1` | 24h, 16 CPU, 128GB, exclusive |
+| Xenium Ranger 4.0 | `/groups/tprice/opt/xeniumranger-xenium4.0` | 12h, 16 CPU, 128GB, exclusive |
 
 ### Config-level tool_path override
 Users can set `tool_path` in their config YAML to override the default install location (useful for testing new tool versions).

@@ -31,9 +31,9 @@ declare -A PIPELINE_TEMPLATES=(
 
 # Maps native pipeline name → tool install directory
 declare -A PIPELINE_TOOL_PATHS=(
-    [cellranger]="/groups/tprice/software/cellranger"
-    [spaceranger]="/groups/tprice/software/spaceranger"
-    [xeniumranger]="/groups/tprice/software/xeniumranger"
+    [cellranger]="/groups/tprice/opt/cellranger-10.0.0"
+    [spaceranger]="/groups/tprice/opt/spaceranger-4.0.1"
+    [xeniumranger]="/groups/tprice/opt/xeniumranger-xenium4.0"
 )
 
 # Native pipelines: no container, tool installed from tarball
