@@ -12,8 +12,11 @@ validate_config() {
     case "$pipeline" in
         addone)     _validate_addone "$config" errors ;;
         bulkrnaseq) _validate_bulkrnaseq "$config" errors ;;
-        psoma)      _validate_psoma "$config" errors ;;
-        *)          die "No validator for pipeline: $pipeline" ;;
+        psoma)          _validate_psoma "$config" errors ;;
+        cellranger)     _validate_cellranger "$config" errors ;;
+        spaceranger)    _validate_spaceranger "$config" errors ;;
+        xeniumranger)   _validate_xeniumranger "$config" errors ;;
+        *)              die "No validator for pipeline: $pipeline" ;;
     esac
 
     if [[ ${#errors[@]} -gt 0 ]]; then
@@ -133,5 +136,188 @@ _validate_psoma() {
             Human|Mouse|Rattus) ;;
             *) warn "Unrecognized species '$species' — expected Human, Mouse, or Rattus" ;;
         esac
+    fi
+}
+
+# ── Cell Ranger validator ─────────────────────────────────────────────────
+_validate_cellranger() {
+    local config="$1"
+    local -n _errs=$2
+
+    # Required keys
+    local required_keys=(sample_id sample_name fastq_dir transcriptome localcores localmem)
+    for key in "${required_keys[@]}"; do
+        if ! yaml_has "$config" "$key"; then
+            _errs+=("Missing required key: $key")
+        fi
+    done
+
+    # Paths that must exist on disk
+    local path_keys=(fastq_dir transcriptome)
+    for key in "${path_keys[@]}"; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            if [[ -n "$val" && "$val" != __* && ! -e "$val" ]]; then
+                _errs+=("Path does not exist for $key: $val")
+            fi
+        fi
+    done
+
+    # Numeric validation
+    for key in localcores localmem; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            if [[ -n "$val" && ! "$val" =~ ^[0-9]+$ ]]; then
+                _errs+=("$key must be a positive integer, got: $val")
+            fi
+        fi
+    done
+
+    # Optional tool_path check
+    if yaml_has "$config" "tool_path"; then
+        local tp
+        tp=$(yaml_get "$config" "tool_path") || true
+        if [[ -n "$tp" && ! -d "$tp" ]]; then
+            _errs+=("tool_path directory does not exist: $tp")
+        elif [[ -n "$tp" && ! -x "$tp/cellranger" ]]; then
+            warn "cellranger binary not found at $tp/cellranger"
+        fi
+    fi
+}
+
+# ── Space Ranger validator ────────────────────────────────────────────────
+_validate_spaceranger() {
+    local config="$1"
+    local -n _errs=$2
+
+    # Required keys
+    local required_keys=(sample_id sample_name fastq_dir transcriptome image slide area localcores localmem)
+    for key in "${required_keys[@]}"; do
+        if ! yaml_has "$config" "$key"; then
+            _errs+=("Missing required key: $key")
+        fi
+    done
+
+    # Paths that must exist on disk
+    local path_keys=(fastq_dir transcriptome image)
+    for key in "${path_keys[@]}"; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            if [[ -n "$val" && "$val" != __* && ! -e "$val" ]]; then
+                _errs+=("Path does not exist for $key: $val")
+            fi
+        fi
+    done
+
+    # Numeric validation
+    for key in localcores localmem; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            if [[ -n "$val" && ! "$val" =~ ^[0-9]+$ ]]; then
+                _errs+=("$key must be a positive integer, got: $val")
+            fi
+        fi
+    done
+
+    # Slide serial number format check
+    if yaml_has "$config" "slide"; then
+        local slide
+        slide=$(yaml_get "$config" "slide") || true
+        if [[ -n "$slide" && ! "$slide" =~ ^V[0-9] ]]; then
+            warn "Slide serial number '$slide' doesn't match expected Visium format (V*)"
+        fi
+    fi
+
+    # Area validation
+    if yaml_has "$config" "area"; then
+        local area
+        area=$(yaml_get "$config" "area") || true
+        case "$area" in
+            A1|B1|C1|D1) ;;
+            *) _errs+=("Invalid capture area: $area (expected A1, B1, C1, or D1)") ;;
+        esac
+    fi
+
+    # Optional tool_path check
+    if yaml_has "$config" "tool_path"; then
+        local tp
+        tp=$(yaml_get "$config" "tool_path") || true
+        if [[ -n "$tp" && ! -d "$tp" ]]; then
+            _errs+=("tool_path directory does not exist: $tp")
+        elif [[ -n "$tp" && ! -x "$tp/spaceranger" ]]; then
+            warn "spaceranger binary not found at $tp/spaceranger"
+        fi
+    fi
+}
+
+# ── Xenium Ranger validator ───────────────────────────────────────────────
+_validate_xeniumranger() {
+    local config="$1"
+    local -n _errs=$2
+
+    # Required keys
+    local required_keys=(sample_id command xenium_bundle localcores localmem)
+    for key in "${required_keys[@]}"; do
+        if ! yaml_has "$config" "$key"; then
+            _errs+=("Missing required key: $key")
+        fi
+    done
+
+    # Xenium bundle path check
+    if yaml_has "$config" "xenium_bundle"; then
+        local val
+        val=$(yaml_get "$config" "xenium_bundle") || true
+        if [[ -n "$val" && "$val" != __* && ! -d "$val" ]]; then
+            _errs+=("xenium_bundle directory does not exist: $val")
+        fi
+    fi
+
+    # Numeric validation
+    for key in localcores localmem; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            if [[ -n "$val" && ! "$val" =~ ^[0-9]+$ ]]; then
+                _errs+=("$key must be a positive integer, got: $val")
+            fi
+        fi
+    done
+
+    # Command validation
+    if yaml_has "$config" "command"; then
+        local cmd
+        cmd=$(yaml_get "$config" "command") || true
+        case "$cmd" in
+            resegment|import-segmentation) ;;
+            *) _errs+=("Invalid command: $cmd (expected resegment or import-segmentation)") ;;
+        esac
+
+        # Conditional: segmentation_file required for import-segmentation
+        if [[ "$cmd" == "import-segmentation" ]]; then
+            if ! yaml_has "$config" "segmentation_file"; then
+                _errs+=("Missing required key for import-segmentation: segmentation_file")
+            else
+                local sf
+                sf=$(yaml_get "$config" "segmentation_file") || true
+                if [[ -n "$sf" && ! -f "$sf" ]]; then
+                    _errs+=("segmentation_file does not exist: $sf")
+                fi
+            fi
+        fi
+    fi
+
+    # Optional tool_path check
+    if yaml_has "$config" "tool_path"; then
+        local tp
+        tp=$(yaml_get "$config" "tool_path") || true
+        if [[ -n "$tp" && ! -d "$tp" ]]; then
+            _errs+=("tool_path directory does not exist: $tp")
+        elif [[ -n "$tp" && ! -x "$tp/xeniumranger" ]]; then
+            warn "xeniumranger binary not found at $tp/xeniumranger"
+        fi
     fi
 }

@@ -1,0 +1,27 @@
+# Xenium Ranger Pipeline Configuration
+# Edit the fields below, then launch with: tjp-launch xeniumranger
+# See ONBOARDING.md for detailed field descriptions.
+#
+# 10x Genomics Xenium Ranger — in situ transcriptomics analysis
+# Native pipeline: no container required, uses installed Xenium Ranger binary.
+
+# Required fields
+sample_id: my_sample                    # ID for the Xenium Ranger run (used as output directory name)
+command: resegment                      # Xenium Ranger command (resegment or import-segmentation)
+xenium_bundle: __SCRATCH__/myproject/xenium_bundle  # Path to Xenium output bundle directory
+
+# Resource limits (match your SLURM allocation)
+localcores: 16
+localmem: 120                           # GB — leave headroom below SLURM --mem
+
+# Optional: override tool path (default: /groups/tprice/software/xeniumranger)
+# tool_path: /groups/tprice/software/xeniumranger
+
+# Command-specific optional parameters:
+#
+# For resegment:
+# expansion_distance: 5                 # Cell expansion distance in microns
+#
+# For import-segmentation:
+# segmentation_file: /path/to/cells.csv.gz  # Required for import-segmentation command
+# units: microns                        # Coordinate units (microns or pixels)

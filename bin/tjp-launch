@@ -255,16 +255,27 @@ validate_config "$PIPELINE" "$CONFIG_PATH"
 info "Config validation passed."
 
 # ── Resolve paths ────────────────────────────────────────────────────────────
-CONTAINER=$(get_container_path "$PIPELINE")
 SLURM_TEMPLATE=$(get_slurm_template "$PIPELINE")
-
-if [[ ! -f "$CONTAINER" ]]; then
-    die "Container not found: $CONTAINER
-  Build and transfer it to HPC first."
-fi
 
 if [[ ! -f "$SLURM_TEMPLATE" ]]; then
     die "SLURM template not found: $SLURM_TEMPLATE"
+fi
+
+if is_native_pipeline "$PIPELINE"; then
+    CONTAINER="native:$(get_tool_path "$PIPELINE")"
+    # Allow config-level tool_path override
+    if yaml_has "$CONFIG_PATH" "tool_path"; then
+        local_tool_path=$(yaml_get "$CONFIG_PATH" "tool_path") || true
+        if [[ -n "$local_tool_path" ]]; then
+            CONTAINER="native:$local_tool_path"
+        fi
+    fi
+else
+    CONTAINER=$(get_container_path "$PIPELINE")
+    if [[ ! -f "$CONTAINER" ]]; then
+        die "Container not found: $CONTAINER
+  Build and transfer it to HPC first."
+    fi
 fi
 
 # ── Create timestamped run directory ─────────────────────────────────────────
@@ -276,11 +287,14 @@ info "Run directory: $RUN_DIR"
 # ── Snapshot config ──────────────────────────────────────────────────────────
 cp "$CONFIG_PATH" "$RUN_DIR/config.yaml"
 
-# ── Read fastq_dir for RNA-seq pipelines (used for stage-out) ────────────────
+# ── Read input dir for stage-out archiving ────────────────────────────────────
 FASTQ_DIR=""
-if [[ "$PIPELINE" == "psoma" || "$PIPELINE" == "bulkrnaseq" ]]; then
-    FASTQ_DIR=$(yaml_get "$RUN_DIR/config.yaml" "fastq_dir")
-fi
+case "$PIPELINE" in
+    psoma|bulkrnaseq|cellranger|spaceranger)
+        FASTQ_DIR=$(yaml_get "$RUN_DIR/config.yaml" "fastq_dir") ;;
+    xeniumranger)
+        FASTQ_DIR=$(yaml_get "$RUN_DIR/config.yaml" "xenium_bundle" 2>/dev/null || echo "") ;;
+esac
 
 # ── Pipeline-specific dispatch ───────────────────────────────────────────────
 SBATCH_CONFIG_ARG=""
@@ -319,6 +333,13 @@ case "$PIPELINE" in
         info "Generating Nextflow pipeline.config..."
         _generate_psoma_config "$RUN_DIR/config.yaml" "$RUN_DIR/pipeline.config" "$SCRATCH_OUTPUT_DIR"
         SBATCH_CONFIG_ARG="$RUN_DIR/pipeline.config"
+        ;;
+    cellranger|spaceranger|xeniumranger)
+        # 10x native pipelines: create scratch output dir, pass config directly
+        SCRATCH_OUTPUT_DIR="$SCRATCH_ROOT/pipelines/$PIPELINE/runs/$TS"
+        mkdir -p "$SCRATCH_OUTPUT_DIR"
+        info "Scratch output dir: $SCRATCH_OUTPUT_DIR"
+        SBATCH_CONFIG_ARG="$RUN_DIR/config.yaml"
         ;;
 esac
 

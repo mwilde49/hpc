@@ -13,6 +13,14 @@ This guide covers how to configure and run the two bulk RNA-seq pipelines availa
 | Typical data source    | Standard Illumina sequencing cores | Psomagen sequencing service     |
 | Read suffix convention | `_R1_001` / `_R2_001`              | `_1` / `_2`                     |
 
+Also available: **10x Genomics** native pipelines (no container needed):
+
+|    **Pipeline**    |    **Purpose**                    |    **SLURM Resources**           |
+|--------------------|-----------------------------------|----------------------------------|
+| Cell Ranger        | Single-cell gene expression       | 24h, 16 CPU, 128GB, exclusive   |
+| Space Ranger       | Spatial gene expression (Visium)  | 24h, 16 CPU, 128GB, exclusive   |
+| Xenium Ranger      | In situ transcriptomics (Xenium)  | 12h, 16 CPU, 128GB, exclusive   |
+
 ---
 
 ## Table of Contents
@@ -22,12 +30,13 @@ This guide covers how to configure and run the two bulk RNA-seq pipelines availa
 3. [Uploading Your Data](#3-uploading-your-data)
 4. [BulkRNASeq Pipeline (UTDal/STAR)](#4-bulkrnaseq-pipeline-utdalstar)
 5. [Psoma Pipeline (HISAT2/Trimmomatic)](#5-psoma-pipeline-hisat2trimmomatic)
-6. [Launching a Pipeline](#6-launching-a-pipeline)
-7. [Monitoring Your Job](#7-monitoring-your-job)
-8. [Finding Your Results](#8-finding-your-results)
-9. [Smoke Testing](#9-smoke-testing)
-10. [Re-running and Reproducibility](#10-re-running-and-reproducibility)
-11. [Troubleshooting](#11-troubleshooting)
+6. [10x Genomics Pipelines](#6-10x-genomics-pipelines)
+7. [Launching a Pipeline](#7-launching-a-pipeline)
+8. [Monitoring Your Job](#8-monitoring-your-job)
+9. [Finding Your Results](#9-finding-your-results)
+10. [Smoke Testing](#10-smoke-testing)
+11. [Re-running and Reproducibility](#11-re-running-and-reproducibility)
+12. [Troubleshooting](#12-troubleshooting)
 
 ---
 
@@ -62,9 +71,15 @@ This creates:
 ├── bulkrnaseq/      ← UTDal/STAR pipeline
 │   ├── config.yaml
 │   └── samples.txt
-└── psoma/           ← Psomagen/HISAT2 pipeline
-    ├── config.yaml
-    └── samples.txt
+├── psoma/           ← Psomagen/HISAT2 pipeline
+│   ├── config.yaml
+│   └── samples.txt
+├── cellranger/      ← 10x single-cell
+│   └── config.yaml
+├── spaceranger/     ← 10x spatial
+│   └── config.yaml
+└── xeniumranger/    ← 10x in situ
+    └── config.yaml
 ```
 
 Setup automatically adds the pipeline tools to your `~/.bashrc`, so they'll be available in every future session. Log out and back in (or run `source ~/.bashrc`) to activate.
@@ -282,13 +297,87 @@ tjp-launch psoma
 
 ---
 
-## 6. Launching a Pipeline
+## 6. 10x Genomics Pipelines
 
-Both pipelines are launched the same way:
+These pipelines use 10x Genomics tools installed natively on the cluster — no container needed. They request exclusive node access and manage their own multithreading.
+
+### Cell Ranger (single-cell gene expression)
 
 ```bash
-tjp-launch bulkrnaseq    # UTDal/STAR pipeline
-tjp-launch psoma          # Psomagen/HISAT2 pipeline
+vi /work/$USER/pipelines/cellranger/config.yaml
+```
+
+The fields you **must** edit:
+
+```yaml
+sample_id: my_sample                        # output directory name
+sample_name: MySample                       # matches FASTQ filename prefix
+fastq_dir: /scratch/juno/YOUR_NETID/myproject/fastq
+transcriptome: /groups/tprice/pipelines/references/cellranger/refdata-gex-GRCh38-2024-A
+```
+
+Launch:
+
+```bash
+tjp-launch cellranger
+```
+
+### Space Ranger (spatial gene expression)
+
+```bash
+vi /work/$USER/pipelines/spaceranger/config.yaml
+```
+
+The fields you **must** edit:
+
+```yaml
+sample_id: my_sample
+sample_name: MySample
+fastq_dir: /scratch/juno/YOUR_NETID/myproject/fastq
+transcriptome: /groups/tprice/pipelines/references/spaceranger/refdata-gex-GRCh38-2024-A
+image: /scratch/juno/YOUR_NETID/myproject/image.tif
+slide: V19J25-123                           # your Visium slide serial number
+area: A1                                    # A1, B1, C1, or D1
+```
+
+Launch:
+
+```bash
+tjp-launch spaceranger
+```
+
+### Xenium Ranger (in situ transcriptomics)
+
+```bash
+vi /work/$USER/pipelines/xeniumranger/config.yaml
+```
+
+The fields you **must** edit:
+
+```yaml
+sample_id: my_sample
+command: resegment                          # or import-segmentation
+xenium_bundle: /scratch/juno/YOUR_NETID/myproject/xenium_bundle
+```
+
+Launch:
+
+```bash
+tjp-launch xeniumranger
+```
+
+---
+
+## 7. Launching a Pipeline
+
+All pipelines are launched the same way:
+
+```bash
+tjp-launch bulkrnaseq     # UTDal/STAR pipeline
+tjp-launch psoma           # Psomagen/HISAT2 pipeline
+tjp-launch cellranger      # 10x single-cell
+tjp-launch spaceranger     # 10x spatial
+tjp-launch xeniumranger    # 10x in situ
 ```
 
 You'll see the Hyperion banner followed by timestamped output:
@@ -330,7 +419,7 @@ tjp-launch psoma --config /path/to/my_custom_config.yaml
 
 ---
 
-## 7. Monitoring Your Job
+## 8. Monitoring Your Job
 You will want to monitor the tail of 99% of jobs to ensure they have launched properly.
 
 ### Check job status
@@ -361,7 +450,7 @@ scancel <JOBID>
 
 ---
 
-## 8. Finding Your Results
+## 9. Finding Your Results
 
 Pipeline outputs are written to your **scratch** directory during execution, then automatically **archived to your work directory** after a successful run. Scratch is fast but wiped every 45 days — the work archive is durable.
 
@@ -426,7 +515,7 @@ Each run is fully self-contained in your **work** directory — metadata, logs, 
 
 ---
 
-## 9. Smoke Testing
+## 10. Smoke Testing
 
 You can quickly verify that a pipeline works end-to-end using pre-configured test data (2 samples submitted to the dev partition):
 
@@ -436,7 +525,7 @@ squeue -u $USER             # monitor job
 tjp-test-validate psoma     # validate outputs after completion
 ```
 
-Supported pipelines: `psoma` and `bulkrnaseq`.
+Supported pipelines: `psoma`, `bulkrnaseq`, and `cellranger`.
 
 `tjp-test` copies shared test FASTQs from the repo to your scratch directory, generates a test config with the correct reference paths, and delegates to `tjp-launch --dev`. After the job completes, `tjp-test-validate` checks that all expected output directories and key files (BAMs, count matrices) were produced.
 
@@ -454,7 +543,7 @@ tjp-test-validate psoma --run 2026-03-05_14-00-55
 
 ---
 
-## 10. Re-running and Reproducibility
+## 11. Re-running and Reproducibility
 
 - Each launch creates a **new** timestamped run directory. Previous runs are never overwritten.
 - The `manifest.json` file records the exact git commit, container checksum, config, and paths used — so any run can be reproduced.
@@ -466,7 +555,7 @@ tjp-launch psoma --config /work/$USER/pipelines/psoma/runs/2026-03-04_14-30-00/c
 
 ---
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 |         Problem                     |                                 Solution                                                           |
 |-------------------------------------|----------------------------------------------------------------------------------------------------|

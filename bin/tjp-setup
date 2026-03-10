@@ -26,13 +26,25 @@ if ! command -v apptainer &>/dev/null; then
     warn "Apptainer not found. You may need to run 'module load apptainer' before launching pipelines."
 fi
 
-# Check containers exist
+# Check containers exist (skip native pipelines)
 local_errors=()
 for pipeline in "${KNOWN_PIPELINES[@]}"; do
+    if is_native_pipeline "$pipeline"; then
+        continue
+    fi
     container_path=$(get_container_path "$pipeline")
     if [[ ! -f "$container_path" ]]; then
         warn "Container not found: $container_path"
         warn "  → It may not have been transferred to HPC yet."
+    fi
+done
+
+# Check 10x tool installations
+for tool in cellranger spaceranger xeniumranger; do
+    tool_dir=$(get_tool_path "$tool")
+    if [[ ! -d "$tool_dir" ]]; then
+        warn "10x tool not found: $tool_dir"
+        warn "  → Extract tarball to /groups/tprice/software/"
     fi
 done
 
@@ -121,6 +133,33 @@ else
     info "Created: $psoma_samples"
 fi
 
+# Cell Ranger config
+cellranger_config="$USER_PIPELINES/cellranger/config.yaml"
+if [[ -f "$cellranger_config" ]]; then
+    warn "Config already exists, skipping: $cellranger_config"
+else
+    _substitute_placeholders "$REPO_ROOT/templates/cellranger/config.yaml" > "$cellranger_config"
+    info "Created: $cellranger_config"
+fi
+
+# Space Ranger config
+spaceranger_config="$USER_PIPELINES/spaceranger/config.yaml"
+if [[ -f "$spaceranger_config" ]]; then
+    warn "Config already exists, skipping: $spaceranger_config"
+else
+    _substitute_placeholders "$REPO_ROOT/templates/spaceranger/config.yaml" > "$spaceranger_config"
+    info "Created: $spaceranger_config"
+fi
+
+# Xenium Ranger config
+xeniumranger_config="$USER_PIPELINES/xeniumranger/config.yaml"
+if [[ -f "$xeniumranger_config" ]]; then
+    warn "Config already exists, skipping: $xeniumranger_config"
+else
+    _substitute_placeholders "$REPO_ROOT/templates/xeniumranger/config.yaml" > "$xeniumranger_config"
+    info "Created: $xeniumranger_config"
+fi
+
 # ── Add to PATH ────────────────────────────────────────────────────────────
 PATH_LINE="export PATH=\"$REPO_ROOT/bin:\$PATH\""
 BASHRC="$HOME/.bashrc"
@@ -145,15 +184,21 @@ Next steps:
 
   1. Edit a pipeline config:
 
-     vi $USER_PIPELINES/addone/config.yaml      # simple demo
-     vi $USER_PIPELINES/bulkrnaseq/config.yaml   # RNA-seq (STAR aligner)
-     vi $USER_PIPELINES/psoma/config.yaml        # RNA-seq (HISAT2/Trimmomatic)
+     vi $USER_PIPELINES/addone/config.yaml        # simple demo
+     vi $USER_PIPELINES/bulkrnaseq/config.yaml     # RNA-seq (STAR aligner)
+     vi $USER_PIPELINES/psoma/config.yaml          # RNA-seq (HISAT2/Trimmomatic)
+     vi $USER_PIPELINES/cellranger/config.yaml     # 10x single-cell
+     vi $USER_PIPELINES/spaceranger/config.yaml    # 10x spatial
+     vi $USER_PIPELINES/xeniumranger/config.yaml   # 10x in situ
 
   2. Launch a pipeline:
 
      tjp-launch addone
      tjp-launch bulkrnaseq
      tjp-launch psoma
+     tjp-launch cellranger
+     tjp-launch spaceranger
+     tjp-launch xeniumranger
 
 See USER_GUIDE.md for detailed documentation.
 EOF

@@ -20,7 +20,8 @@ source "$SCRIPT_DIR/lib/common.sh"
 
 # ── Constants ────────────────────────────────────────────────────────────────
 TEST_DATA_SRC="$REPO_ROOT/test_data/rnaseq"
-SUPPORTED_PIPELINES=(psoma bulkrnaseq)
+TEST_DATA_10X="$REPO_ROOT/test_data/10x"
+SUPPORTED_PIPELINES=(psoma bulkrnaseq cellranger)
 
 # ── Usage ────────────────────────────────────────────────────────────────────
 usage() {
@@ -75,18 +76,24 @@ $is_supported || die "Unsupported pipeline: $PIPELINE (supported: ${SUPPORTED_PI
 # ── Paths ────────────────────────────────────────────────────────────────────
 SCRATCH_TEST_DIR="$SCRATCH_ROOT/pipelines/$PIPELINE/test_data"
 SCRATCH_FASTQ_DIR="$SCRATCH_TEST_DIR/fastq"
-SRC_FASTQ_DIR="$TEST_DATA_SRC/fastq"
-SRC_SAMPLES="$TEST_DATA_SRC/$PIPELINE/samples.txt"
+
+if [[ "$PIPELINE" == "cellranger" ]]; then
+    SRC_FASTQ_DIR="$TEST_DATA_10X/cellranger/fastq"
+    SRC_SAMPLES=""
+else
+    SRC_FASTQ_DIR="$TEST_DATA_SRC/fastq"
+    SRC_SAMPLES="$TEST_DATA_SRC/$PIPELINE/samples.txt"
+fi
 
 hyperion_banner "SMOKE TEST"
 
 # ── Pre-flight checks ────────────────────────────────────────────────────────
 if [[ ! -d "$SRC_FASTQ_DIR" ]]; then
     die "Test FASTQ directory not found: $SRC_FASTQ_DIR
-  Run subsample_from_real.sh first to generate test data."
+  Stage test data first (see test_data/ README)."
 fi
 
-if [[ ! -f "$SRC_SAMPLES" ]]; then
+if [[ -n "$SRC_SAMPLES" && ! -f "$SRC_SAMPLES" ]]; then
     die "Samples file not found: $SRC_SAMPLES"
 fi
 
@@ -96,7 +103,7 @@ src_files=("$SRC_FASTQ_DIR"/*.fastq.gz)
 shopt -u nullglob
 if [[ ${#src_files[@]} -eq 0 ]]; then
     die "No .fastq.gz files found in $SRC_FASTQ_DIR
-  Run subsample_from_real.sh first to generate test data."
+  Stage test data first (see test_data/ README)."
 fi
 
 # ── Clean if requested ────────────────────────────────────────────────────────
@@ -142,11 +149,23 @@ elif [[ "$PIPELINE" == "bulkrnaseq" ]]; then
             cp "$f" "$dest"
         fi
     done
+elif [[ "$PIPELINE" == "cellranger" ]]; then
+    # Cell Ranger uses standard Illumina naming — copy as-is
+    for f in "$SRC_FASTQ_DIR"/*.fastq.gz; do
+        [[ -f "$f" ]] || continue
+        dest="$SCRATCH_FASTQ_DIR/$(basename "$f")"
+        if [[ ! -f "$dest" ]]; then
+            info "Copying $(basename "$f") to scratch..."
+            cp "$f" "$dest"
+        fi
+    done
 fi
 
-# ── Copy samples file ────────────────────────────────────────────────────────
-cp "$SRC_SAMPLES" "$SCRATCH_TEST_DIR/samples.txt"
-info "Samples file: $SCRATCH_TEST_DIR/samples.txt"
+# ── Copy samples file (RNA-seq pipelines only) ──────────────────────────────
+if [[ -n "$SRC_SAMPLES" ]]; then
+    cp "$SRC_SAMPLES" "$SCRATCH_TEST_DIR/samples.txt"
+    info "Samples file: $SCRATCH_TEST_DIR/samples.txt"
+fi
 
 # ── Generate test config YAML ────────────────────────────────────────────────
 TEST_CONFIG="$SCRATCH_TEST_DIR/config.yaml"
@@ -198,6 +217,23 @@ paired_hts: pos
 fastqc_cores: 40
 run_fastqc: true
 run_rna_pipeline: true
+YAML
+elif [[ "$PIPELINE" == "cellranger" ]]; then
+    # Derive sample_name from the first FASTQ filename
+    shopt -s nullglob
+    test_fastqs=("$SCRATCH_FASTQ_DIR"/*_R1_001.fastq.gz "$SCRATCH_FASTQ_DIR"/*_R1.fastq.gz)
+    shopt -u nullglob
+    test_sample_name="test_sample"
+    if [[ ${#test_fastqs[@]} -gt 0 ]]; then
+        test_sample_name=$(basename "${test_fastqs[0]}" | sed 's/_S[0-9]*_L[0-9]*_R[12]_001\.fastq\.gz$//' | sed 's/_R[12]\.fastq\.gz$//')
+    fi
+    cat > "$TEST_CONFIG" <<YAML
+sample_id: cellranger_test
+sample_name: $test_sample_name
+fastq_dir: $SCRATCH_FASTQ_DIR
+transcriptome: /groups/tprice/pipelines/references/cellranger/refdata-gex-GRCh38-2024-A
+localcores: 16
+localmem: 120
 YAML
 fi
 

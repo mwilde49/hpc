@@ -93,12 +93,75 @@ vi /work/$USER/pipelines/psoma/samples.txt
 
 List sample names without the read suffix or `.fastq.gz` extension. For example, if your files are `Sample_19_1.fastq.gz`, list `Sample_19`.
 
+### Cell Ranger (10x single-cell gene expression)
+
+```bash
+vi /work/$USER/pipelines/cellranger/config.yaml
+```
+
+Fields:
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `sample_id` | yes | ID for the run (used as output directory name) |
+| `sample_name` | yes | Sample name matching FASTQ filenames |
+| `fastq_dir` | yes | Directory containing FASTQ files |
+| `transcriptome` | yes | Path to Cell Ranger reference transcriptome |
+| `localcores` | yes | Number of CPU cores (match SLURM allocation) |
+| `localmem` | yes | Memory in GB (leave headroom below SLURM `--mem`) |
+| `tool_path` | no | Override default tool location |
+| `chemistry` | no | Chemistry type (`auto`, `SC3Pv3`, etc.) |
+| `expect_cells` | no | Expected number of recovered cells |
+| `include_introns` | no | Include intronic reads (default: true) |
+
+### Space Ranger (10x spatial gene expression)
+
+```bash
+vi /work/$USER/pipelines/spaceranger/config.yaml
+```
+
+Fields:
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `sample_id` | yes | ID for the run |
+| `sample_name` | yes | Sample name matching FASTQ filenames |
+| `fastq_dir` | yes | Directory containing FASTQ files |
+| `transcriptome` | yes | Path to Space Ranger reference transcriptome |
+| `image` | yes | Path to microscope image (TIFF) |
+| `slide` | yes | Visium slide serial number |
+| `area` | yes | Capture area (`A1`, `B1`, `C1`, or `D1`) |
+| `localcores` | yes | Number of CPU cores |
+| `localmem` | yes | Memory in GB |
+| `tool_path` | no | Override default tool location |
+
+### Xenium Ranger (10x in situ transcriptomics)
+
+```bash
+vi /work/$USER/pipelines/xeniumranger/config.yaml
+```
+
+Fields:
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `sample_id` | yes | ID for the run |
+| `command` | yes | `resegment` or `import-segmentation` |
+| `xenium_bundle` | yes | Path to Xenium output bundle directory |
+| `localcores` | yes | Number of CPU cores |
+| `localmem` | yes | Memory in GB |
+| `tool_path` | no | Override default tool location |
+| `segmentation_file` | conditional | Required when command is `import-segmentation` |
+
 ## 3. Launch
 
 ```bash
 tjp-launch addone
 tjp-launch bulkrnaseq
 tjp-launch psoma
+tjp-launch cellranger
+tjp-launch spaceranger
+tjp-launch xeniumranger
 ```
 
 Use a custom config path:
@@ -151,7 +214,7 @@ squeue -u $USER             # monitor job
 tjp-test-validate psoma     # validate outputs after completion
 ```
 
-Works for both `psoma` and `bulkrnaseq`. Use `--clean` to wipe previous test data:
+Works for `psoma`, `bulkrnaseq`, and `cellranger`. Use `--clean` to wipe previous test data:
 
 ```bash
 tjp-test bulkrnaseq --clean

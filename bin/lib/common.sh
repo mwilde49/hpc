@@ -24,10 +24,23 @@ declare -A PIPELINE_TEMPLATES=(
     [addone]="slurm_templates/addone_slurm_template.sh"
     [bulkrnaseq]="slurm_templates/bulkrnaseq_slurm_template.sh"
     [psoma]="slurm_templates/psoma_slurm_template.sh"
+    [cellranger]="slurm_templates/cellranger_slurm_template.sh"
+    [spaceranger]="slurm_templates/spaceranger_slurm_template.sh"
+    [xeniumranger]="slurm_templates/xeniumranger_slurm_template.sh"
 )
 
+# Maps native pipeline name → tool install directory
+declare -A PIPELINE_TOOL_PATHS=(
+    [cellranger]="/groups/tprice/software/cellranger"
+    [spaceranger]="/groups/tprice/software/spaceranger"
+    [xeniumranger]="/groups/tprice/software/xeniumranger"
+)
+
+# Native pipelines: no container, tool installed from tarball
+NATIVE_PIPELINES=(cellranger spaceranger xeniumranger)
+
 # Ordered list of known pipelines (bash 3 compat for iteration)
-KNOWN_PIPELINES=(addone bulkrnaseq psoma)
+KNOWN_PIPELINES=(addone bulkrnaseq psoma cellranger spaceranger xeniumranger)
 
 # ── Color output ─────────────────────────────────────────────────────────────
 if [[ -t 1 ]]; then
@@ -76,7 +89,20 @@ timestamp() {
 
 is_known_pipeline() {
     local name="$1"
-    [[ -n "${PIPELINE_CONTAINERS[$name]+x}" ]]
+    [[ -n "${PIPELINE_CONTAINERS[$name]+x}" || -n "${PIPELINE_TEMPLATES[$name]+x}" ]]
+}
+
+is_native_pipeline() {
+    local n="$1"
+    for p in "${NATIVE_PIPELINES[@]}"; do [[ "$p" == "$n" ]] && return 0; done
+    return 1
+}
+
+get_tool_path() {
+    local name="$1"
+    local custom_path
+    # Allow per-run override via config (checked by caller), fall back to registry
+    printf '%s' "${PIPELINE_TOOL_PATHS[$name]:-}"
 }
 
 get_container_path() {

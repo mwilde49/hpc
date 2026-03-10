@@ -12,7 +12,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 
-SUPPORTED_PIPELINES=(psoma bulkrnaseq)
+SUPPORTED_PIPELINES=(psoma bulkrnaseq cellranger)
 
 # ── Usage ────────────────────────────────────────────────────────────────────
 usage() {
@@ -115,6 +115,26 @@ elif [[ "$PIPELINE" == "bulkrnaseq" ]]; then
         "3_filter_output/*.filt.bam"
         "4_stringtie_counts_output/genes.tpm.txt"
         "5_raw_counts_output/raw_htseq_counts.csv"
+    )
+elif [[ "$PIPELINE" == "cellranger" ]]; then
+    # Cell Ranger outputs are under <sample_id>/outs/
+    # Try to find the sample_id from the work run config
+    WORK_RUNS="$WORK_ROOT/pipelines/$PIPELINE/runs"
+    sample_id="cellranger_test"
+    if [[ -n "$RUN_TS" && -f "$WORK_RUNS/$RUN_TS/config.yaml" ]]; then
+        sample_id=$(yaml_get "$WORK_RUNS/$RUN_TS/config.yaml" "sample_id" 2>/dev/null || echo "cellranger_test")
+    fi
+    CHECK_DIRS=(
+        "$sample_id/outs"
+        "$sample_id/outs/filtered_feature_bc_matrix"
+        "$sample_id/outs/raw_feature_bc_matrix"
+    )
+    CHECK_FILES=(
+        "$sample_id/outs/web_summary.html"
+        "$sample_id/outs/metrics_summary.csv"
+        "$sample_id/outs/filtered_feature_bc_matrix/barcodes.tsv.gz"
+        "$sample_id/outs/filtered_feature_bc_matrix/features.tsv.gz"
+        "$sample_id/outs/filtered_feature_bc_matrix/matrix.mtx.gz"
     )
 fi
 

@@ -7,7 +7,17 @@
 # Partial md5 of first 10MB for sub-second execution on large containers.
 compute_sif_checksum() {
     local sif="$1"
-    if [[ -f "$sif" ]]; then
+    if [[ "$sif" == native:* ]]; then
+        # Native tool: return version string instead of hash
+        local tool_dir="${sif#native:}"
+        local tool_name
+        tool_name=$(basename "$tool_dir")
+        if [[ -x "$tool_dir/$tool_name" ]]; then
+            "$tool_dir/$tool_name" --version 2>/dev/null | head -1 || echo "version_unknown"
+        else
+            echo "tool_not_found"
+        fi
+    elif [[ -f "$sif" ]]; then
         dd if="$sif" bs=1M count=10 2>/dev/null | md5sum | awk '{print $1}'
     else
         printf 'container_not_found'
@@ -54,6 +64,14 @@ generate_manifest() {
         psoma)
             input_paths=$(yaml_get "$config" "fastq_dir" 2>/dev/null || echo "")
             output_paths="$SCRATCH_ROOT/pipelines/psoma/runs/$run_ts"
+            ;;
+        cellranger|spaceranger)
+            input_paths=$(yaml_get "$config" "fastq_dir" 2>/dev/null || echo "")
+            output_paths="$SCRATCH_ROOT/pipelines/$pipeline/runs/$run_ts"
+            ;;
+        xeniumranger)
+            input_paths=$(yaml_get "$config" "xenium_bundle" 2>/dev/null || echo "")
+            output_paths="$SCRATCH_ROOT/pipelines/xeniumranger/runs/$run_ts"
             ;;
     esac
 

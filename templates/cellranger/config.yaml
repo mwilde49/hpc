@@ -1,0 +1,27 @@
+# Cell Ranger Pipeline Configuration
+# Edit the fields below, then launch with: tjp-launch cellranger
+# See ONBOARDING.md for detailed field descriptions.
+#
+# 10x Genomics Cell Ranger — single-cell gene expression analysis
+# Native pipeline: no container required, uses installed Cell Ranger binary.
+
+# Required fields
+sample_id: my_sample                    # ID for the Cell Ranger run (used as output directory name)
+sample_name: MySample                   # Sample name matching FASTQ filenames (e.g., MySample_S1_L001_R1_001.fastq.gz)
+fastq_dir: __SCRATCH__/myproject/fastq  # Directory containing FASTQ files
+transcriptome: /groups/tprice/pipelines/references/cellranger/refdata-gex-GRCh38-2024-A  # Reference transcriptome
+
+# Resource limits (match your SLURM allocation)
+localcores: 16
+localmem: 120                           # GB — leave headroom below SLURM --mem
+
+# Optional: override tool path (default: /groups/tprice/software/cellranger)
+# tool_path: /groups/tprice/software/cellranger
+
+# Optional parameters (uncomment to use)
+# chemistry: auto                       # Chemistry type (auto, SC3Pv3, SC5P-PE, etc.)
+# expect_cells: 3000                    # Expected number of recovered cells
+# force_cells: 5000                     # Force a specific number of cells
+# include_introns: true                 # Include intronic reads (default: true for Cell Ranger 7+)
+# create_bam: true                      # Generate BAM output (default: true)
+# no_bam: false                         # Skip BAM generation (mutually exclusive with create_bam)

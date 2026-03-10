@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HPC pipeline framework for the TJP group on Juno HPC, deployed to the shared group location `/groups/tprice/pipelines`. Uses Apptainer containers + SLURM scheduling + config-driven YAML execution. Has three pipelines: AddOne (inline demo), BulkRNASeq (submoduled container + external Nextflow pipeline), and Psoma (submoduled combined container+pipeline repo). Designed to scale horizontally by adding new pipeline directories or container submodules.
+HPC pipeline framework for the TJP group on Juno HPC, deployed to the shared group location `/groups/tprice/pipelines`. Uses Apptainer containers + SLURM scheduling + config-driven YAML execution. Has six pipelines: AddOne (inline demo), BulkRNASeq (submoduled container + external Nextflow pipeline), Psoma (submoduled combined container+pipeline repo), and three 10x Genomics native pipelines (Cell Ranger, Space Ranger, Xenium Ranger). Designed to scale horizontally by adding new pipeline directories or container submodules.
 
 ## Build and Run Commands
 
@@ -48,7 +48,7 @@ Supporting layers:
 
 Execution flow: `sbatch template.sh config.yaml` → SLURM allocates node → Apptainer runs container → pipeline executes → writes to scratch → archives inputs/outputs to work run directory.
 
-Pipelines can be **inline** (code in `pipelines/<name>/`, e.g., addone) or **submoduled** (container repo in `containers/<name>/` with external pipeline code, e.g., bulkrnaseq).
+Pipelines can be **inline** (code in `pipelines/<name>/`, e.g., addone), **submoduled** (container repo in `containers/<name>/` with external pipeline code, e.g., bulkrnaseq), or **native** (no container, tool manages its own execution, e.g., cellranger).
 
 ## User Workflow (Recommended)
 
@@ -77,7 +77,7 @@ squeue -u $USER             # monitor
 tjp-test-validate psoma     # check outputs after completion
 ```
 
-Supports `psoma` and `bulkrnaseq`. Test FASTQs live at `$REPO_ROOT/test_data/rnaseq/fastq/` (gitignored, generated on HPC). Use `--clean` to wipe previous test data.
+Supports `psoma`, `bulkrnaseq`, and `cellranger`. Test FASTQs live at `$REPO_ROOT/test_data/rnaseq/fastq/` (RNA-seq, gitignored, generated on HPC) and `$REPO_ROOT/test_data/10x/` (10x pipelines). Use `--clean` to wipe previous test data.
 
 ## HPC Path Conventions (Juno-Specific)
 
@@ -153,6 +153,38 @@ sbatch slurm_templates/psoma_slurm_template.sh
 - HISAT2 index at `/groups/tprice/pipelines/references/hisat2_index/`
 - NexteraPE-PE.fa adapter file lives in the psoma submodule (auto-referenced)
 
+## 10x Genomics Pipelines (Cell Ranger, Space Ranger, Xenium Ranger)
+
+### Native Architecture
+
+Unlike BulkRNASeq/Psoma, 10x pipelines are **native** — no Apptainer container, no Nextflow. The tools are installed from tarballs at `/groups/tprice/software/<tool>/` and manage their own threading via `--localcores`/`--localmem`. The SLURM template calls a wrapper script from the `containers/10x/` submodule which invokes the tool directly.
+
+### Submodule
+
+The `mwilde49/10x` repo is a git submodule at `containers/10x/`. It contains:
+- `bin/*-run.sh` — wrapper scripts for each tool
+- `lib/10x_common.sh` — shared YAML parsing and tool discovery
+- `lib/validate_*.sh` — per-tool validation
+- `test/test_*.sh` — binary smoke tests
+
+### Key differences from container pipelines
+- **No `.sif` file** — tools installed natively from 10x Genomics tarballs
+- **No Nextflow** — SLURM template calls wrapper script directly
+- **Config passes through** — YAML config goes directly to SLURM (no Nextflow config generation)
+- **`--exclusive` SLURM flag** — 10x tools expect full node access
+- `is_native_pipeline()` gates all native-specific logic in shared code
+- Manifest uses `native:<tool_path>` for `container_file` and tool version for `container_checksum`
+
+### Tool paths
+| Tool | Install path | SLURM resources |
+|------|-------------|-----------------|
+| Cell Ranger | `/groups/tprice/software/cellranger` | 24h, 16 CPU, 128GB, exclusive |
+| Space Ranger | `/groups/tprice/software/spaceranger` | 24h, 16 CPU, 128GB, exclusive |
+| Xenium Ranger | `/groups/tprice/software/xeniumranger` | 12h, 16 CPU, 128GB, exclusive |
+
+### Config-level tool_path override
+Users can set `tool_path` in their config YAML to override the default install location (useful for testing new tool versions).
+
 ## Adding a New Pipeline
 
 ### Inline pipelines (e.g., addone)
@@ -176,9 +208,21 @@ For pipelines with their own container repo:
 5. Create a top-level `<NAME>_HPC_GUIDE.md` documenting setup and usage
 6. .sif files are NOT in git — build in submodule dir, transfer via `scp` to HPC
 
+### Native pipelines (e.g., cellranger)
+
+For tools that don't need a container:
+
+1. Add the wrapper repo as a submodule: `git submodule add <url> containers/<name>/`
+2. Install the tool from tarball to `/groups/tprice/software/<name>/`
+3. Add `PIPELINE_TOOL_PATHS[<name>]` and `NATIVE_PIPELINES+=(<name>)` in `bin/lib/common.sh`
+4. Add `slurm_templates/<name>_slurm_template.sh` calling the wrapper script
+5. Add config template in `templates/<name>/config.yaml`
+6. Add validator in `bin/lib/validate.sh`
+
 ## Key Constraints
 
 - `.sif` container files are excluded from git (large binaries) — must be transferred separately to HPC
 - Pipelines must support `--config <yaml>` for config-driven execution
-- SLURM templates must bind `PROJECT_ROOT`, `SCRATCH_ROOT`, and `WORK_ROOT` into the container
+- Container-based SLURM templates must bind `PROJECT_ROOT`, `SCRATCH_ROOT`, and `WORK_ROOT` into the container
+- Native pipeline SLURM templates use `--exclusive` and call wrapper scripts directly
 - Outputs go to scratch space, never to the project directory
