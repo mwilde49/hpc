@@ -9,7 +9,7 @@
 sample_id: my_sample                    # ID for the Space Ranger run (used as output directory name)
 sample_name: MySample                   # Sample name matching FASTQ filenames
 fastq_dir: __SCRATCH__/myproject/fastq  # Directory containing FASTQ files
-transcriptome: /groups/tprice/opt/cellranger_references/refdata-gex-GRCh38-2024-A  # Reference transcriptome
+transcriptome: /groups/tprice/pipelines/references/refdata-gex-GRCh38-2024-A  # Reference transcriptome
 image: __SCRATCH__/myproject/image.tif  # Brightfield or fluorescence microscope image
 slide: V19J25-123                       # Visium slide serial number
 area: A1                                # Capture area on the slide (A1, B1, C1, or D1)

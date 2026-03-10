@@ -9,7 +9,7 @@
 sample_id: my_sample                    # ID for the Cell Ranger run (used as output directory name)
 sample_name: MySample                   # Sample name matching FASTQ filenames (e.g., MySample_S1_L001_R1_001.fastq.gz)
 fastq_dir: __SCRATCH__/myproject/fastq  # Directory containing FASTQ files
-transcriptome: /groups/tprice/opt/cellranger_references/refdata-gex-GRCh38-2024-A  # Reference transcriptome
+transcriptome: /groups/tprice/pipelines/references/refdata-gex-GRCh38-2024-A  # Reference transcriptome
 
 # Resource limits (match your SLURM allocation)
 localcores: 16

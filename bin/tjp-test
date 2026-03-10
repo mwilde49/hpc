@@ -231,7 +231,7 @@ elif [[ "$PIPELINE" == "cellranger" ]]; then
 sample_id: cellranger_test
 sample_name: $test_sample_name
 fastq_dir: $SCRATCH_FASTQ_DIR
-transcriptome: /groups/tprice/opt/cellranger_references/refdata-gex-GRCh38-2024-A
+transcriptome: /groups/tprice/pipelines/references/refdata-gex-GRCh38-2024-A
 localcores: 16
 localmem: 120
 YAML
