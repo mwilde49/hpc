@@ -67,16 +67,7 @@ This creates:
     └── samples.txt
 ```
 
-Add the pipeline tools to your PATH (do this each session, or add to your `~/.bashrc`):
-
-```bash
-export PATH="/groups/tprice/pipelines/bin:$PATH"
-```
-```bash
-echo 'export PATH="/groups/tprice/pipelines/bin:$PATH"' >> ~/.bashrc
-```
-
-I would recommend doing the second if you intend to use this more than once
+Setup automatically adds the pipeline tools to your `~/.bashrc`, so they'll be available in every future session. Log out and back in (or run `source ~/.bashrc`) to activate.
 
 ---
 

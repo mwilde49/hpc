@@ -12,13 +12,7 @@ Quick start for running pipelines on Juno HPC.
 /groups/tprice/pipelines/bin/tjp-setup
 ```
 
-This creates your personal workspace at `/work/$USER/pipelines/` with template configs for each pipeline.
-
-Optionally add the tools to your PATH for the current session:
-
-```bash
-export PATH="/groups/tprice/pipelines/bin:$PATH"
-```
+This creates your personal workspace at `/work/$USER/pipelines/` with template configs for each pipeline, and automatically adds the tools to your `~/.bashrc`. Log out and back in (or run `source ~/.bashrc`) to activate.
 
 ## 2. Configure a Pipeline
 
