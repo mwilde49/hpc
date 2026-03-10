@@ -43,7 +43,7 @@ Four-layer stack where each layer has a single responsibility:
 
 Supporting layers:
 
-- **`bin/`** — user-facing CLI tools (`tjp-setup`, `tjp-launch`, `tjp-test`, `tjp-test-validate`) and shared libraries (`bin/lib/`)
+- **`bin/`** — user-facing CLI tools (`tjp-setup`, `tjp-launch`, `tjp-test`, `tjp-test-validate`) with `hyperion-*` and `biocruiser-*` symlink aliases, plus shared libraries (`bin/lib/` including `branding.sh` for Hyperion Compute themed output)
 - **`templates/`** — per-pipeline config templates with `__USER__`/`__SCRATCH__`/`__WORK__` placeholders, plus the Nextflow config template (`pipeline.config.tmpl`)
 
 Execution flow: `sbatch template.sh config.yaml` → SLURM allocates node → Apptainer runs container → pipeline executes → writes to scratch → archives inputs/outputs to work run directory.

@@ -46,7 +46,7 @@ fi
 # --- Run pipeline ---
 
 echo "====================================================================="
-echo "  HYPERION BIOCRUISER — BulkRNASeq Pipeline Executing"
+echo "  HYPERION COMPUTE — BulkRNASeq Pipeline Executing"
 echo "====================================================================="
 
 mkdir -p logs

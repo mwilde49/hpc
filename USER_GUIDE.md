@@ -1,8 +1,8 @@
 # Hyperion Compute — User Guide
 
-### TJP Next Generation Bulk RNA-Seq Pipelines, High Performance Computing Edition
+### Next Generation Bulk RNA-Seq Pipelines, High Performance Computing Edition
 
-This guide covers how to configure and run the two bulk RNA-seq pipelines available on the TJP HPC system (Juno). You do **not** need admin access, any special training, or to build anything — containers and references are already installed. All you need is this guide. Feel free to reach out to me (Michael) with any questions.
+This guide covers how to configure and run the two bulk RNA-seq pipelines available on the HPC system (Juno). You do **not** need admin access, any special training, or to build anything — containers and references are already installed. All you need is this guide. Feel free to reach out to me (Michael) with any questions.
 
 > **Note:** The CLI tools are available as `tjp-*`, `hyperion-*`, or `biocruiser-*` — they're all identical. Use whichever you prefer. This guide uses `tjp-*` throughout, but you can substitute freely (e.g., `hyperion-launch psoma` instead of `tjp-launch psoma`).
 
@@ -179,7 +179,7 @@ Fields you **may** need to change:
 | `run_fastqc`       | `true`    | Set to `false` to skip QC reports               |
 | `run_rna_pipeline` | `true`    | Set to `false` to run only FastQC               |
 
-Fields you should **not** change (shared references are pre-installed):
+Fields you should **generally not** change (shared references are pre-installed):
 
 ```yaml
 star_index: /groups/tprice/pipelines/references/star_index
@@ -374,7 +374,7 @@ scancel <JOBID>
 
 Pipeline outputs are written to your **scratch** directory during execution, then automatically **archived to your work directory** after a successful run. Scratch is fast but wiped every 45 days — the work archive is durable.
 
-**Scratch** (pipeline execution, wiped every 45 days):
+**Scratch** (pipeline execution, REMEMBER THAT THIS IS WIPED every 45 days):
 ```
 /scratch/juno/$USER/pipelines/<pipeline>/runs/<timestamp>/
 ```

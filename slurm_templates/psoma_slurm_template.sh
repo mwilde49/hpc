@@ -51,7 +51,7 @@ fi
 # --- Run pipeline ---
 
 echo "====================================================================="
-echo "  HYPERION BIOCRUISER — Psoma Pipeline Executing"
+echo "  HYPERION COMPUTE — Psoma Pipeline Executing"
 echo "====================================================================="
 
 mkdir -p logs
