@@ -145,7 +145,7 @@ _validate_cellranger() {
     local -n _errs=$2
 
     # Required keys
-    local required_keys=(sample_id sample_name fastq_dir transcriptome localcores localmem)
+    local required_keys=(sample_id sample_name fastq_dir transcriptome localcores localmem create_bam)
     for key in "${required_keys[@]}"; do
         if ! yaml_has "$config" "$key"; then
             _errs+=("Missing required key: $key")
