@@ -12,7 +12,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 
-SUPPORTED_PIPELINES=(psoma bulkrnaseq cellranger)
+SUPPORTED_PIPELINES=(psoma bulkrnaseq cellranger spaceranger)
 
 # ── Usage ────────────────────────────────────────────────────────────────────
 usage() {
@@ -135,6 +135,26 @@ elif [[ "$PIPELINE" == "cellranger" ]]; then
         "$sample_id/outs/filtered_feature_bc_matrix/barcodes.tsv.gz"
         "$sample_id/outs/filtered_feature_bc_matrix/features.tsv.gz"
         "$sample_id/outs/filtered_feature_bc_matrix/matrix.mtx.gz"
+    )
+elif [[ "$PIPELINE" == "spaceranger" ]]; then
+    # Space Ranger outputs are under <sample_id>/outs/
+    WORK_RUNS="$WORK_ROOT/pipelines/$PIPELINE/runs"
+    sample_id="spaceranger_test"
+    if [[ -n "$RUN_TS" && -f "$WORK_RUNS/$RUN_TS/config.yaml" ]]; then
+        sample_id=$(yaml_get "$WORK_RUNS/$RUN_TS/config.yaml" "sample_id" 2>/dev/null || echo "spaceranger_test")
+    fi
+    CHECK_DIRS=(
+        "$sample_id/outs"
+        "$sample_id/outs/spatial"
+        "$sample_id/outs/filtered_feature_bc_matrix"
+        "$sample_id/outs/raw_feature_bc_matrix"
+    )
+    CHECK_FILES=(
+        "$sample_id/outs/web_summary.html"
+        "$sample_id/outs/metrics_summary.csv"
+        "$sample_id/outs/spatial/tissue_positions.csv"
+        "$sample_id/outs/spatial/scalefactors_json.json"
+        "$sample_id/outs/filtered_feature_bc_matrix.h5"
     )
 fi
 

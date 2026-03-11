@@ -21,7 +21,7 @@ source "$SCRIPT_DIR/lib/common.sh"
 # ── Constants ────────────────────────────────────────────────────────────────
 TEST_DATA_SRC="$REPO_ROOT/test_data/rnaseq"
 TEST_DATA_10X="$REPO_ROOT/test_data/10x"
-SUPPORTED_PIPELINES=(psoma bulkrnaseq cellranger)
+SUPPORTED_PIPELINES=(psoma bulkrnaseq cellranger spaceranger)
 
 # ── Usage ────────────────────────────────────────────────────────────────────
 usage() {
@@ -79,6 +79,13 @@ SCRATCH_FASTQ_DIR="$SCRATCH_TEST_DIR/fastq"
 
 if [[ "$PIPELINE" == "cellranger" ]]; then
     SRC_FASTQ_DIR="$TEST_DATA_10X/cellranger/fastq"
+    SRC_SAMPLES=""
+elif [[ "$PIPELINE" == "spaceranger" ]]; then
+    # Space Ranger ships with tiny test inputs in the install directory
+    SPACERANGER_DIR=$(get_tool_path spaceranger)
+    SRC_FASTQ_DIR="$SPACERANGER_DIR/external/spaceranger_tiny_inputs/fastqs"
+    SRC_IMAGE="$SPACERANGER_DIR/external/spaceranger_tiny_inputs/image/tinyimage.jpg"
+    SRC_REF="$SPACERANGER_DIR/external/spaceranger_tiny_ref"
     SRC_SAMPLES=""
 else
     SRC_FASTQ_DIR="$TEST_DATA_SRC/fastq"
@@ -149,8 +156,8 @@ elif [[ "$PIPELINE" == "bulkrnaseq" ]]; then
             cp "$f" "$dest"
         fi
     done
-elif [[ "$PIPELINE" == "cellranger" ]]; then
-    # Cell Ranger uses standard Illumina naming — copy as-is
+elif [[ "$PIPELINE" == "cellranger" || "$PIPELINE" == "spaceranger" ]]; then
+    # 10x pipelines use standard Illumina naming — copy as-is
     for f in "$SRC_FASTQ_DIR"/*.fastq.gz; do
         [[ -f "$f" ]] || continue
         dest="$SCRATCH_FASTQ_DIR/$(basename "$f")"
@@ -159,6 +166,12 @@ elif [[ "$PIPELINE" == "cellranger" ]]; then
             cp "$f" "$dest"
         fi
     done
+    # Space Ranger also needs the image file
+    if [[ "$PIPELINE" == "spaceranger" ]]; then
+        mkdir -p "$SCRATCH_TEST_DIR/image"
+        cp "$SRC_IMAGE" "$SCRATCH_TEST_DIR/image/"
+        info "Copied test image: $(basename "$SRC_IMAGE")"
+    fi
 fi
 
 # ── Copy samples file (RNA-seq pipelines only) ──────────────────────────────
@@ -234,6 +247,20 @@ fastq_dir: $SCRATCH_FASTQ_DIR
 transcriptome: /groups/tprice/pipelines/references/refdata-gex-GRCh38-2024-A
 localcores: 16
 localmem: 120
+create_bam: true
+YAML
+elif [[ "$PIPELINE" == "spaceranger" ]]; then
+    cat > "$TEST_CONFIG" <<YAML
+sample_id: spaceranger_test
+sample_name: tinytest
+fastq_dir: $SCRATCH_FASTQ_DIR
+transcriptome: $SRC_REF
+image: $SCRATCH_TEST_DIR/image/tinyimage.jpg
+slide: VPLACEHOLDER
+area: A1
+localcores: 16
+localmem: 120
+create_bam: true
 YAML
 fi
 

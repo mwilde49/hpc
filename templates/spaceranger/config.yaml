@@ -18,6 +18,9 @@ area: A1                                # Capture area on the slide (A1, B1, C1,
 localcores: 16
 localmem: 120                           # GB — leave headroom below SLURM --mem
 
+# BAM output (required in Space Ranger 3+)
+create_bam: true
+
 # Optional: override tool path (default: /groups/tprice/opt/spaceranger-4.0.1)
 # tool_path: /groups/tprice/opt/spaceranger-4.0.1
 
