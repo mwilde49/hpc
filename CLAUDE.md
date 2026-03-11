@@ -77,7 +77,7 @@ squeue -u $USER             # monitor
 tjp-test-validate psoma     # check outputs after completion
 ```
 
-Supports `psoma`, `bulkrnaseq`, and `cellranger`. Test FASTQs live at `$REPO_ROOT/test_data/rnaseq/fastq/` (RNA-seq, gitignored, generated on HPC) and `$REPO_ROOT/test_data/10x/` (10x pipelines). Use `--clean` to wipe previous test data.
+Supports `psoma`, `bulkrnaseq`, `cellranger`, and `spaceranger`. Test FASTQs live at `$REPO_ROOT/test_data/rnaseq/fastq/` (RNA-seq, gitignored, generated on HPC) and `$REPO_ROOT/test_data/10x/` (10x pipelines). Spaceranger uses bundled tiny inputs from the Space Ranger install directory. Use `--clean` to wipe previous test data.
 
 ## HPC Path Conventions (Juno-Specific)
 

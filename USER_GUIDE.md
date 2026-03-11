@@ -314,6 +314,7 @@ sample_id: my_sample                        # output directory name
 sample_name: MySample                       # matches FASTQ filename prefix
 fastq_dir: /scratch/juno/YOUR_NETID/myproject/fastq
 transcriptome: /groups/tprice/pipelines/references/cellranger/refdata-gex-GRCh38-2024-A
+create_bam: true                            # required in Cell Ranger 10+
 ```
 
 Launch:
@@ -338,6 +339,13 @@ transcriptome: /groups/tprice/pipelines/references/spaceranger/refdata-gex-GRCh3
 image: /scratch/juno/YOUR_NETID/myproject/image.tif
 slide: V19J25-123                           # your Visium slide serial number
 area: A1                                    # A1, B1, C1, or D1
+create_bam: true                            # required in Space Ranger 3+
+```
+
+If your slide serial number is unknown, use `unknown_slide` instead of `slide`+`area`:
+
+```yaml
+unknown_slide: visium-1                     # visium-1, visium-2, visium-2-large, or visium-hd
 ```
 
 Launch:
@@ -525,7 +533,7 @@ squeue -u $USER             # monitor job
 tjp-test-validate psoma     # validate outputs after completion
 ```
 
-Supported pipelines: `psoma`, `bulkrnaseq`, and `cellranger`.
+Supported pipelines: `psoma`, `bulkrnaseq`, `cellranger`, and `spaceranger`.
 
 `tjp-test` copies shared test FASTQs from the repo to your scratch directory, generates a test config with the correct reference paths, and delegates to `tjp-launch --dev`. After the job completes, `tjp-test-validate` checks that all expected output directories and key files (BAMs, count matrices) were produced.
 

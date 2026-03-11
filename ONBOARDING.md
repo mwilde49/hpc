@@ -109,6 +109,7 @@ Fields:
 | `transcriptome` | yes | Path to Cell Ranger reference transcriptome |
 | `localcores` | yes | Number of CPU cores (match SLURM allocation) |
 | `localmem` | yes | Memory in GB (leave headroom below SLURM `--mem`) |
+| `create_bam` | yes | Create BAM file (`true`/`false`) — required in Cell Ranger 10+ |
 | `tool_path` | no | Override default tool location |
 | `chemistry` | no | Chemistry type (`auto`, `SC3Pv3`, etc.) |
 | `expect_cells` | no | Expected number of recovered cells |
@@ -129,11 +130,15 @@ Fields:
 | `fastq_dir` | yes | Directory containing FASTQ files |
 | `transcriptome` | yes | Path to Space Ranger reference transcriptome |
 | `image` | yes | Path to microscope image (TIFF) |
-| `slide` | yes | Visium slide serial number |
-| `area` | yes | Capture area (`A1`, `B1`, `C1`, or `D1`) |
+| `slide` | yes* | Visium slide serial number (e.g., `V19J25-123`) |
+| `area` | yes* | Capture area (`A1`, `B1`, `C1`, or `D1`) |
+| `unknown_slide` | yes* | Use instead of `slide`+`area` when slide serial is unknown (`visium-1`, `visium-2`, `visium-2-large`, or `visium-hd`) |
 | `localcores` | yes | Number of CPU cores |
 | `localmem` | yes | Memory in GB |
+| `create_bam` | yes | Create BAM file (`true`/`false`) — required in Space Ranger 3+ |
 | `tool_path` | no | Override default tool location |
+
+*Provide either `slide`+`area` or `unknown_slide`, not both.
 
 ### Xenium Ranger (10x in situ transcriptomics)
 
@@ -214,7 +219,7 @@ squeue -u $USER             # monitor job
 tjp-test-validate psoma     # validate outputs after completion
 ```
 
-Works for `psoma`, `bulkrnaseq`, and `cellranger`. Use `--clean` to wipe previous test data:
+Works for `psoma`, `bulkrnaseq`, `cellranger`, and `spaceranger`. Use `--clean` to wipe previous test data:
 
 ```bash
 tjp-test bulkrnaseq --clean
