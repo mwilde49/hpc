@@ -256,8 +256,7 @@ sample_name: tinytest
 fastq_dir: $SCRATCH_FASTQ_DIR
 transcriptome: $SRC_REF
 image: $SCRATCH_TEST_DIR/image/tinyimage.jpg
-slide: VPLACEHOLDER
-area: A1
+unknown_slide: visium-1
 localcores: 16
 localmem: 120
 create_bam: true

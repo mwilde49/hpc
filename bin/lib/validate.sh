@@ -192,13 +192,33 @@ _validate_spaceranger() {
     local config="$1"
     local -n _errs=$2
 
-    # Required keys
-    local required_keys=(sample_id sample_name fastq_dir transcriptome image slide area localcores localmem create_bam)
+    # Required keys (slide+area OR unknown_slide)
+    local required_keys=(sample_id sample_name fastq_dir transcriptome image localcores localmem create_bam)
     for key in "${required_keys[@]}"; do
         if ! yaml_has "$config" "$key"; then
             _errs+=("Missing required key: $key")
         fi
     done
+
+    # Slide identification: either slide+area or unknown_slide
+    if yaml_has "$config" "unknown_slide"; then
+        local us
+        us=$(yaml_get "$config" "unknown_slide") || true
+        case "$us" in
+            visium-1|visium-2|visium-2-large|visium-hd) ;;
+            *) _errs+=("Invalid unknown_slide value: $us (expected visium-1, visium-2, visium-2-large, or visium-hd)") ;;
+        esac
+        if yaml_has "$config" "slide" || yaml_has "$config" "area"; then
+            warn "Both unknown_slide and slide/area specified — unknown_slide takes precedence"
+        fi
+    else
+        if ! yaml_has "$config" "slide"; then
+            _errs+=("Missing required key: slide (or use unknown_slide)")
+        fi
+        if ! yaml_has "$config" "area"; then
+            _errs+=("Missing required key: area (or use unknown_slide)")
+        fi
+    fi
 
     # Paths that must exist on disk
     local path_keys=(fastq_dir transcriptome image)
