@@ -18,10 +18,12 @@ localmem: 120                           # GB — leave headroom below SLURM --me
 # Optional: override tool path (default: /groups/tprice/opt/cellranger-10.0.0)
 # tool_path: /groups/tprice/opt/cellranger-10.0.0
 
+# BAM output (required in Cell Ranger 10+)
+create_bam: true
+
 # Optional parameters (uncomment to use)
 # chemistry: auto                       # Chemistry type (auto, SC3Pv3, SC5P-PE, etc.)
 # expect_cells: 3000                    # Expected number of recovered cells
 # force_cells: 5000                     # Force a specific number of cells
 # include_introns: true                 # Include intronic reads (default: true for Cell Ranger 7+)
-# create_bam: true                      # Generate BAM output (default: true)
 # no_bam: false                         # Skip BAM generation (mutually exclusive with create_bam)
