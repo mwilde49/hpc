@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# tjp-edit — open a pipeline's config file for editing
+#
+# Usage: tjp-edit <pipeline>
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
+
+usage() {
+    cat <<EOF
+Usage: tjp-edit <pipeline>
+
+Open the user config for a pipeline in your default editor.
+
+Pipelines: ${KNOWN_PIPELINES[*]}
+
+Examples:
+  tjp-edit psoma
+  tjp-edit cellranger
+  EDITOR=nano tjp-edit bulkrnaseq
+EOF
+    exit "${1:-0}"
+}
+
+[[ $# -lt 1 ]] && usage 1
+[[ "$1" == "-h" || "$1" == "--help" ]] && usage 0
+
+PIPELINE="$1"
+is_known_pipeline "$PIPELINE" || die "Unknown pipeline: $PIPELINE"
+
+CONFIG="$USER_PIPELINES/$PIPELINE/config.yaml"
+[[ -f "$CONFIG" ]] || die "Config not found: $CONFIG (run tjp-setup first)"
+
+info "Opening $CONFIG"
+"${EDITOR:-vi}" "$CONFIG"
