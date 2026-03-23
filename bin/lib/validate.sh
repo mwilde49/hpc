@@ -13,6 +13,7 @@ validate_config() {
         addone)     _validate_addone "$config" errors ;;
         bulkrnaseq) _validate_bulkrnaseq "$config" errors ;;
         psoma)          _validate_psoma "$config" errors ;;
+        virome)         _validate_virome "$config" errors ;;
         cellranger)     _validate_cellranger "$config" errors ;;
         spaceranger)    _validate_spaceranger "$config" errors ;;
         xeniumranger)   _validate_xeniumranger "$config" errors ;;
@@ -137,6 +138,69 @@ _validate_psoma() {
             *) warn "Unrecognized species '$species' — expected Human, Mouse, or Rattus" ;;
         esac
     fi
+}
+
+# ── Virome validator ─────────────────────────────────────────────────────
+_validate_virome() {
+    local config="$1"
+    local -n _errs=$2
+
+    # Required keys
+    local required_keys=(project_name samplesheet outdir star_index kraken2_db adapters container_dir)
+    for key in "${required_keys[@]}"; do
+        if ! yaml_has "$config" "$key"; then
+            _errs+=("Missing required key: $key")
+        fi
+    done
+
+    # Paths that must exist on disk
+    local path_keys=(samplesheet star_index kraken2_db adapters container_dir)
+    for key in "${path_keys[@]}"; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            if [[ -n "$val" && "$val" != /path/to/* && ! -e "$val" ]]; then
+                _errs+=("Path does not exist for $key: $val")
+            fi
+        fi
+    done
+
+    # Samplesheet format: must have sample and fastq_r1 headers
+    if yaml_has "$config" "samplesheet"; then
+        local ss
+        ss=$(yaml_get "$config" "samplesheet") || true
+        if [[ -n "$ss" && -f "$ss" ]]; then
+            local header
+            header=$(head -1 "$ss")
+            if ! grep -q "sample" <<< "$header"; then
+                _errs+=("Samplesheet missing 'sample' column header: $ss")
+            fi
+            if ! grep -q "fastq_r1" <<< "$header"; then
+                _errs+=("Samplesheet missing 'fastq_r1' column header: $ss")
+            fi
+        fi
+    fi
+
+    # container_dir: warn if directory exists but no .sif files built yet
+    if yaml_has "$config" "container_dir"; then
+        local cdir
+        cdir=$(yaml_get "$config" "container_dir") || true
+        if [[ -n "$cdir" && -d "$cdir" ]] && ! ls "$cdir"/*.sif &>/dev/null 2>&1; then
+            warn "No .sif containers found in container_dir: $cdir"
+            warn "  → Copy built containers or run: sbatch $REPO_ROOT/containers/virome/scripts/build_containers.sh"
+        fi
+    fi
+
+    # Numeric params (optional but validated if present)
+    for key in trim_headcrop trim_leading trim_trailing trim_minlen min_reads_per_taxon; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            if [[ -n "$val" && ! "$val" =~ ^[0-9]+$ ]]; then
+                _errs+=("$key must be a non-negative integer, got: $val")
+            fi
+        fi
+    done
 }
 
 # ── Cell Ranger validator ─────────────────────────────────────────────────

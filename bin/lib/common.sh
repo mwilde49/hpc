@@ -13,10 +13,12 @@ USER_PIPELINES="$WORK_ROOT/pipelines"
 
 # ── Pipeline registry ────────────────────────────────────────────────────────
 # Maps pipeline name → container .sif path (relative to REPO_ROOT)
+# For multi-container pipelines (e.g. virome), the value is a directory path.
 declare -A PIPELINE_CONTAINERS=(
     [addone]="containers/addone_latest.sif"
     [bulkrnaseq]="containers/bulkrnaseq/bulkrnaseq_v1.0.0.sif"
     [psoma]="containers/psoma/psomagen_v1.0.0.sif"
+    [virome]="containers/virome"
 )
 
 # Maps pipeline name → SLURM template path (relative to REPO_ROOT)
@@ -24,6 +26,7 @@ declare -A PIPELINE_TEMPLATES=(
     [addone]="slurm_templates/addone_slurm_template.sh"
     [bulkrnaseq]="slurm_templates/bulkrnaseq_slurm_template.sh"
     [psoma]="slurm_templates/psoma_slurm_template.sh"
+    [virome]="slurm_templates/virome_slurm_template.sh"
     [cellranger]="slurm_templates/cellranger_slurm_template.sh"
     [spaceranger]="slurm_templates/spaceranger_slurm_template.sh"
     [xeniumranger]="slurm_templates/xeniumranger_slurm_template.sh"
@@ -40,7 +43,7 @@ declare -A PIPELINE_TOOL_PATHS=(
 NATIVE_PIPELINES=(cellranger spaceranger xeniumranger)
 
 # Ordered list of known pipelines (bash 3 compat for iteration)
-KNOWN_PIPELINES=(addone bulkrnaseq psoma cellranger spaceranger xeniumranger)
+KNOWN_PIPELINES=(addone bulkrnaseq psoma virome cellranger spaceranger xeniumranger)
 
 # ── Color output ─────────────────────────────────────────────────────────────
 if [[ -t 1 ]]; then
@@ -95,6 +98,15 @@ is_known_pipeline() {
 is_native_pipeline() {
     local n="$1"
     for p in "${NATIVE_PIPELINES[@]}"; do [[ "$p" == "$n" ]] && return 0; done
+    return 1
+}
+
+# Multi-container pipelines use a directory of .sif files rather than one monolithic container.
+MULTICONTAINER_PIPELINES=(virome)
+
+is_multicontainer_pipeline() {
+    local n="$1"
+    for p in "${MULTICONTAINER_PIPELINES[@]}"; do [[ "$p" == "$n" ]] && return 0; done
     return 1
 }
 

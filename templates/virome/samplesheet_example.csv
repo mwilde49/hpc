@@ -1,0 +1,3 @@
+sample,fastq_r1,fastq_r2
+sample_01,/scratch/juno/USER/raw_data/sample_01_R1.fastq.gz,/scratch/juno/USER/raw_data/sample_01_R2.fastq.gz
+sample_02,/scratch/juno/USER/raw_data/sample_02_R1.fastq.gz,/scratch/juno/USER/raw_data/sample_02_R2.fastq.gz

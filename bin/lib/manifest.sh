@@ -17,6 +17,18 @@ compute_sif_checksum() {
         else
             echo "tool_not_found"
         fi
+    elif [[ -d "$sif" ]]; then
+        # Multi-container directory: partial checksum of each .sif combined
+        local combined=""
+        for f in "$sif"/*.sif; do
+            [[ -f "$f" ]] || continue
+            combined+=$(dd if="$f" bs=1M count=10 2>/dev/null | md5sum | awk '{print $1}')
+        done
+        if [[ -n "$combined" ]]; then
+            printf '%s' "$combined" | md5sum | awk '{print $1}'
+        else
+            printf 'containers_not_built'
+        fi
     elif [[ -f "$sif" ]]; then
         dd if="$sif" bs=1M count=10 2>/dev/null | md5sum | awk '{print $1}'
     else
@@ -64,6 +76,10 @@ generate_manifest() {
         psoma)
             input_paths=$(yaml_get "$config" "fastq_dir" 2>/dev/null || echo "")
             output_paths="$SCRATCH_ROOT/pipelines/psoma/runs/$run_ts"
+            ;;
+        virome)
+            input_paths=$(yaml_get "$config" "samplesheet" 2>/dev/null || echo "")
+            output_paths=$(yaml_get "$config" "outdir" 2>/dev/null || echo "")
             ;;
         cellranger|spaceranger)
             input_paths=$(yaml_get "$config" "fastq_dir" 2>/dev/null || echo "")

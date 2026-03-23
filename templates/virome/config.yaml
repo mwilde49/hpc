@@ -1,0 +1,27 @@
+project_name: "my_project"
+
+# Samplesheet CSV (columns: sample, fastq_r1, fastq_r2)
+# Copy samplesheet_example.csv to this location and fill in your paths.
+samplesheet: "__SCRATCH__/virome/samplesheet.csv"
+
+# Output directory (written to scratch, archived to work after completion)
+outdir: "__SCRATCH__/virome/results"
+
+# Reference databases (pre-built for Juno)
+star_index: "/groups/tprice/pipelines/references/star_index"
+kraken2_db: "/groups/tprice/pipelines/references/kraken2_viral_db"
+
+# Adapter sequences and container directory (auto-configured — do not change)
+adapters: "__REPO_ROOT__/containers/virome/assets/NexteraPE-PE.fa"
+container_dir: "__REPO_ROOT__/containers/virome"
+
+# Trimmomatic quality trimming parameters
+trim_headcrop: 0
+trim_leading: 3
+trim_trailing: 3
+trim_slidingwindow: "4:15"
+trim_minlen: 36
+
+# Kraken2 classification parameters
+kraken2_confidence: 0.1
+min_reads_per_taxon: 5

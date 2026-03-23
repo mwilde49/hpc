@@ -955,3 +955,516 @@ This is also why Psoma's SLURM template sets `--env HOME=/tmp` — Nextflow trie
 | `/groups/tprice/pipelines/references/blacklist.bed` | Blacklisted regions |
 | `/groups/tprice/pipelines/references/hisat2_index/` | HISAT2 genome index |
 | `/groups/tprice/pipelines/references/star_index/` | STAR genome index |
+
+---
+
+## Appendix A: Execution Flow Diagrams
+
+Detailed nesting and timeline for each pipeline, showing every layer from user command to tool execution.
+
+### A.1 AddOne (Inline Container)
+
+```
+USER LOGIN NODE
+│
+├─ tjp-launch addone
+│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh
+│   ├─ 2. validate_config() → _validate_addone()
+│   │      checks: input file exists, output key present
+│   ├─ 3. create /work/$USER/pipelines/addone/runs/<timestamp>/
+│   ├─ 4. cp config.yaml → run dir (snapshot)
+│   ├─ 5. generate_manifest() → manifest.json
+│   ├─ 6. sbatch addone_slurm_template.sh config.yaml
+│   │      ════════════════════════════════════════════════
+│   │      HANDOFF — control leaves login node, enters SLURM queue
+│   │      ════════════════════════════════════════════════
+│   └─ 7. extract job ID, update manifest, print summary
+│
+COMPUTE NODE (allocated by SLURM: 1 CPU, 1GB, 5min)
+│
+├─ addone_slurm_template.sh
+│   ├─ 8. module load apptainer
+│   ├─ 9. apptainer exec \
+│   │       --bind $PROJECT_ROOT --bind $SCRATCH_ROOT --bind $WORK_ROOT \
+│   │       $CONTAINER \
+│   │       ════════════════════════════════════════════════
+│   │       HANDOFF — enters sealed container
+│   │       ════════════════════════════════════════════════
+│   │
+│   │   INSIDE CONTAINER (.sif — python:3.11-slim + pyyaml)
+│   │   │
+│   │   └─ 10. python addone.py --config config.yaml
+│   │          ├─ load YAML config
+│   │          ├─ read input file → list of numbers
+│   │          ├─ add 1 to each number
+│   │          └─ write output file
+│   │
+│   └─ container exits, SLURM template ends
+│
+DONE — job exits, SLURM releases node
+
+Nesting depth: 3 layers
+  tjp-launch → SLURM template → Apptainer → Python script
+```
+
+### A.2 BulkRNASeq (Submoduled Container + External Nextflow)
+
+```
+USER LOGIN NODE
+│
+├─ tjp-launch bulkrnaseq
+│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh
+│   ├─ 2. validate_config() → _validate_bulkrnaseq()
+│   │      checks: fastq_dir exists, samples_file exists,
+│   │      star_index exists, reference_gtf exists
+│   ├─ 3. create /work/$USER/pipelines/bulkrnaseq/runs/<timestamp>/
+│   ├─ 4. cp config.yaml → run dir (snapshot)
+│   ├─ 5. create /scratch/juno/$USER/pipelines/bulkrnaseq/runs/<timestamp>/
+│   ├─ 6. symlink UTDal repo files into scratch dir
+│   │      ln -sf $REPO_ROOT/Bulk-RNA-Seq-Nextflow-Pipeline/* → scratch/
+│   ├─ 7. _generate_nextflow_config()
+│   │      reads user YAML → sed substitutes into pipeline.config.tmpl
+│   │      → writes run dir/pipeline.config
+│   │      (references wired in here: star_index, reference_gtf,
+│   │       filter.bed, blacklist.bed)
+│   ├─ 8. generate_manifest() → manifest.json
+│   ├─ 9. sbatch bulkrnaseq_slurm_template.sh pipeline.config run_dir scratch_dir fastq_dir
+│   │      ════════════════════════════════════════════════
+│   │      HANDOFF — control leaves login node, enters SLURM queue
+│   │      ════════════════════════════════════════════════
+│   └─ 10. extract job ID, update manifest, print summary
+│
+COMPUTE NODE (allocated by SLURM: 40 CPU, 128GB, 12h)
+│
+├─ bulkrnaseq_slurm_template.sh
+│   ├─ 11. module load apptainer
+│   ├─ 12. pre-flight: container exists? UTDal repo exists? config exists?
+│   ├─ 13. apptainer exec \
+│   │       --cleanenv \
+│   │       --env PYTHONNOUSERSITE=1 \
+│   │       --bind $PROJECT_ROOT --bind $SCRATCH_ROOT --bind $WORK_ROOT \
+│   │       $CONTAINER \
+│   │       ════════════════════════════════════════════════
+│   │       HANDOFF — enters sealed container
+│   │       ════════════════════════════════════════════════
+│   │
+│   │   INSIDE CONTAINER (.sif)
+│   │   │
+│   │   ├─ 14. nextflow run bulk_rna_seq_nextflow_pipeline.nf \
+│   │   │       -c pipeline.config \
+│   │   │       -w /scratch/juno/$USER/nextflow_work
+│   │   │
+│   │   │   NEXTFLOW ORCHESTRATES THESE STAGES:
+│   │   │   │
+│   │   │   ├─ 15. FastQC (if run_fastqc=true)
+│   │   │   │      reads: fastq_dir/*.fastq.gz
+│   │   │   │      → QC reports
+│   │   │   │
+│   │   │   ├─ 16. STAR alignment
+│   │   │   │      reads: fastq_dir/*.fastq.gz
+│   │   │   │      uses:  star_index (reference genome index)
+│   │   │   │      uses:  reference_gtf (gene annotation)
+│   │   │   │      → sorted BAM files
+│   │   │   │
+│   │   │   ├─ 17. Filtering
+│   │   │   │      reads: BAM files from step 16
+│   │   │   │      uses:  filter.bed (genomic regions to exclude)
+│   │   │   │      uses:  blacklist.bed (blacklisted regions)
+│   │   │   │      → filtered BAM files
+│   │   │   │
+│   │   │   ├─ 18. StringTie quantification
+│   │   │   │      reads: filtered BAMs from step 17
+│   │   │   │      uses:  reference_gtf
+│   │   │   │      → transcript-level counts
+│   │   │   │
+│   │   │   └─ 19. featureCounts (raw counts)
+│   │   │          reads: filtered BAMs from step 17
+│   │   │          uses:  reference_gtf
+│   │   │          → gene-level count matrix
+│   │   │
+│   │   └─ Nextflow exits
+│   │       ════════════════════════════════════════════════
+│   │       HANDOFF — exits container, back to SLURM template
+│   │       ════════════════════════════════════════════════
+│   │
+│   ├─ 20. check pipeline exit code (fail → skip archive, exit)
+│   ├─ 21. rsync --checksum scratch outputs → run dir/outputs/
+│   ├─ 22. rsync --checksum fastq_dir → run dir/inputs/
+│   └─ 23. dry-run rsync verification → pass/fail
+│
+DONE — job exits, SLURM releases node
+
+Nesting depth: 4 layers
+  tjp-launch → SLURM template → Apptainer → Nextflow → tools (STAR, samtools, etc.)
+```
+
+### A.3 Psoma (Submoduled Combined Container+Pipeline)
+
+```
+USER LOGIN NODE
+│
+├─ tjp-launch psoma
+│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh
+│   ├─ 2. validate_config() → _validate_psoma()
+│   │      checks: fastq_dir, samples_file, reference_gtf exist
+│   │      checks: hisat2_index prefix valid (${index}.1.ht2 exists)
+│   ├─ 3. create /work/$USER/pipelines/psoma/runs/<timestamp>/
+│   ├─ 4. cp config.yaml → run dir (snapshot)
+│   ├─ 5. create /scratch/juno/$USER/pipelines/psoma/runs/<timestamp>/
+│   ├─ 6. _generate_psoma_config()
+│   │      reads user YAML → sed substitutes into pipeline.config.tmpl
+│   │      → writes run dir/pipeline.config
+│   │      auto-sets: config_directory = $REPO_ROOT/containers/psoma
+│   │      auto-sets: illumina_clip_file = .../NexteraPE-PE.fa
+│   │      auto-sets: output_directory = scratch output dir
+│   │      (references: hisat2_index, reference_gtf, filter.bed, blacklist.bed)
+│   ├─ 7. generate_manifest() → manifest.json
+│   ├─ 8. sbatch psoma_slurm_template.sh pipeline.config run_dir scratch_dir fastq_dir
+│   │      ════════════════════════════════════════════════
+│   │      HANDOFF — control leaves login node, enters SLURM queue
+│   │      ════════════════════════════════════════════════
+│   └─ 9. extract job ID, update manifest, print summary
+│
+COMPUTE NODE (allocated by SLURM: 40 CPU, 128GB, 12h)
+│
+├─ psoma_slurm_template.sh
+│   ├─ 10. module load apptainer
+│   ├─ 11. pre-flight: container exists? submodule exists? config exists?
+│   ├─ 12. apptainer exec \
+│   │       --cleanenv \
+│   │       --env PYTHONNOUSERSITE=1 \
+│   │       --env HOME=/tmp \
+│   │       --env _JAVA_OPTIONS=-Xmx16g \
+│   │       --bind $PROJECT_ROOT --bind $SCRATCH_ROOT --bind $WORK_ROOT \
+│   │       $CONTAINER \
+│   │       ════════════════════════════════════════════════
+│   │       HANDOFF — enters sealed container
+│   │       ════════════════════════════════════════════════
+│   │
+│   │   INSIDE CONTAINER (.sif)
+│   │   │
+│   │   ├─ 13. nextflow run psomagen_bulk_rna_seq_pipeline.nf \
+│   │   │       -c pipeline.config \
+│   │   │       -w /scratch/juno/$USER/nextflow_work
+│   │   │
+│   │   │   NEXTFLOW ORCHESTRATES THESE STAGES:
+│   │   │   │
+│   │   │   ├─ 14. FastQC (if run_fastqc=true)
+│   │   │   │      reads: fastq_dir/*.fastq.gz
+│   │   │   │      → QC reports
+│   │   │   │
+│   │   │   ├─ 15. Trimmomatic adapter/quality trimming
+│   │   │   │      reads: fastq_dir/*.fastq.gz
+│   │   │   │      uses:  NexteraPE-PE.fa (Nextera adapters, from submodule)
+│   │   │   │      params: headcrop, leading, trailing, slidingwindow, minlen
+│   │   │   │      → trimmed FASTQ files
+│   │   │   │
+│   │   │   ├─ 16. HISAT2 alignment
+│   │   │   │      reads: trimmed FASTQs from step 15
+│   │   │   │      uses:  hisat2_index (prefix path, e.g., /path/to/gencode48)
+│   │   │   │      uses:  reference_gtf (gene annotation)
+│   │   │   │      → sorted BAM files
+│   │   │   │
+│   │   │   ├─ 17. Filtering
+│   │   │   │      reads: BAM files from step 16
+│   │   │   │      uses:  filter.bed, blacklist.bed
+│   │   │   │      → filtered BAM files
+│   │   │   │
+│   │   │   ├─ 18. StringTie quantification
+│   │   │   │      reads: filtered BAMs from step 17
+│   │   │   │      uses:  reference_gtf
+│   │   │   │      → transcript-level counts
+│   │   │   │
+│   │   │   └─ 19. featureCounts (raw counts)
+│   │   │          reads: filtered BAMs from step 17
+│   │   │          uses:  reference_gtf
+│   │   │          → gene-level count matrix
+│   │   │
+│   │   └─ Nextflow exits
+│   │       ════════════════════════════════════════════════
+│   │       HANDOFF — exits container, back to SLURM template
+│   │       ════════════════════════════════════════════════
+│   │
+│   ├─ 20. check pipeline exit code
+│   ├─ 21. rsync --checksum scratch outputs → run dir/outputs/
+│   ├─ 22. rsync --checksum fastq_dir → run dir/inputs/
+│   └─ 23. dry-run rsync verification → pass/fail
+│
+DONE — job exits, SLURM releases node
+
+Nesting depth: 4 layers
+  tjp-launch → SLURM template → Apptainer → Nextflow → tools (HISAT2, Trimmomatic, samtools, etc.)
+
+Key differences from BulkRNASeq:
+  - HISAT2 instead of STAR (prefix-path index, not directory)
+  - Trimmomatic step added before alignment (step 15)
+  - --env HOME=/tmp (Nextflow needs writable ~)
+  - --env _JAVA_OPTIONS=-Xmx16g (Java heap limit)
+  - config_directory points to submodule, not symlinked UTDal files
+  - No symlink step (pipeline code is in the submodule itself)
+  - Read suffixes: _1/_2 instead of _R1_001/_R2_001
+```
+
+### A.4 Cell Ranger (Native 10x)
+
+```
+USER LOGIN NODE
+│
+├─ tjp-launch cellranger
+│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh
+│   ├─ 2. validate_config() → _validate_cellranger()
+│   │      checks: sample_id, sample_name, fastq_dir, transcriptome,
+│   │      localcores, localmem, create_bam present
+│   │      checks: fastq_dir, transcriptome paths exist
+│   │      checks: localcores, localmem are positive integers
+│   ├─ 3. is_native_pipeline("cellranger") → true
+│   │      CONTAINER = "native:/groups/tprice/opt/cellranger-10.0.0"
+│   ├─ 4. create /work/$USER/pipelines/cellranger/runs/<timestamp>/
+│   ├─ 5. cp config.yaml → run dir (snapshot)
+│   ├─ 6. create /scratch/juno/$USER/pipelines/cellranger/runs/<timestamp>/
+│   ├─ 7. SBATCH_CONFIG_ARG = config.yaml (no Nextflow config generation)
+│   ├─ 8. generate_manifest() → manifest.json
+│   │      container_file: "native:/groups/tprice/opt/cellranger-10.0.0"
+│   │      container_checksum: tool version string
+│   ├─ 9. sbatch cellranger_slurm_template.sh config.yaml run_dir scratch_dir fastq_dir
+│   │      ════════════════════════════════════════════════
+│   │      HANDOFF — control leaves login node, enters SLURM queue
+│   │      ════════════════════════════════════════════════
+│   └─ 10. extract job ID, update manifest, print summary
+│
+COMPUTE NODE (allocated by SLURM: 16 CPU, 128GB, 24h, EXCLUSIVE)
+│
+├─ cellranger_slurm_template.sh
+│   │
+│   │  (no module load apptainer — native pipeline)
+│   │
+│   ├─ 11. pre-flight: config exists? wrapper script exists?
+│   ├─ 12. bash containers/10x/bin/cellranger-run.sh config.yaml scratch_dir
+│   │       ════════════════════════════════════════════════
+│   │       HANDOFF — enters 10x wrapper script
+│   │       ════════════════════════════════════════════════
+│   │
+│   │   WRAPPER SCRIPT (cellranger-run.sh)
+│   │   │
+│   │   ├─ 13. source lib/10x_common.sh
+│   │   ├─ 14. require_config_keys: sample_id, sample_name, fastq_dir,
+│   │   │      transcriptome, localcores, localmem
+│   │   ├─ 15. yaml_get each config value (+ optional: create_bam,
+│   │   │      chemistry, expect_cells, force_cells, include_introns, no_bam)
+│   │   ├─ 16. find_10x_binary "cellranger" "$tool_path"
+│   │   │      checks: config tool_path → $PATH → common HPC paths
+│   │   │      → /groups/tprice/opt/cellranger-10.0.0/cellranger
+│   │   ├─ 17. require_paths_exist: fastq_dir, transcriptome
+│   │   ├─ 18. cd "$SCRATCH_OUTPUT_DIR"
+│   │   │      (Cell Ranger writes to <cwd>/<id>/outs/)
+│   │   ├─ 19. build command:
+│   │   │      cellranger count \
+│   │   │          --id=$sample_id \
+│   │   │          --transcriptome=$transcriptome \
+│   │   │          --fastqs=$fastq_dir \
+│   │   │          --sample=$sample_name \
+│   │   │          --localcores=$localcores \
+│   │   │          --localmem=$localmem \
+│   │   │          [--create-bam=$create_bam] \
+│   │   │          [--chemistry=$chemistry] ...
+│   │   ├─ 20. EXECUTE cellranger count
+│   │   │      Cell Ranger manages its own threading internally
+│   │   │      → $SCRATCH_OUTPUT_DIR/$sample_id/outs/
+│   │   │         ├── filtered_feature_bc_matrix/
+│   │   │         ├── raw_feature_bc_matrix/
+│   │   │         ├── web_summary.html
+│   │   │         ├── metrics_summary.csv
+│   │   │         └── possorted_genome_bam.bam (if create_bam=true)
+│   │   └─ 21. exit with cellranger's exit code
+│   │       ════════════════════════════════════════════════
+│   │       HANDOFF — back to SLURM template
+│   │       ════════════════════════════════════════════════
+│   │
+│   ├─ 22. check pipeline exit code
+│   ├─ 23. rsync --checksum scratch outputs → run dir/outputs/
+│   ├─ 24. rsync --checksum fastq_dir → run dir/inputs/
+│   └─ 25. dry-run rsync verification → pass/fail
+│
+DONE — job exits, SLURM releases node
+
+Nesting depth: 3 layers
+  tjp-launch → SLURM template → wrapper script → cellranger binary
+
+Key differences from container pipelines:
+  - No Apptainer, no container, no Nextflow
+  - --exclusive SLURM flag (full node)
+  - Config YAML passed directly (no pipeline.config generation)
+  - Binary discovery via find_10x_binary() with fallback chain
+  - Tool manages own threading via --localcores/--localmem
+```
+
+### A.5 Space Ranger (Native 10x)
+
+```
+USER LOGIN NODE
+│
+├─ tjp-launch spaceranger
+│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh
+│   ├─ 2. validate_config() → _validate_spaceranger()
+│   │      checks: sample_id, sample_name, fastq_dir, transcriptome,
+│   │      image, localcores, localmem, create_bam present
+│   │      checks: slide identification — EITHER:
+│   │        (slide + area) where area ∈ {A1, B1, C1, D1}
+│   │        OR unknown_slide ∈ {visium-1, visium-2, visium-2-large, visium-hd}
+│   │      checks: paths exist (fastq_dir, transcriptome, image)
+│   ├─ 3-10. (same as Cell Ranger: native path, run dir, manifest, sbatch)
+│   │      ════════════════════════════════════════════════
+│   │      HANDOFF — enters SLURM queue
+│   │      ════════════════════════════════════════════════
+│
+COMPUTE NODE (allocated by SLURM: 16 CPU, 128GB, 24h, EXCLUSIVE)
+│
+├─ spaceranger_slurm_template.sh
+│   ├─ 11. pre-flight: config exists? wrapper exists?
+│   ├─ 12. bash containers/10x/bin/spaceranger-run.sh config.yaml scratch_dir
+│   │
+│   │   WRAPPER SCRIPT (spaceranger-run.sh)
+│   │   │
+│   │   ├─ 13. source lib/10x_common.sh
+│   │   ├─ 14. require_config_keys: sample_id, sample_name, fastq_dir,
+│   │   │      transcriptome, image, localcores, localmem
+│   │   ├─ 15. yaml_get each value (+ optional: slide, area, unknown_slide,
+│   │   │      cytaimage, darkimage, colorizedimage, reorient_images,
+│   │   │      loupe_alignment, create_bam, no_bam, tool_path)
+│   │   ├─ 16. find_10x_binary "spaceranger"
+│   │   ├─ 17. require_paths_exist: fastq_dir, transcriptome, image
+│   │   ├─ 18. cd "$SCRATCH_OUTPUT_DIR"
+│   │   ├─ 19. build command:
+│   │   │      spaceranger count \
+│   │   │          --id=$sample_id \
+│   │   │          --transcriptome=$transcriptome \
+│   │   │          --fastqs=$fastq_dir \
+│   │   │          --sample=$sample_name \
+│   │   │          --image=$image \
+│   │   │          --localcores=$localcores \
+│   │   │          --localmem=$localmem
+│   │   │
+│   │   ├─ 20. SLIDE IDENTIFICATION (conditional):
+│   │   │      if unknown_slide set:
+│   │   │          --unknown-slide=$unknown_slide
+│   │   │      else:
+│   │   │          --slide=$slide --area=$area
+│   │   │
+│   │   ├─ 21. append optional flags (cytaimage, darkimage, etc.)
+│   │   ├─ 22. EXECUTE spaceranger count
+│   │   │      → $SCRATCH_OUTPUT_DIR/$sample_id/outs/
+│   │   │         ├── spatial/
+│   │   │         │   ├── tissue_positions.csv
+│   │   │         │   ├── scalefactors_json.json
+│   │   │         │   └── tissue_hires_image.png
+│   │   │         ├── filtered_feature_bc_matrix/
+│   │   │         ├── raw_feature_bc_matrix/
+│   │   │         └── web_summary.html
+│   │   └─ 23. exit with spaceranger's exit code
+│   │
+│   ├─ 24-27. archive + verification (same as Cell Ranger)
+│
+DONE
+
+Nesting depth: 3 layers
+  tjp-launch → SLURM template → wrapper script → spaceranger binary
+
+Key differences from Cell Ranger:
+  - Requires image (microscope TIF) as input
+  - Slide identification: --slide/--area OR --unknown-slide
+  - Additional optional image inputs (cytaimage, darkimage, colorizedimage)
+  - Outputs include spatial/ directory with tissue positions and scale factors
+```
+
+### A.6 Xenium Ranger (Native 10x)
+
+```
+USER LOGIN NODE
+│
+├─ tjp-launch xeniumranger
+│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh
+│   ├─ 2. validate_config() → _validate_xeniumranger()
+│   │      checks: sample_id, command, xenium_bundle, localcores, localmem
+│   │      checks: command ∈ {resegment, import-segmentation}
+│   │      if import-segmentation: segmentation_file required + must exist
+│   │      checks: xenium_bundle path exists
+│   ├─ 3-10. (same native path, but FASTQ_DIR = xenium_bundle for archiving)
+│   │      ════════════════════════════════════════════════
+│   │      HANDOFF — enters SLURM queue
+│   │      ════════════════════════════════════════════════
+│
+COMPUTE NODE (allocated by SLURM: 16 CPU, 128GB, 12h, EXCLUSIVE)
+│
+├─ xeniumranger_slurm_template.sh
+│   ├─ 11. pre-flight: config exists? wrapper exists?
+│   ├─ 12. bash containers/10x/bin/xeniumranger-run.sh config.yaml scratch_dir
+│   │
+│   │   WRAPPER SCRIPT (xeniumranger-run.sh)
+│   │   │
+│   │   ├─ 13. source lib/10x_common.sh
+│   │   ├─ 14. require_config_keys: sample_id, command, xenium_bundle,
+│   │   │      localcores, localmem
+│   │   ├─ 15. yaml_get each value (+ optional: tool_path)
+│   │   ├─ 16. find_10x_binary "xeniumranger"
+│   │   ├─ 17. require_paths_exist: xenium_bundle
+│   │   ├─ 18. cd "$SCRATCH_OUTPUT_DIR"
+│   │   │
+│   │   ├─ 19. COMMAND DISPATCH:
+│   │   │
+│   │   │   case "$command" in
+│   │   │
+│   │   │   ┌─ resegment ──────────────────────────────────────┐
+│   │   │   │  optional: expansion_distance, panel_file        │
+│   │   │   │                                                  │
+│   │   │   │  xeniumranger resegment \                        │
+│   │   │   │      --id=$sample_id \                           │
+│   │   │   │      --xenium-bundle=$xenium_bundle \            │
+│   │   │   │      --localcores=$localcores \                  │
+│   │   │   │      --localmem=$localmem \                      │
+│   │   │   │      [--expansion-distance=$expansion_distance] \│
+│   │   │   │      [--panel-file=$panel_file]                  │
+│   │   │   └──────────────────────────────────────────────────┘
+│   │   │
+│   │   │   ┌─ import-segmentation ────────────────────────────┐
+│   │   │   │  required: segmentation_file                     │
+│   │   │   │  optional: viz_labels                            │
+│   │   │   │                                                  │
+│   │   │   │  xeniumranger import-segmentation \              │
+│   │   │   │      --id=$sample_id \                           │
+│   │   │   │      --xenium-bundle=$xenium_bundle \            │
+│   │   │   │      --segmentation=$segmentation_file \         │
+│   │   │   │      --localcores=$localcores \                  │
+│   │   │   │      --localmem=$localmem \                      │
+│   │   │   │      [--viz-labels=$viz_labels]                  │
+│   │   │   └──────────────────────────────────────────────────┘
+│   │   │
+│   │   └─ 20. exit with xeniumranger's exit code
+│   │
+│   ├─ 21-24. archive + verification (INPUT_DIR instead of FASTQ_DIR)
+│
+DONE
+
+Nesting depth: 3 layers
+  tjp-launch → SLURM template → wrapper script → xeniumranger binary
+
+Key differences from Cell Ranger / Space Ranger:
+  - No FASTQs — works on pre-computed Xenium output bundles
+  - Dual command: resegment OR import-segmentation (not count)
+  - Command-specific required fields (segmentation_file for import)
+  - 12h walltime (post-processing, not alignment)
+  - Archives INPUT_DIR (xenium_bundle) not FASTQ_DIR
+  - No smoke test support in tjp-test (infrastructure ready but not wired)
+```
+
+### A.7 Nesting Depth Summary
+
+```
+Pipeline        Nesting                                              Depth
+──────────────  ───────────────────────────────────────────────────   ─────
+AddOne          tjp-launch → SLURM → Apptainer → Python              3
+BulkRNASeq      tjp-launch → SLURM → Apptainer → Nextflow → tools   4
+Psoma           tjp-launch → SLURM → Apptainer → Nextflow → tools   4
+Cell Ranger     tjp-launch → SLURM → wrapper → cellranger            3
+Space Ranger    tjp-launch → SLURM → wrapper → spaceranger           3
+Xenium Ranger   tjp-launch → SLURM → wrapper → xeniumranger          3
+```

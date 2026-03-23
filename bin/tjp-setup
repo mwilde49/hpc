@@ -33,7 +33,15 @@ for pipeline in "${KNOWN_PIPELINES[@]}"; do
         continue
     fi
     container_path=$(get_container_path "$pipeline")
-    if [[ ! -f "$container_path" ]]; then
+    if is_multicontainer_pipeline "$pipeline"; then
+        if [[ ! -d "$container_path" ]]; then
+            warn "Container directory not found: $container_path"
+            warn "  → Run: git submodule update --init containers/virome"
+        elif ! ls "$container_path"/*.sif &>/dev/null 2>&1; then
+            warn "No containers built yet in: $container_path"
+            warn "  → Copy built .sif files there, or run: sbatch $REPO_ROOT/containers/virome/scripts/build_containers.sh"
+        fi
+    elif [[ ! -f "$container_path" ]]; then
         warn "Container not found: $container_path"
         warn "  → It may not have been transferred to HPC yet."
     fi
@@ -85,6 +93,7 @@ _substitute_placeholders() {
         -e "s|__USER__|$USER|g" \
         -e "s|__SCRATCH__|$SCRATCH_ROOT|g" \
         -e "s|__WORK__|$WORK_ROOT|g" \
+        -e "s|__REPO_ROOT__|$REPO_ROOT|g" \
         "$1"
 }
 
@@ -131,6 +140,24 @@ if [[ -f "$psoma_samples" ]]; then
 else
     cp "$REPO_ROOT/templates/psoma/samples_example.txt" "$psoma_samples"
     info "Created: $psoma_samples"
+fi
+
+# Virome config
+virome_config="$USER_PIPELINES/virome/config.yaml"
+if [[ -f "$virome_config" ]]; then
+    warn "Config already exists, skipping: $virome_config"
+else
+    _substitute_placeholders "$REPO_ROOT/templates/virome/config.yaml" > "$virome_config"
+    info "Created: $virome_config"
+fi
+
+# Virome samplesheet example
+virome_samplesheet="$USER_PIPELINES/virome/samplesheet.csv"
+if [[ -f "$virome_samplesheet" ]]; then
+    warn "Samplesheet already exists, skipping: $virome_samplesheet"
+else
+    cp "$REPO_ROOT/templates/virome/samplesheet_example.csv" "$virome_samplesheet"
+    info "Created: $virome_samplesheet"
 fi
 
 # Cell Ranger config
@@ -187,6 +214,7 @@ Next steps:
      vi $USER_PIPELINES/addone/config.yaml        # simple demo
      vi $USER_PIPELINES/bulkrnaseq/config.yaml     # RNA-seq (STAR aligner)
      vi $USER_PIPELINES/psoma/config.yaml          # RNA-seq (HISAT2/Trimmomatic)
+     vi $USER_PIPELINES/virome/config.yaml         # viral profiling from bulk RNA-seq
      vi $USER_PIPELINES/cellranger/config.yaml     # 10x single-cell
      vi $USER_PIPELINES/spaceranger/config.yaml    # 10x spatial
      vi $USER_PIPELINES/xeniumranger/config.yaml   # 10x in situ
@@ -196,6 +224,7 @@ Next steps:
      tjp-launch addone
      tjp-launch bulkrnaseq
      tjp-launch psoma
+     tjp-launch virome
      tjp-launch cellranger
      tjp-launch spaceranger
      tjp-launch xeniumranger

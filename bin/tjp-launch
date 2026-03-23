@@ -270,6 +270,16 @@ if is_native_pipeline "$PIPELINE"; then
             CONTAINER="native:$local_tool_path"
         fi
     fi
+elif is_multicontainer_pipeline "$PIPELINE"; then
+    CONTAINER=$(get_container_path "$PIPELINE")
+    if [[ ! -d "$CONTAINER" ]]; then
+        die "Container directory not found: $CONTAINER
+  Run: git submodule update --init containers/virome"
+    fi
+    if ! ls "$CONTAINER"/*.sif &>/dev/null 2>&1; then
+        warn "No .sif containers found in $CONTAINER"
+        warn "  → Copy built containers there before running the pipeline."
+    fi
 else
     CONTAINER=$(get_container_path "$PIPELINE")
     if [[ ! -f "$CONTAINER" ]]; then
@@ -294,6 +304,9 @@ case "$PIPELINE" in
         FASTQ_DIR=$(yaml_get "$RUN_DIR/config.yaml" "fastq_dir") ;;
     xeniumranger)
         FASTQ_DIR=$(yaml_get "$RUN_DIR/config.yaml" "xenium_bundle" 2>/dev/null || echo "") ;;
+    virome)
+        # virome uses a samplesheet CSV — no single fastq_dir to archive
+        FASTQ_DIR="" ;;
 esac
 
 # ── Pipeline-specific dispatch ───────────────────────────────────────────────
@@ -333,6 +346,15 @@ case "$PIPELINE" in
         info "Generating Nextflow pipeline.config..."
         _generate_psoma_config "$RUN_DIR/config.yaml" "$RUN_DIR/pipeline.config" "$SCRATCH_OUTPUT_DIR"
         SBATCH_CONFIG_ARG="$RUN_DIR/pipeline.config"
+        ;;
+    virome)
+        # Virome: outdir comes from user config (Nextflow params-file passthrough)
+        SCRATCH_OUTPUT_DIR=$(yaml_get "$RUN_DIR/config.yaml" "outdir" 2>/dev/null || echo "")
+        if [[ -z "$SCRATCH_OUTPUT_DIR" ]]; then
+            die "virome config missing required key: outdir"
+        fi
+        info "Output dir: $SCRATCH_OUTPUT_DIR"
+        SBATCH_CONFIG_ARG="$RUN_DIR/config.yaml"
         ;;
     cellranger|spaceranger|xeniumranger)
         # 10x native pipelines: create scratch output dir, pass config directly

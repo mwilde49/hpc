@@ -7,3 +7,6 @@
 [submodule "containers/10x"]
 	path = containers/10x
 	url = https://github.com/mwilde49/10x
+[submodule "containers/virome"]
+	path = containers/virome
+	url = https://github.com/mwilde49/virome-pipeline
