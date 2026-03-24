@@ -12,7 +12,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 
-SUPPORTED_PIPELINES=(psoma bulkrnaseq cellranger spaceranger)
+SUPPORTED_PIPELINES=(psoma bulkrnaseq virome cellranger spaceranger)
 
 # ── Usage ────────────────────────────────────────────────────────────────────
 usage() {
@@ -61,23 +61,37 @@ done
 $is_supported || die "Unsupported pipeline: $PIPELINE (supported: ${SUPPORTED_PIPELINES[*]})"
 
 # ── Find the run directory ───────────────────────────────────────────────────
-SCRATCH_RUNS="$SCRATCH_ROOT/pipelines/$PIPELINE/runs"
+# Virome outputs are staged to work after completion; validate against work archive.
+# All other pipelines are validated against their scratch run directories.
+if [[ "$PIPELINE" == "virome" ]]; then
+    RUNS_BASE="$WORK_ROOT/pipelines/$PIPELINE/runs"
+else
+    RUNS_BASE="$SCRATCH_ROOT/pipelines/$PIPELINE/runs"
+fi
 
 if [[ -n "$RUN_TS" ]]; then
-    RUN_DIR="$SCRATCH_RUNS/$RUN_TS"
+    if [[ "$PIPELINE" == "virome" ]]; then
+        RUN_DIR="$RUNS_BASE/$RUN_TS/outputs"
+    else
+        RUN_DIR="$RUNS_BASE/$RUN_TS"
+    fi
     if [[ ! -d "$RUN_DIR" ]]; then
         die "Run directory not found: $RUN_DIR"
     fi
 else
-    if [[ ! -d "$SCRATCH_RUNS" ]]; then
-        die "No runs directory found: $SCRATCH_RUNS"
+    if [[ ! -d "$RUNS_BASE" ]]; then
+        die "No runs directory found: $RUNS_BASE"
     fi
-    # Find most recent run (directory names are timestamps, sort works)
-    RUN_DIR=$(find "$SCRATCH_RUNS" -mindepth 1 -maxdepth 1 -type d | sort | tail -1)
-    if [[ -z "$RUN_DIR" ]]; then
-        die "No runs found in $SCRATCH_RUNS"
+    latest=$(find "$RUNS_BASE" -mindepth 1 -maxdepth 1 -type d | sort | tail -1)
+    if [[ -z "$latest" ]]; then
+        die "No runs found in $RUNS_BASE"
     fi
-    RUN_TS=$(basename "$RUN_DIR")
+    RUN_TS=$(basename "$latest")
+    if [[ "$PIPELINE" == "virome" ]]; then
+        RUN_DIR="$latest/outputs"
+    else
+        RUN_DIR="$latest"
+    fi
 fi
 
 hyperion_banner "VALIDATION"
@@ -89,7 +103,18 @@ echo ""
 declare -a CHECK_DIRS
 declare -a CHECK_FILES
 
-if [[ "$PIPELINE" == "psoma" ]]; then
+if [[ "$PIPELINE" == "virome" ]]; then
+    CHECK_DIRS=(
+        "results"
+        "multiqc"
+        "multiqc/multiqc_data"
+    )
+    CHECK_FILES=(
+        "results/viral_abundance_matrix.tsv"
+        "results/viral_abundance_matrix.csv"
+        "multiqc/multiqc_report.html"
+    )
+elif [[ "$PIPELINE" == "psoma" ]]; then
     CHECK_DIRS=(
         "2_trim_output"
         "3_hisat2_mapping_output"

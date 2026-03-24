@@ -21,7 +21,7 @@ source "$SCRIPT_DIR/lib/common.sh"
 # ── Constants ────────────────────────────────────────────────────────────────
 TEST_DATA_SRC="$REPO_ROOT/test_data/rnaseq"
 TEST_DATA_10X="$REPO_ROOT/test_data/10x"
-SUPPORTED_PIPELINES=(psoma bulkrnaseq cellranger spaceranger)
+SUPPORTED_PIPELINES=(psoma bulkrnaseq virome cellranger spaceranger)
 
 # ── Usage ────────────────────────────────────────────────────────────────────
 usage() {
@@ -77,7 +77,10 @@ $is_supported || die "Unsupported pipeline: $PIPELINE (supported: ${SUPPORTED_PI
 SCRATCH_TEST_DIR="$SCRATCH_ROOT/pipelines/$PIPELINE/test_data"
 SCRATCH_FASTQ_DIR="$SCRATCH_TEST_DIR/fastq"
 
-if [[ "$PIPELINE" == "cellranger" ]]; then
+if [[ "$PIPELINE" == "virome" ]]; then
+    SRC_FASTQ_DIR="$TEST_DATA_SRC/fastq"
+    SRC_SAMPLES=""
+elif [[ "$PIPELINE" == "cellranger" ]]; then
     SRC_FASTQ_DIR="$TEST_DATA_10X/cellranger/fastq"
     SRC_SAMPLES=""
 elif [[ "$PIPELINE" == "spaceranger" ]]; then
@@ -122,7 +125,17 @@ fi
 # ── Copy test FASTQs to scratch ──────────────────────────────────────────────
 mkdir -p "$SCRATCH_FASTQ_DIR"
 
-if [[ "$PIPELINE" == "psoma" ]]; then
+if [[ "$PIPELINE" == "virome" ]]; then
+    # Virome uses _1/_2 suffixes — copy files as-is (samplesheet built below)
+    for f in "$SRC_FASTQ_DIR"/*_1.fastq.gz "$SRC_FASTQ_DIR"/*_2.fastq.gz; do
+        [[ -f "$f" ]] || continue
+        dest="$SCRATCH_FASTQ_DIR/$(basename "$f")"
+        if [[ ! -f "$dest" ]]; then
+            info "Copying $(basename "$f") to scratch..."
+            cp "$f" "$dest"
+        fi
+    done
+elif [[ "$PIPELINE" == "psoma" ]]; then
     # Psoma uses _1/_2 suffixes — copy files as-is
     for f in "$SRC_FASTQ_DIR"/*_1.fastq.gz "$SRC_FASTQ_DIR"/*_2.fastq.gz; do
         [[ -f "$f" ]] || continue
@@ -183,7 +196,38 @@ fi
 # ── Generate test config YAML ────────────────────────────────────────────────
 TEST_CONFIG="$SCRATCH_TEST_DIR/config.yaml"
 
-if [[ "$PIPELINE" == "psoma" ]]; then
+if [[ "$PIPELINE" == "virome" ]]; then
+    # Build samplesheet CSV from copied FASTQs
+    SAMPLESHEET="$SCRATCH_TEST_DIR/samplesheet.csv"
+    echo "sample,fastq_r1,fastq_r2" > "$SAMPLESHEET"
+    for r1 in "$SCRATCH_FASTQ_DIR"/*_1.fastq.gz; do
+        [[ -f "$r1" ]] || continue
+        r2="${r1/_1.fastq.gz/_2.fastq.gz}"
+        if [[ -f "$r2" ]]; then
+            sample=$(basename "$r1" _1.fastq.gz)
+            echo "$sample,$r1,$r2" >> "$SAMPLESHEET"
+        fi
+    done
+    info "Generated samplesheet: $SAMPLESHEET"
+
+    VIROME_OUTDIR="$SCRATCH_ROOT/pipelines/virome/test_data/results"
+    cat > "$TEST_CONFIG" <<YAML
+project_name: Virome-Test-2samples
+samplesheet: $SAMPLESHEET
+outdir: $VIROME_OUTDIR
+star_index: /groups/tprice/pipelines/references/star_index
+kraken2_db: /groups/tprice/pipelines/references/kraken2_viral_db
+adapters: $REPO_ROOT/containers/virome/assets/NexteraPE-PE.fa
+container_dir: $REPO_ROOT/containers/virome
+trim_headcrop: 0
+trim_leading: 3
+trim_trailing: 3
+trim_slidingwindow: "4:15"
+trim_minlen: 36
+kraken2_confidence: 0.1
+min_reads_per_taxon: 5
+YAML
+elif [[ "$PIPELINE" == "psoma" ]]; then
     cat > "$TEST_CONFIG" <<YAML
 project_name: Psoma-Test-2samples
 species: Human
