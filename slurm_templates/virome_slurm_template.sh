@@ -49,12 +49,14 @@ if [ -z "$PIPELINE_CONFIG" ] || [ ! -f "$PIPELINE_CONFIG" ]; then
     exit 1
 fi
 
-if ! ls "$PIPELINE_REPO"/*.sif &>/dev/null 2>&1; then
-    echo "ERROR: No .sif containers found at $PIPELINE_REPO/"
-    echo "Copy built containers there, or build with:"
-    echo "  sbatch $PIPELINE_REPO/scripts/build_containers.sh"
-    exit 1
-fi
+for sif in fastqc trimmomatic star kraken2 python multiqc; do
+    if [ ! -f "$PIPELINE_REPO/${sif}.sif" ]; then
+        echo "ERROR: Missing container: ${sif}.sif (expected at $PIPELINE_REPO/${sif}.sif)"
+        echo "Copy built containers there, or build with:"
+        echo "  sbatch $PIPELINE_REPO/scripts/build_containers.sh"
+        exit 1
+    fi
+done
 
 # --- Run pipeline ---
 
