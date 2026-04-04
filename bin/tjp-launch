@@ -280,6 +280,14 @@ elif is_multicontainer_pipeline "$PIPELINE"; then
         warn "No .sif containers found in $CONTAINER"
         warn "  → Copy built containers there before running the pipeline."
     fi
+elif is_nextflow_managed_pipeline "$PIPELINE"; then
+    # Nextflow pulls per-process containers automatically via Apptainer.
+    # The "container" entry in PIPELINE_CONTAINERS points to the Nextflow config.
+    CONTAINER=$(get_container_path "$PIPELINE")
+    if [[ ! -f "$CONTAINER" ]]; then
+        die "Nextflow config not found: $CONTAINER
+  Ensure the longreads repo is deployed at: $(dirname "$(dirname "$CONTAINER")")"
+    fi
 else
     CONTAINER=$(get_container_path "$PIPELINE")
     if [[ ! -f "$CONTAINER" ]]; then
@@ -307,6 +315,11 @@ case "$PIPELINE" in
     virome)
         # virome uses a samplesheet CSV — no single fastq_dir to archive
         FASTQ_DIR="" ;;
+    sqanti3)
+        # sqanti3 takes a collapsed GTF — no fastq_dir
+        FASTQ_DIR="" ;;
+    wf-transcriptomes)
+        FASTQ_DIR=$(yaml_get "$RUN_DIR/config.yaml" "fastq_dir" 2>/dev/null || echo "") ;;
 esac
 
 # ── Pipeline-specific dispatch ───────────────────────────────────────────────
@@ -361,6 +374,26 @@ case "$PIPELINE" in
         SCRATCH_OUTPUT_DIR="$SCRATCH_ROOT/pipelines/$PIPELINE/runs/$TS"
         mkdir -p "$SCRATCH_OUTPUT_DIR"
         info "Scratch output dir: $SCRATCH_OUTPUT_DIR"
+        SBATCH_CONFIG_ARG="$RUN_DIR/config.yaml"
+        ;;
+    sqanti3)
+        # SQANTI3: outdir from user config; orchestrator creates scratch output dir
+        # The orchestrator itself submits per-stage sub-jobs with --dependency chaining.
+        SCRATCH_OUTPUT_DIR=$(yaml_get "$RUN_DIR/config.yaml" "outdir" 2>/dev/null || echo "")
+        if [[ -z "$SCRATCH_OUTPUT_DIR" ]]; then
+            die "sqanti3 config missing required key: outdir"
+        fi
+        info "Output dir: $SCRATCH_OUTPUT_DIR"
+        SBATCH_CONFIG_ARG="$RUN_DIR/config.yaml"
+        ;;
+    wf-transcriptomes)
+        # wf-transcriptomes: Nextflow head job; outdir written directly by Nextflow.
+        # No scratch staging — Nextflow manages its own work dir on scratch.
+        SCRATCH_OUTPUT_DIR=$(yaml_get "$RUN_DIR/config.yaml" "outdir" 2>/dev/null || echo "")
+        if [[ -z "$SCRATCH_OUTPUT_DIR" ]]; then
+            die "wf-transcriptomes config missing required key: outdir"
+        fi
+        info "Output dir: $SCRATCH_OUTPUT_DIR"
         SBATCH_CONFIG_ARG="$RUN_DIR/config.yaml"
         ;;
 esac

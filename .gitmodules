@@ -10,3 +10,6 @@
 [submodule "containers/virome"]
 	path = containers/virome
 	url = https://github.com/mwilde49/virome-pipeline
+[submodule "containers/sqanti3"]
+	path = containers/sqanti3
+	url = https://github.com/mwilde49/longreads.git

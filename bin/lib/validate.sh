@@ -17,6 +17,8 @@ validate_config() {
         cellranger)     _validate_cellranger "$config" errors ;;
         spaceranger)    _validate_spaceranger "$config" errors ;;
         xeniumranger)   _validate_xeniumranger "$config" errors ;;
+        sqanti3)           _validate_sqanti3 "$config" errors ;;
+        wf-transcriptomes) _validate_wf_transcriptomes "$config" errors ;;
         *)              die "No validator for pipeline: $pipeline" ;;
     esac
 
@@ -403,5 +405,147 @@ _validate_xeniumranger() {
         elif [[ -n "$tp" && ! -x "$tp/xeniumranger" ]]; then
             warn "xeniumranger binary not found at $tp/xeniumranger"
         fi
+    fi
+}
+
+# ── SQANTI3 validator ────────────────────────────────────────────────────────
+_validate_sqanti3() {
+    local config="$1"
+    local -n _errs=$2
+
+    # Required keys
+    local required_keys=(sample isoforms refGTF refFasta outdir)
+    for key in "${required_keys[@]}"; do
+        if ! yaml_has "$config" "$key"; then
+            _errs+=("Missing required key: $key")
+        fi
+    done
+
+    # Required file paths that must exist
+    local path_keys=(isoforms refGTF refFasta)
+    for key in "${path_keys[@]}"; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            if [[ -n "$val" && "$val" != /path/to/* && ! -f "$val" ]]; then
+                _errs+=("File does not exist for $key: $val")
+            fi
+        fi
+    done
+
+    # Optional file paths (warn if set but missing)
+    local opt_keys=(coverage fl_count CAGE_peak polyA_motif_list polyA_peak)
+    for key in "${opt_keys[@]}"; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            if [[ -n "$val" && "$val" != /path/to/* && ! -f "$val" ]]; then
+                warn "Optional path does not exist for $key: $val"
+            fi
+        fi
+    done
+
+    # filter_mode: must be "rules" or "ml"
+    if yaml_has "$config" "filter_mode"; then
+        local fm
+        fm=$(yaml_get "$config" "filter_mode") || true
+        case "$fm" in
+            rules|ml) ;;
+            *) _errs+=("filter_mode must be 'rules' or 'ml', got: $fm") ;;
+        esac
+    fi
+
+    # rescue_mode: must be "automatic" or "full"
+    if yaml_has "$config" "rescue_mode"; then
+        local rm_val
+        rm_val=$(yaml_get "$config" "rescue_mode") || true
+        case "$rm_val" in
+            automatic|full) ;;
+            *) _errs+=("rescue_mode must be 'automatic' or 'full', got: $rm_val") ;;
+        esac
+    fi
+
+    # Numeric validation for cpus/chunks
+    for key in cpus chunks; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            if [[ -n "$val" && ! "$val" =~ ^[0-9]+$ ]]; then
+                _errs+=("$key must be a non-negative integer, got: $val")
+            fi
+        fi
+    done
+}
+
+# ── wf-transcriptomes validator ───────────────────────────────────────────────
+_validate_wf_transcriptomes() {
+    local config="$1"
+    local -n _errs=$2
+
+    # Required keys
+    for key in sample fastq_dir sample_sheet ref_genome ref_annotation outdir; do
+        if ! yaml_has "$config" "$key"; then
+            _errs+=("Missing required key: $key")
+        else
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            [[ -z "$val" ]] && _errs+=("$key is empty")
+        fi
+    done
+
+    # fastq_dir must exist
+    if yaml_has "$config" "fastq_dir"; then
+        local fastq_dir
+        fastq_dir=$(yaml_get "$config" "fastq_dir") || true
+        if [[ -n "$fastq_dir" && ! -d "$fastq_dir" ]]; then
+            _errs+=("fastq_dir not found: $fastq_dir")
+        fi
+    fi
+
+    # sample_sheet must exist
+    if yaml_has "$config" "sample_sheet"; then
+        local ss
+        ss=$(yaml_get "$config" "sample_sheet") || true
+        if [[ -n "$ss" && ! -f "$ss" ]]; then
+            _errs+=("sample_sheet not found: $ss")
+        fi
+    fi
+
+    # ref_genome must exist
+    if yaml_has "$config" "ref_genome"; then
+        local rg
+        rg=$(yaml_get "$config" "ref_genome") || true
+        if [[ -n "$rg" && ! -f "$rg" ]]; then
+            _errs+=("ref_genome not found: $rg")
+        fi
+    fi
+
+    # ref_annotation must exist
+    if yaml_has "$config" "ref_annotation"; then
+        local ra
+        ra=$(yaml_get "$config" "ref_annotation") || true
+        if [[ -n "$ra" && ! -f "$ra" ]]; then
+            _errs+=("ref_annotation not found: $ra")
+        fi
+    fi
+
+    # de_analysis: must be true or false
+    if yaml_has "$config" "de_analysis"; then
+        local de
+        de=$(yaml_get "$config" "de_analysis") || true
+        case "$de" in
+            true|false) ;;
+            *) _errs+=("de_analysis must be 'true' or 'false', got: $de") ;;
+        esac
+    fi
+
+    # direct_rna: must be true or false
+    if yaml_has "$config" "direct_rna"; then
+        local dr
+        dr=$(yaml_get "$config" "direct_rna") || true
+        case "$dr" in
+            true|false) ;;
+            *) _errs+=("direct_rna must be 'true' or 'false', got: $dr") ;;
+        esac
     fi
 }

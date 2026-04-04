@@ -1,0 +1,69 @@
+# SQANTI3 Pipeline Configuration
+# Copy this file to your project directory and fill in your paths.
+# Launch with: tjp-launch sqanti3 --config /path/to/this/config.yaml
+#
+# SQANTI3 evaluates long-read transcriptome quality (QC → Filter → Rescue).
+# Runs 4 SLURM jobs: stage 1a (long-read QC) and 1b (reference QC) in parallel,
+# then filter (stage 2) and rescue (stage 3) sequentially.
+
+sample: "my_sample"
+
+# ── Required input files ──────────────────────────────────────────────────────
+# Collapsed isoforms GTF from EPI2ME wf-transcriptomes, FLAIR, StringTie2, etc.
+isoforms: /path/to/collapsed_isoforms.gtf
+
+# Reference annotation and genome
+refGTF:   /path/to/gencode.v47.annotation.gtf
+refFasta: /path/to/GRCh38.primary_assembly.genome.fa
+
+# ── Short-read junction support (strongly recommended) ───────────────────────
+# Pre-computed STAR junction file. Run STAR separately; do not compute inside SQANTI3.
+# Use empty string ("") to skip.
+coverage: /path/to/SJ.out.tab
+
+# Transcript abundance from featureCounts or similar (columns: id, count)
+fl_count: /path/to/abundance.tsv
+
+# ── Optional orthogonal evidence ─────────────────────────────────────────────
+# Leave blank to use SQANTI3's built-in human/mouse databases.
+CAGE_peak:        ""
+polyA_motif_list: ""
+polyA_peak:       ""
+
+# ── Technology ───────────────────────────────────────────────────────────────
+# true for Oxford Nanopore (FLAIR/StringTie2/Bambu IDs not in PB.X.Y format)
+# false for PacBio IsoSeq (IsoSeq3 collapse, standard PB.X.Y IDs)
+force_id_ignore: true
+
+# ── Resources ────────────────────────────────────────────────────────────────
+# Set to 0 to auto-compute from GTF transcript count:
+#   <50K transcripts  → 8 CPUs,  16G, 4 chunks
+#   50K–200K          → 16 CPUs, 32G, 8 chunks
+#   200K–1M           → 32 CPUs, 128G, 14 chunks
+#   >1M               → 32 CPUs, 256G, 20 chunks
+cpus:   0
+chunks: 0
+
+# ── Feature toggles ───────────────────────────────────────────────────────────
+# skip_report: true skips the 150-plot HTML report (saves ~30 min)
+skip_report: true
+
+# skip_orf: true skips TransDecoder ORF prediction (saves time, set true if ORFs not needed)
+skip_orf: false
+
+# filter_mode: "rules" (default, deterministic) or "ml" (random forest, requires TP/TN sets)
+filter_mode: rules
+
+# filter_mono_exonic: false = retain mono-exonic transcripts in filtered output
+filter_mono_exonic: false
+
+# rescue_mode: "automatic" (default, safer) or "full" (more aggressive rescue)
+rescue_mode: automatic
+
+# ── Output ───────────────────────────────────────────────────────────────────
+# All stage outputs are written under outdir/:
+#   outdir/qc/        - long-read QC outputs
+#   outdir/refqc/     - reference QC outputs (required by rescue)
+#   outdir/filter/    - filtered transcriptome
+#   outdir/rescue/    - rescued transcriptome (final output)
+outdir: /work/__USER__/sqanti3/my_sample

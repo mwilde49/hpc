@@ -19,6 +19,10 @@ declare -A PIPELINE_CONTAINERS=(
     [bulkrnaseq]="containers/bulkrnaseq/bulkrnaseq_v1.0.0.sif"
     [psoma]="containers/psoma/psomagen_v1.0.0.sif"
     [virome]="containers/virome"
+    [sqanti3]="containers/sqanti3/sqanti3_v5.5.4.sif"
+    # wf-transcriptomes: Nextflow pulls per-process containers automatically.
+    # The "container" entry points to the Nextflow config that controls this.
+    [wf-transcriptomes]="containers/sqanti3/configs/wf_transcriptomes/juno.config"
 )
 
 # Maps pipeline name → SLURM template path (relative to REPO_ROOT)
@@ -30,6 +34,8 @@ declare -A PIPELINE_TEMPLATES=(
     [cellranger]="slurm_templates/cellranger_slurm_template.sh"
     [spaceranger]="slurm_templates/spaceranger_slurm_template.sh"
     [xeniumranger]="slurm_templates/xeniumranger_slurm_template.sh"
+    [sqanti3]="slurm_templates/sqanti3_slurm_template.sh"
+    [wf-transcriptomes]="slurm_templates/wf_transcriptomes_slurm_template.sh"
 )
 
 # Maps native pipeline name → tool install directory
@@ -42,8 +48,12 @@ declare -A PIPELINE_TOOL_PATHS=(
 # Native pipelines: no container, tool installed from tarball
 NATIVE_PIPELINES=(cellranger spaceranger xeniumranger)
 
+# Nextflow-managed pipelines: Nextflow pulls per-process containers automatically.
+# Container check verifies the Nextflow config file exists, not a SIF.
+NEXTFLOW_MANAGED_PIPELINES=(wf-transcriptomes)
+
 # Ordered list of known pipelines (bash 3 compat for iteration)
-KNOWN_PIPELINES=(addone bulkrnaseq psoma virome cellranger spaceranger xeniumranger)
+KNOWN_PIPELINES=(addone bulkrnaseq psoma virome cellranger spaceranger xeniumranger sqanti3 wf-transcriptomes)
 
 # ── Color output ─────────────────────────────────────────────────────────────
 if [[ -t 1 ]]; then
@@ -107,6 +117,12 @@ MULTICONTAINER_PIPELINES=(virome)
 is_multicontainer_pipeline() {
     local n="$1"
     for p in "${MULTICONTAINER_PIPELINES[@]}"; do [[ "$p" == "$n" ]] && return 0; done
+    return 1
+}
+
+is_nextflow_managed_pipeline() {
+    local n="$1"
+    for p in "${NEXTFLOW_MANAGED_PIPELINES[@]}"; do [[ "$p" == "$n" ]] && return 0; done
     return 1
 }
 

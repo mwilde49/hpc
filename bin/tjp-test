@@ -21,7 +21,7 @@ source "$SCRIPT_DIR/lib/common.sh"
 # ── Constants ────────────────────────────────────────────────────────────────
 TEST_DATA_SRC="$REPO_ROOT/test_data/rnaseq"
 TEST_DATA_10X="$REPO_ROOT/test_data/10x"
-SUPPORTED_PIPELINES=(psoma bulkrnaseq virome cellranger spaceranger)
+SUPPORTED_PIPELINES=(psoma bulkrnaseq virome cellranger spaceranger sqanti3 wf-transcriptomes)
 
 # ── Usage ────────────────────────────────────────────────────────────────────
 usage() {
@@ -77,7 +77,17 @@ $is_supported || die "Unsupported pipeline: $PIPELINE (supported: ${SUPPORTED_PI
 SCRATCH_TEST_DIR="$SCRATCH_ROOT/pipelines/$PIPELINE/test_data"
 SCRATCH_FASTQ_DIR="$SCRATCH_TEST_DIR/fastq"
 
-if [[ "$PIPELINE" == "virome" ]]; then
+if [[ "$PIPELINE" == "sqanti3" ]]; then
+    # SQANTI3 uses GTF/FASTA inputs, not FASTQs
+    SQANTI3_TEST_DATA="$REPO_ROOT/containers/sqanti3/SQANTI3/data"
+    SRC_FASTQ_DIR=""
+    SRC_SAMPLES=""
+elif [[ "$PIPELINE" == "wf-transcriptomes" ]]; then
+    # wf-transcriptomes uses ONT FASTQs — must be staged manually (see containers/sqanti3/test_data/wf_transcriptomes)
+    WF_TX_TEST_DATA="$REPO_ROOT/containers/sqanti3/test_data/wf_transcriptomes"
+    SRC_FASTQ_DIR=""
+    SRC_SAMPLES=""
+elif [[ "$PIPELINE" == "virome" ]]; then
     SRC_FASTQ_DIR="$TEST_DATA_SRC/fastq"
     SRC_SAMPLES=""
 elif [[ "$PIPELINE" == "cellranger" ]]; then
@@ -96,6 +106,94 @@ else
 fi
 
 hyperion_banner "SMOKE TEST"
+
+# ── SQANTI3: separate code path (no FASTQs) ──────────────────────────────────
+if [[ "$PIPELINE" == "sqanti3" ]]; then
+    if [[ ! -d "$SQANTI3_TEST_DATA" ]]; then
+        die "SQANTI3 test data not found: $SQANTI3_TEST_DATA
+  Ensure the sqanti3 submodule is checked out: git submodule update --init containers/sqanti3"
+    fi
+
+    SQANTI3_OUTDIR="$SCRATCH_ROOT/pipelines/sqanti3/test_data/results"
+    TEST_CONFIG="$SCRATCH_ROOT/pipelines/sqanti3/test_data/config.yaml"
+    mkdir -p "$(dirname "$TEST_CONFIG")"
+
+    cat > "$TEST_CONFIG" <<YAML
+sample: UHR_chr22_test
+isoforms: ${SQANTI3_TEST_DATA}/UHR_chr22.gtf
+refGTF:   ${SQANTI3_TEST_DATA}/reference/gencode.v38.basic_chr22.gtf
+refFasta: ${SQANTI3_TEST_DATA}/reference/GRCh38.p13_chr22.fasta
+coverage: ""
+fl_count: ${SQANTI3_TEST_DATA}/UHR_abundance.tsv
+CAGE_peak:        ${SQANTI3_TEST_DATA}/ref_TSS_annotation/human.refTSS_v3.1.hg38.bed
+polyA_motif_list: ${SQANTI3_TEST_DATA}/polyA_motifs/mouse_and_human.polyA_motif.txt
+polyA_peak: ""
+force_id_ignore: false
+cpus:   4
+chunks: 1
+skip_report: true
+skip_orf: false
+filter_mode: rules
+filter_mono_exonic: false
+rescue_mode: automatic
+outdir: ${SQANTI3_OUTDIR}
+YAML
+
+    info "Generated SQANTI3 test config: $TEST_CONFIG"
+    info "Delegating to tjp-launch sqanti3 --dev --config $TEST_CONFIG"
+    echo ""
+    "$SCRIPT_DIR/tjp-launch" sqanti3 --dev --config "$TEST_CONFIG"
+
+    echo ""
+    info "After job completes, validate outputs with:"
+    echo "  tjp-test-validate sqanti3"
+    exit 0
+fi
+
+# ── wf-transcriptomes: separate code path (needs staged ONT FASTQs) ───────────
+if [[ "$PIPELINE" == "wf-transcriptomes" ]]; then
+    WFTX_FASTQ_DIR="$WF_TX_TEST_DATA/fastq"
+    WFTX_SAMPLE_SHEET="$WF_TX_TEST_DATA/sample_sheet.csv"
+    WFTX_OUTDIR="$SCRATCH_ROOT/pipelines/wf-transcriptomes/test_data/results"
+    TEST_CONFIG="$SCRATCH_ROOT/pipelines/wf-transcriptomes/test_data/config.yaml"
+
+    if [[ ! -d "$WFTX_FASTQ_DIR" ]]; then
+        die "wf-transcriptomes test FASTQ dir not found: $WFTX_FASTQ_DIR
+  Stage test ONT FASTQs first — see $WF_TX_TEST_DATA/README.md"
+    fi
+
+    if [[ ! -f "$WFTX_SAMPLE_SHEET" ]]; then
+        die "wf-transcriptomes test sample sheet not found: $WFTX_SAMPLE_SHEET
+  Create a CSV with columns: barcode,alias"
+    fi
+
+    mkdir -p "$(dirname "$TEST_CONFIG")"
+
+    cat > "$TEST_CONFIG" <<YAML
+sample:         wftx_test
+fastq_dir:      ${WFTX_FASTQ_DIR}
+sample_sheet:   ${WFTX_SAMPLE_SHEET}
+ref_genome:     /groups/tprice/pipelines/references/GRCh38.primary_assembly.genome.fa
+ref_annotation: /groups/tprice/pipelines/references/gencode.v47.primary_assembly.annotation.gtf
+wf_version:     v2.3.0
+direct_rna:     false
+minimap2_index_opts: "-k 15"
+min_read_length: 100
+min_qscore:     9
+de_analysis:    false
+outdir:         ${WFTX_OUTDIR}
+YAML
+
+    info "Generated wf-transcriptomes test config: $TEST_CONFIG"
+    info "Delegating to tjp-launch wf-transcriptomes --dev --config $TEST_CONFIG"
+    echo ""
+    "$SCRIPT_DIR/tjp-launch" wf-transcriptomes --dev --config "$TEST_CONFIG"
+
+    echo ""
+    info "Monitor: squeue -u $USER"
+    info "Output will be at: $WFTX_OUTDIR"
+    exit 0
+fi
 
 # ── Pre-flight checks ────────────────────────────────────────────────────────
 if [[ ! -d "$SRC_FASTQ_DIR" ]]; then
