@@ -22,6 +22,7 @@ set -euo pipefail
 
 PROJECT_ROOT=/groups/tprice/pipelines
 PIPELINE_REPO=$PROJECT_ROOT/containers/sqanti3   # longreads repo deployment path
+NEXTFLOW=$PROJECT_ROOT/bin/nextflow
 
 USER_CONFIG="${1:?ERROR: Config not provided}"
 RUN_DIR="${2:?ERROR: Run dir not provided}"
@@ -88,7 +89,7 @@ echo "====================================================================="
 # Nextflow submits per-process SLURM jobs via juno.config (slurm executor).
 # -resume allows restart from last successful task if this job is resubmitted.
 
-nextflow run epi2me-labs/wf-transcriptomes \
+"$NEXTFLOW" run epi2me-labs/wf-transcriptomes \
     -r "$WF_VERSION" \
     -profile singularity \
     -c "$NF_CONFIG" \
