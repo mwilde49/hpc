@@ -63,7 +63,7 @@ MIN_READ_LENGTH=$(yaml_get "$USER_CONFIG" "min_read_length")
 MIN_QSCORE=$(yaml_get "$USER_CONFIG" "min_qscore")
 
 # Defaults
-[[ -z "$WF_VERSION" ]]       && WF_VERSION="v2.3.0"
+[[ -z "$WF_VERSION" ]]       && WF_VERSION="v1.7.2"
 [[ -z "$DIRECT_RNA" ]]       && DIRECT_RNA="false"
 [[ -z "$DE_ANALYSIS" ]]      && DE_ANALYSIS="false"
 [[ -z "$MINIMAP2_OPTS" ]]    && MINIMAP2_OPTS="-k 15"

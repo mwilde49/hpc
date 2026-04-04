@@ -175,7 +175,7 @@ fastq_dir:      ${WFTX_FASTQ_DIR}
 sample_sheet:   ${WFTX_SAMPLE_SHEET}
 ref_genome:     /groups/tprice/pipelines/references/GRCh38.primary_assembly.genome.fa
 ref_annotation: /groups/tprice/pipelines/references/gencode.v47.primary_assembly.annotation.gtf
-wf_version:     v2.3.0
+wf_version:     v1.7.2
 direct_rna:     false
 minimap2_index_opts: "-k 15"
 min_read_length: 100
