@@ -59,16 +59,11 @@ WF_VERSION=$(yaml_get "$USER_CONFIG" "wf_version")
 DIRECT_RNA=$(yaml_get "$USER_CONFIG" "direct_rna")
 DE_ANALYSIS=$(yaml_get "$USER_CONFIG" "de_analysis")
 MINIMAP2_OPTS=$(yaml_get "$USER_CONFIG" "minimap2_index_opts")
-MIN_READ_LENGTH=$(yaml_get "$USER_CONFIG" "min_read_length")
-MIN_QSCORE=$(yaml_get "$USER_CONFIG" "min_qscore")
-
 # Defaults
 [[ -z "$WF_VERSION" ]]       && WF_VERSION="v1.7.2"
 [[ -z "$DIRECT_RNA" ]]       && DIRECT_RNA="false"
 [[ -z "$DE_ANALYSIS" ]]      && DE_ANALYSIS="false"
 [[ -z "$MINIMAP2_OPTS" ]]    && MINIMAP2_OPTS="-k 15"
-[[ -z "$MIN_READ_LENGTH" ]]  && MIN_READ_LENGTH="100"
-[[ -z "$MIN_QSCORE" ]]       && MIN_QSCORE="9"
 
 # Per-sample Nextflow work dir — sample-specific so -resume works on resubmit
 NF_WORK_DIR="/scratch/juno/$USER/nf_work/wf_transcriptomes/$SAMPLE"
@@ -99,12 +94,9 @@ echo "====================================================================="
     --sample_sheet "$SAMPLE_SHEET" \
     --ref_genome "$REF_GENOME" \
     --ref_annotation "$REF_ANNOTATION" \
-    --transcriptome_assembly true \
     --de_analysis "$DE_ANALYSIS" \
     --direct_rna "$DIRECT_RNA" \
     --minimap2_index_opts "$MINIMAP2_OPTS" \
-    --min_read_length "$MIN_READ_LENGTH" \
-    --min_qscore "$MIN_QSCORE" \
     --out_dir "$OUTDIR"
 
 # ── Locate merged GTF ─────────────────────────────────────────────────────────
