@@ -1,6 +1,6 @@
 # BioCruiser / Hyperion Compute — Developer Onboarding Guide
 
-This document is a comprehensive technical reference for developers joining the TJP HPC pipeline framework. It covers every layer of the system, traces execution flows step-by-step for all six pipelines, and explains the design decisions behind each component.
+This document is a comprehensive technical reference for developers joining the TJP HPC pipeline framework. It covers every layer of the system, traces execution flows step-by-step for all nine pipelines, and explains the design decisions behind each component.
 
 ---
 
@@ -17,6 +17,9 @@ This document is a comprehensive technical reference for developers joining the 
    - [Cell Ranger (Native 10x)](#45-cell-ranger-native-10x)
    - [Space Ranger (Native 10x)](#46-space-ranger-native-10x)
    - [Xenium Ranger (Native 10x)](#47-xenium-ranger-native-10x)
+   - [Virome (Native Nextflow + Per-Process Containers)](#48-virome-native-nextflow--per-process-containers)
+   - [SQANTI3 (4-Stage SLURM DAG)](#49-sqanti3-4-stage-slurm-dag)
+   - [wf-transcriptomes (Nextflow SLURM Executor)](#410-wf-transcriptomes-nextflow-slurm-executor)
 5. [Pipeline Comparison Matrix](#5-pipeline-comparison-matrix)
 6. [Testing Infrastructure](#6-testing-infrastructure)
 7. [Adding a New Pipeline](#7-adding-a-new-pipeline)
@@ -27,7 +30,7 @@ This document is a comprehensive technical reference for developers joining the 
 
 ## 1. System Overview
 
-This framework runs bioinformatics pipelines on the Juno HPC cluster for the TJP research group. It is deployed to `/groups/tprice/pipelines` and provides six pipelines:
+This framework runs bioinformatics pipelines on the Juno HPC cluster for the TJP research group. It is deployed to `/groups/tprice/pipelines` and provides nine pipelines:
 
 | Pipeline | Type | Purpose |
 |----------|------|---------|
@@ -37,15 +40,20 @@ This framework runs bioinformatics pipelines on the Juno HPC cluster for the TJP
 | **Cell Ranger** | Native 10x | Single-cell RNA-seq (10x Genomics) |
 | **Space Ranger** | Native 10x | Spatial transcriptomics (10x Visium) |
 | **Xenium Ranger** | Native 10x | In situ transcriptomics (10x Xenium) |
+| **Virome** | Submoduled (native Nextflow) | Viral profiling (Kraken2/MetaPhlAn3) |
+| **SQANTI3** | Submoduled (SLURM DAG) | Long-read isoform QC (4-stage pipeline) |
+| **wf-transcriptomes** | Submoduled (Nextflow SLURM executor) | ONT full-length transcript analysis |
 
-Users interact through five CLI tools:
+Users interact through seven CLI tools:
 
 ```
 tjp-setup          →  One-time workspace initialization
+tjp-launch         →  Submit a single pipeline run
+tjp-batch          →  Batch submission from CSV samplesheet
 tjp-test           →  Smoke test with bundled test data
 tjp-test-validate  →  Verify smoke test outputs
-tjp-launch         →  Submit a pipeline run
 tjp-validate       →  Validate config without submitting
+labdata            →  Metadata management (find/show PLR-xxxx records)
 ```
 
 All tools also have `hyperion-*` and `biocruiser-*` symlink aliases.
@@ -62,7 +70,7 @@ The framework has four layers, each with a single responsibility. Think of it as
 
 YAML files where users specify their inputs, outputs, and parameters. Templates contain `__USER__`, `__SCRATCH__`, and `__WORK__` placeholders that `tjp-setup` replaces with real paths. Users edit these once, then launch.
 
-Each pipeline has different required keys. For example, Cell Ranger needs `sample_id`, `fastq_dir`, `transcriptome`, `localcores`, `localmem`, and `create_bam`. Psoma needs `hisat2_index`, `reference_gtf`, and Trimmomatic parameters.
+Each pipeline has different required keys. For example, Cell Ranger needs `sample_id`, `fastq_dir`, `transcriptome`, `localcores`, `localmem`, and `create_bam`. Psoma needs `hisat2_index`, `reference_gtf`, and Trimmomatic parameters. All pipelines that integrate with Titan include an optional block of `titan_*` fields for metadata registration.
 
 ### Layer 2: SLURM (the receptionist)
 
@@ -80,20 +88,25 @@ Key resource allocations:
 | Cell Ranger | 24h | 16 | 128 GB | Yes |
 | Space Ranger | 24h | 16 | 128 GB | Yes |
 | Xenium Ranger | 12h | 16 | 128 GB | Yes |
+| Virome | 12h | 20 | 64 GB | No |
+| SQANTI3 | Orchestrator: 1h; stages: dynamic | Dynamic | Dynamic | No |
+| wf-transcriptomes | 24h head job; sub-jobs dynamic | 2 (head) | 8 GB (head) | No |
 
 ### Layer 3: Execution Environment (the sealed toolbox)
 
 **Location:** `containers/` (container definitions and submodules)
 
-Two models:
+Three models:
 
-- **Container pipelines** (AddOne, BulkRNASeq, Psoma): All dependencies are packaged into an Apptainer `.sif` file. The SLURM template runs `apptainer exec` with `--cleanenv` (no host environment leakage) and `--env PYTHONNOUSERSITE=1` (no host Python package shadowing). Host directories are bind-mounted into the container.
+- **Container pipelines** (AddOne, BulkRNASeq, Psoma, SQANTI3): All dependencies are packaged into an Apptainer `.sif` file. The SLURM template runs `apptainer exec` with `--cleanenv` (no host environment leakage) and `--env PYTHONNOUSERSITE=1` (no host Python package shadowing). Host directories are bind-mounted into the container.
 
 - **Native pipelines** (Cell Ranger, Space Ranger, Xenium Ranger): 10x Genomics tools are installed from tarballs at `/groups/tprice/opt/` and manage their own execution. The SLURM template calls a wrapper script that invokes the tool directly. No container needed.
 
+- **Nextflow-managed pipelines** (Virome, wf-transcriptomes): Nextflow runs natively on the compute node (no Apptainer wrapper for the head process). Nextflow itself manages per-process containers or submits sub-jobs to SLURM.
+
 ### Layer 4: Pipeline (the worker)
 
-The actual scientific code. For container pipelines, this is Python/Nextflow scripts inside the container. For native pipelines, this is the 10x Genomics binary itself. This layer reads the config, processes data, and writes results.
+The actual scientific code. For container pipelines, this is Python/Nextflow scripts inside the container. For native pipelines, this is the 10x Genomics binary itself. For Nextflow-managed pipelines, this is a Nextflow workflow that coordinates tools across stages. This layer reads the config, processes data, and writes results.
 
 ### How They Connect
 
@@ -103,7 +116,8 @@ User runs tjp-launch <pipeline>
     ▼
 CLI Layer (bin/tjp-launch)
     │  validates config, creates run directory,
-    │  generates manifest, calls sbatch
+    │  generates manifest, registers Titan metadata,
+    │  calls sbatch
     │
     ▼
 SLURM Layer (slurm_templates/)
@@ -114,6 +128,7 @@ SLURM Layer (slurm_templates/)
 Execution Layer (containers/ or native tools)
     │  container: apptainer exec ... pipeline_script
     │  native:    bash wrapper.sh config.yaml output_dir
+    │  nextflow:  nextflow run ... --params-file config.yaml
     │
     ▼
 Pipeline Layer (pipelines/ or external code)
@@ -138,12 +153,14 @@ This is the central nervous system. Every script sources it. It defines:
 - `PIPELINE_TEMPLATES` — maps pipeline names to SLURM template paths (lines 22-30)
 - `PIPELINE_TOOL_PATHS` — maps native pipelines to tool install directories (lines 34-36)
 - `NATIVE_PIPELINES` — array of pipelines that skip containers (line 40)
+- `NEXTFLOW_MANAGED_PIPELINES` — array of pipelines where Nextflow manages sub-job containers
 - `KNOWN_PIPELINES` — master list of all pipelines (line 43)
 
 **Key functions:**
 - `yaml_get <file> <key>` — reads a value from flat YAML (grep-based, not a full parser)
 - `yaml_has <file> <key>` — checks if a key exists
 - `is_native_pipeline <name>` — returns 0 if pipeline skips containers
+- `is_nextflow_managed_pipeline <name>` — returns 0 if Nextflow manages sub-job execution
 - `get_tool_path <name>` — returns native tool install path
 - `get_container_path <name>` — returns full `.sif` path
 - `get_slurm_template <name>` — returns SLURM template path
@@ -163,6 +180,8 @@ Each pipeline has a `_validate_<name>()` function. The dispatcher `validate_conf
    - Psoma: HISAT2 index is a prefix path — checks `${index}.1.ht2` exists
    - Space Ranger: XOR logic — either (`slide` + `area`) or `unknown_slide`, not both
    - Xenium Ranger: `command` must be `resegment` or `import-segmentation`; if `import-segmentation`, `segmentation_file` is required
+   - SQANTI3: isoform GTF and reference GTF must both exist
+   - wf-transcriptomes: `sample_sheet` CSV must exist, `wf_version` is checked for semver format
 
 Errors are collected in an array and reported all at once, not one-at-a-time.
 
@@ -182,7 +201,8 @@ Every launch creates a `manifest.json` in the run directory:
     "slurm_job_id": "123456",
     "slurm_template": "slurm_templates/psoma_slurm_template.sh",
     "input_paths": "/scratch/juno/jsmith/fastq/",
-    "output_paths": "/scratch/juno/jsmith/pipelines/psoma/runs/2026-03-11_14-30-45"
+    "output_paths": "/scratch/juno/jsmith/pipelines/psoma/runs/2026-03-11_14-30-45",
+    "titan_pipeline_run_id": "PLR-a3b7"
 }
 ```
 
@@ -190,6 +210,7 @@ Key details:
 - `container_checksum` is an MD5 of the first 10MB of the `.sif` file (for speed)
 - For native pipelines, `container_file` is `native:<tool_path>` and `container_checksum` is the tool version string
 - `slurm_job_id` starts as `"pending"` and is updated after `sbatch` returns
+- `titan_pipeline_run_id` is populated after metadata registration (if Titan fields are present in config); absent from manifest if no Titan block in config
 
 ### 3.4 Branding (`bin/lib/branding.sh`)
 
@@ -204,7 +225,102 @@ One-time script that:
 1. Runs pre-flight checks (Apptainer available, containers exist, 10x tools installed)
 2. Creates `/work/$USER/pipelines/<pipeline>/runs/` for all known pipelines
 3. Copies config templates with placeholder substitution (`__USER__` → `$USER`, etc.)
-4. Adds `$REPO_ROOT/bin` to the user's `.bashrc`
+4. Also copies samplesheet templates from `templates/<pipeline>/samplesheet.csv` (if present)
+5. Adds `$REPO_ROOT/bin` to the user's `.bashrc`
+
+### 3.6 Samplesheet Library (`bin/lib/samplesheet.sh`)
+
+Provides CSV samplesheet validation and parsing for all nine pipelines. All batch-mode operations go through this library.
+
+**Key public functions:**
+
+- `validate_samplesheet <pipeline> <path>` — checks that all required columns for the given pipeline are present in the CSV header; exits non-zero with a descriptive error if any are missing
+- `samplesheet_row_count <path>` — returns the number of data rows (excludes the header line and any lines beginning with `#`)
+- `samplesheet_get_col <path> <column> <row_num>` — extract a single cell value by column name and 1-indexed row number
+- `samplesheet_to_samples_file <path> <output>` — write all `sample_name` values (one per line) to a file; used by bulkrnaseq/psoma to generate the `samples_file` param
+- `samplesheet_infer_fastq_dir <path>` — returns `$(dirname)` of the first `fastq_1` path; used by bulkrnaseq/psoma when the samplesheet encodes full paths
+- `samplesheet_get_titan_ids <path> <row_num>` — prints Titan ID fields (`project_id`, `sample_id`, `library_id`, `run_id`) as `key=value` pairs for a given row; returns empty for any absent columns
+
+**Required columns per pipeline** are defined in the `_SAMPLESHEET_REQUIRED_COLS` associative array at the top of `samplesheet.sh`. Each entry is a space-separated list of column names. Example:
+
+```bash
+_SAMPLESHEET_REQUIRED_COLS[cellranger]="sample_id sample_name fastq_dir transcriptome"
+_SAMPLESHEET_REQUIRED_COLS[psoma]="sample_name fastq_1 fastq_2"
+_SAMPLESHEET_REQUIRED_COLS[virome]="sample_id fastq_1 fastq_2"
+```
+
+Adding a new pipeline requires adding its entry here as well as registering it in `common.sh`.
+
+### 3.7 Metadata Library (`bin/lib/metadata.sh`)
+
+Provides local Titan metadata record generation. Records are stored as JSON files in the user's metadata store at `$WORK_ROOT/pipelines/metadata/`. When Titan connectivity is available in the future, these local records will be the source of truth for sync.
+
+**Key public functions:**
+
+- `register_pipeline_run [options]` — generates a `PLR-xxxx` ID (collision-checked against existing records), writes a JSON record to the metadata store, and prints the new ID on stdout. Options: `--pipeline <name>`, `--job-id <id>`, `--run-dir <path>`, `--config <path>`, `--project-id <PRJ-xxxx>`, `--sample-id <SMP-xxxx>`, `--library-id <LIB-xxxx>`, `--run-id <RUN-xxxx>`
+- `update_pipeline_run_status <plr_id> <status>` — updates the `status` field in-place using `jq`; valid values are `submitted`, `running`, `completed`, `failed`
+- `generate_titan_id <TYPE>` — generates a `TYPE-xxxx` ID (4 lowercase hex characters) that does not collide with any existing record of that type in the metadata store; used internally by `register_pipeline_run`
+- `metadata_get_store` — returns the path to the metadata store directory, creating it if it does not exist
+
+**PLR-xxxx JSON schema:**
+
+```json
+{
+    "id": "PLR-xxxx",
+    "pipeline": "psoma",
+    "slurm_job_id": "151456",
+    "run_directory": "/work/$USER/pipelines/psoma/runs/<ts>/",
+    "config_snapshot": "/work/$USER/.../config.yaml",
+    "status": "submitted",
+    "titan_registered": false,
+    "project_id": "PRJ-xxxx",
+    "sample_id": "SMP-xxxx",
+    "library_id": "LIB-xxxx",
+    "run_id": "RUN-xxxx"
+}
+```
+
+The `titan_registered` flag is `false` locally; it will be set to `true` when a future Titan sync confirms server-side registration. Fields `project_id` through `run_id` are omitted (rather than null) if the corresponding `titan_*` keys are absent from the config.
+
+**`labdata` CLI (`bin/labdata`):**
+
+User-facing tool for browsing the local metadata store:
+- `labdata list` — list all PLR records (newest first)
+- `labdata show <PLR-xxxx>` — pretty-print a single record
+- `labdata status <PLR-xxxx> <status>` — manually update status
+
+### 3.8 Batch Launcher (`bin/tjp-batch`)
+
+Reads a CSV samplesheet and submits one or more pipeline runs without requiring the user to manually edit a config per sample. All samplesheet validation is delegated to `bin/lib/samplesheet.sh`.
+
+**Usage:**
+```
+tjp-batch <pipeline> --samplesheet <path> [--config <base_config>] [--dev]
+```
+
+**Two batch modes:**
+
+- **Per-row** (cellranger, spaceranger, xeniumranger, sqanti3, wf-transcriptomes): one `tjp-launch` call per CSV data row. Each row provides sample-specific values that override or extend the base config.
+
+- **Per-sheet** (bulkrnaseq, psoma, virome): one `tjp-launch` call for the entire samplesheet. The samplesheet is treated as a unit (all samples processed together in one Nextflow run).
+
+**Per-row flow:**
+1. Validate samplesheet via `validate_samplesheet <pipeline> <path>`
+2. For each data row:
+   a. Read per-row values (`sample_id`, `fastq_dir`, Titan IDs, etc.)
+   b. Generate a per-sample config by copying the base config and injecting row values
+   c. Call `tjp-launch <pipeline> --config <per_sample_config> [--dev]`
+3. Print a summary table of submitted job IDs and PLR IDs
+
+**Per-sheet flow:**
+1. Validate samplesheet via `validate_samplesheet <pipeline> <path>`
+2. Build augmented config:
+   - Virome: inject `samplesheet: <path>` into the base config
+   - BulkRNASeq/Psoma: call `samplesheet_to_samples_file` to write a samples file and `samplesheet_infer_fastq_dir` to determine `fastq_dir`; inject both into the base config
+3. Call `tjp-launch <pipeline> --config <augmented_config> [--dev]` once
+4. Print submitted job ID
+
+The `--dev` flag is forwarded to every `tjp-launch` call, routing all jobs to the dev partition.
 
 ---
 
@@ -222,6 +338,7 @@ set -euo pipefail
 source lib/common.sh     ← pipeline registry, YAML helpers, logging
 source lib/validate.sh   ← per-pipeline validators
 source lib/manifest.sh   ← manifest generation
+source lib/metadata.sh   ← PLR-xxxx Titan metadata
 ```
 
 #### Step 2: Argument Parsing (lines 200-231)
@@ -251,7 +368,7 @@ if is_native_pipeline "$PIPELINE":
     (check for config-level tool_path override)
 else:
     CONTAINER = get_container_path "$PIPELINE"
-    verify .sif file exists
+    verify .sif file exists (skipped for nextflow-managed pipelines)
 ```
 
 #### Step 5: Run Directory (lines 281-288)
@@ -268,6 +385,8 @@ case $PIPELINE in
     bulkrnaseq|psoma)  FASTQ_DIR = yaml_get config "fastq_dir" ;;
     cellranger|spaceranger) FASTQ_DIR = yaml_get config "fastq_dir" ;;
     xeniumranger) FASTQ_DIR = yaml_get config "xenium_bundle" ;;
+    virome) FASTQ_DIR = "" (outdir used instead) ;;
+    sqanti3|wf_transcriptomes) FASTQ_DIR = "" (output goes to outdir) ;;
     addone) FASTQ_DIR = "" ;;
 esac
 ```
@@ -281,7 +400,16 @@ generate_manifest "$RUN_DIR" "$PIPELINE" "$RUN_DIR/config.yaml" "$CONTAINER" "$S
   → writes RUN_DIR/manifest.json with git commit, container checksum, paths
 ```
 
-#### Step 9: Submit (lines 350-366)
+#### Step 9: Titan Metadata Registration
+After sbatch returns the job ID:
+- Reads `titan_project_id`, `titan_sample_id`, `titan_library_id`, `titan_run_id` from `config.yaml` (if present)
+- Calls `register_pipeline_run()` from `metadata.sh` with the pipeline name, SLURM job ID, run directory path, config snapshot path, and any Titan IDs found
+- Returns a `PLR-xxxx` ID
+- Calls `update_manifest_titan_id()` to add `titan_pipeline_run_id` to `manifest.json`
+- Logs: `Metadata record: PLR-a3b7  (labdata show PLR-a3b7)`
+- If no `titan_*` keys are present in config, this step is skipped silently
+
+#### Step 10: Submit (lines 350-366)
 ```
 sbatch \
     --output="$RUN_DIR/slurm_%j.out" \
@@ -294,10 +422,11 @@ sbatch \
     "$FASTQ_DIR"                        ← arg $4: input dir for archiving
 ```
 
-#### Step 10: Post-Submit (lines 369-400)
+#### Step 11: Post-Submit (lines 369-400)
 ```
 JOB_ID = parse from sbatch output
 update_manifest_job_id "$RUN_DIR" "$JOB_ID"
+update_pipeline_run_status "$PLR_ID" "submitted"  ← if Titan metadata registered
 print summary (job ID, run dir, monitoring commands)
 ```
 
@@ -719,6 +848,255 @@ Note: uses `INPUT_DIR` instead of `FASTQ_DIR` for archiving (Xenium input is a b
 
 ---
 
+### 4.8 Virome (Native Nextflow + Per-Process Containers)
+
+**Type:** Submoduled — `mwilde49/virome` at `containers/virome/` (pinned to v1.4.0). Nextflow runs natively on the compute node; each Nextflow process uses its own `.sif` container from `containers/virome/containers/`.
+
+**Purpose:** Viral metagenomic profiling using Kraken2 for taxonomic classification and MetaPhlAn3 for abundance estimation.
+
+#### Key Architectural Distinction
+
+Virome is neither a container pipeline (no Apptainer wrapper for the head process) nor a fully native pipeline (individual processes still use containers). Nextflow is loaded as a module and runs directly on the compute node. The `--params-file` flag passes the user YAML directly to the Nextflow workflow — no intermediate config translation by `tjp-launch`.
+
+This means:
+- No `_generate_virome_config()` function in `tjp-launch`
+- The YAML key names must match the Nextflow `params.*` names in the workflow exactly
+- `is_nextflow_managed_pipeline("virome")` returns true, gating native-specific logic
+
+#### Dispatch (tjp-launch)
+
+```
+1. Create scratch output dir (used as Nextflow work dir only)
+2. SBATCH_CONFIG_ARG = "$RUN_DIR/config.yaml"   ← passthrough, no translation
+```
+
+No config generation. The user YAML is passed directly to Nextflow via `--params-file`.
+
+#### SLURM Execution (`slurm_templates/virome_slurm_template.sh`)
+
+```
+#SBATCH --time=12:00:00
+#SBATCH --cpus-per-task=20
+#SBATCH --mem=64G
+```
+
+1. `module load nextflow apptainer`
+2. Pre-flight: verify that `*.sif` container files exist in `$PROJECT_ROOT/containers/virome/containers/`; abort with a descriptive error if any are missing (common failure mode after a fresh git clone before SIF files have been staged)
+3. Execute:
+
+```bash
+nextflow run $PROJECT_ROOT/containers/virome/main.nf \
+    -profile juno \
+    --params-file "$CONFIG" \
+    -w "$SCRATCH_OUTPUT_DIR/work"
+```
+
+4. No separate stage-out step — output writes directly to `outdir:` from config (user is responsible for setting `outdir` to a persistent location, not scratch)
+
+#### Config Validation (`_validate_virome`, validate.sh)
+
+Required: `outdir`, `kraken2_db`, plus either `fastq_dir` (batch) or `samplesheet` (when using `tjp-batch`)
+
+Path checks: `kraken2_db`, `outdir` parent directory must exist
+
+#### Key Takeaway
+
+Virome demonstrates the passthrough pattern: when a Nextflow workflow already has a well-defined `params` schema, there is no reason to add a translation layer. The user edits the YAML directly to match the Nextflow params namespace.
+
+---
+
+### 4.9 SQANTI3 (4-Stage SLURM DAG)
+
+**Type:** Submoduled — `mwilde49/longreads` at `containers/sqanti3/` (pinned to current release). Uses a single `.sif` container (`containers/sqanti3/sqanti3_v5.5.4.sif`) for all four stages.
+
+**Purpose:** Long-read isoform QC pipeline for PacBio/ONT data. Classifies isoforms against a reference annotation, filters low-confidence isoforms, and rescues those supported by additional evidence.
+
+#### Architecture: Orchestrator + 4-Stage DAG
+
+Unlike all other pipelines, the SLURM template for SQANTI3 is an **orchestrator**: it does not run the pipeline itself, but instead submits four dependent SLURM jobs that form a directed acyclic graph (DAG). The orchestrator job exits quickly after submitting the stage jobs.
+
+```
+sqanti3_slurm_template.sh  ←  orchestrator (exits after job submission)
+    │
+    ├─ SLURM job: stage_1a_qc_longreads.sh      (depends on: none)
+    ├─ SLURM job: stage_1b_qc_reference.sh       (depends on: none)
+    ├─ SLURM job: stage_2_filter.sh              (depends on: 1a + 1b complete)
+    └─ SLURM job: stage_3_rescue.sh              (depends on: 2 complete)
+```
+
+Stage scripts live in `containers/sqanti3/slurm_templates/`. The orchestrator passes the config path and scratch output dir to each stage as positional arguments.
+
+#### Dynamic Resource Scaling
+
+The orchestrator reads `isoform_gtf` from the config, counts transcripts with `awk`, and passes scaled `--cpus` and `--mem` arguments to each `sbatch` call. This avoids wasting resources on small datasets while ensuring large datasets (>100k transcripts) get enough memory for the GTF parsing steps.
+
+#### Dispatch (tjp-launch)
+
+```
+1. SBATCH_CONFIG_ARG = "$RUN_DIR/config.yaml"   ← passthrough to orchestrator
+```
+
+No config translation. The orchestrator reads the YAML directly.
+
+#### SLURM Orchestrator (`slurm_templates/sqanti3_slurm_template.sh`)
+
+```
+#SBATCH --time=01:00:00        ← orchestrator itself is short-lived
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=4G
+```
+
+1. Read config: `ISOFORM_GTF = yaml_get "$CONFIG" "isoform_gtf"`
+2. Count transcripts: `N_TX=$(awk '/transcript_id/ {count++} END {print count}' "$ISOFORM_GTF")`
+3. Scale resources: set `STAGE_CPUS` and `STAGE_MEM` based on `$N_TX` thresholds
+4. Submit stage 1a and 1b in parallel (no dependency):
+```bash
+JOB_1A=$(sbatch --parsable \
+    --cpus-per-task=$STAGE_CPUS --mem=${STAGE_MEM}G \
+    containers/sqanti3/slurm_templates/stage_1a_qc_longreads.sh \
+    "$CONFIG" "$SCRATCH_OUTPUT_DIR")
+
+JOB_1B=$(sbatch --parsable \
+    --cpus-per-task=$STAGE_CPUS --mem=${STAGE_MEM}G \
+    containers/sqanti3/slurm_templates/stage_1b_qc_reference.sh \
+    "$CONFIG" "$SCRATCH_OUTPUT_DIR")
+```
+5. Submit stage 2 with afterok dependency on both 1a and 1b:
+```bash
+JOB_2=$(sbatch --parsable \
+    --dependency=afterok:${JOB_1A}:${JOB_1B} \
+    containers/sqanti3/slurm_templates/stage_2_filter.sh \
+    "$CONFIG" "$SCRATCH_OUTPUT_DIR")
+```
+6. Submit stage 3 with afterok dependency on stage 2:
+```bash
+JOB_3=$(sbatch --parsable \
+    --dependency=afterok:${JOB_2} \
+    containers/sqanti3/slurm_templates/stage_3_rescue.sh \
+    "$CONFIG" "$SCRATCH_OUTPUT_DIR")
+```
+7. Log all four job IDs and exit
+
+#### Stage Execution (each stage script)
+
+Each stage script calls `apptainer exec` with the sqanti3 SIF:
+
+```bash
+apptainer exec \
+    --bind $PROJECT_ROOT:$PROJECT_ROOT \
+    --bind $SCRATCH_ROOT:$SCRATCH_ROOT \
+    $SIF \
+    python SQANTI3_qc.py [stage-specific args from config]
+```
+
+#### Container Pre-Pull Requirement
+
+The SIF must be staged on HPC before first use — it is too large for git and is not built from a local `.def` file:
+
+```bash
+apptainer pull containers/sqanti3/sqanti3_v5.5.4.sif \
+    docker://anaconesalab/sqanti3:v5.5.4
+```
+
+#### Config Validation (`_validate_sqanti3`, validate.sh)
+
+Required: `isoform_gtf`, `isoform_fasta`, `reference_gtf`, `outdir`
+
+Path checks: `isoform_gtf`, `isoform_fasta`, `reference_gtf` must exist; `outdir` parent must exist
+
+---
+
+### 4.10 wf-transcriptomes (Nextflow SLURM Executor)
+
+**Type:** Submoduled — shares `mwilde49/longreads` at `containers/sqanti3/` with SQANTI3. The Nextflow workflow is `epi2me-labs/wf-transcriptomes`, fetched by Nextflow at runtime.
+
+**Purpose:** End-to-end ONT full-length transcript analysis: basecalling QC, alignment, assembly, abundance, fusion detection, and differential expression.
+
+#### Architecture: Head Job + Dynamic Sub-Jobs
+
+This is the most complex execution model in the framework. A single SLURM head job runs Nextflow on a compute node. Nextflow is configured with `executor = 'slurm'`, so each Nextflow process submits its own SLURM job. The compute topology is dynamic: the head job coordinates dozens of sub-jobs that run on separate compute nodes.
+
+```
+SLURM head job (wf_transcriptomes_slurm_template.sh)
+    │
+    └─ Nextflow process manager (running on head compute node)
+           │
+           ├─ sbatch → SLURM sub-job: minimap2 alignment
+           ├─ sbatch → SLURM sub-job: StringTie assembly
+           ├─ sbatch → SLURM sub-job: salmon quantification
+           ├─ sbatch → SLURM sub-job: JAFFAL fusion detection
+           └─ ... (each process = one SLURM job)
+```
+
+**Critical constraint:** The head job must stay alive for the entire duration. If the head job is cancelled or times out before sub-jobs complete, Nextflow cannot collect results and the run fails. The head job's walltime (`24:00:00`) must exceed the total expected runtime including queueing delays for sub-jobs.
+
+#### Nextflow SLURM Executor Config
+
+The executor configuration lives at `containers/sqanti3/configs/wf_transcriptomes/juno.config`:
+
+```groovy
+executor {
+    name = 'slurm'
+    queueSize = 50
+    submitRateLimit = '10 sec'
+}
+
+process {
+    queue = 'normal'
+    clusterOptions = '--account=tprice'
+}
+```
+
+This file is passed to Nextflow via `-c` alongside the pipeline's built-in config.
+
+#### Dispatch (tjp-launch)
+
+```
+1. SBATCH_CONFIG_ARG = "$RUN_DIR/config.yaml"   ← passthrough to head job
+```
+
+No config translation. The user YAML is passed directly to wf-transcriptomes via `--params-file`.
+
+#### SLURM Head Job (`slurm_templates/wf_transcriptomes_slurm_template.sh`)
+
+```
+#SBATCH --time=24:00:00        ← must outlast all sub-jobs
+#SBATCH --cpus-per-task=2      ← head job is coordinator, not worker
+#SBATCH --mem=8G
+```
+
+1. `module load nextflow`
+2. Read `wf_version` from config (default: `v1.7.2`)
+3. Execute:
+
+```bash
+nextflow run epi2me-labs/wf-transcriptomes \
+    -r "$wf_version" \
+    -c "$PROJECT_ROOT/containers/sqanti3/configs/wf_transcriptomes/juno.config" \
+    --params-file "$CONFIG" \
+    -w "$SCRATCH_OUTPUT_DIR/work"
+```
+
+4. No separate stage-out — output goes directly to `outdir:` from config
+
+#### EPI2ME Samplesheet
+
+The `sample_sheet:` key in config points to an EPI2ME-format CSV that maps barcode directories to sample names. This is passed directly to wf-transcriptomes and is distinct from the framework's own samplesheet format. The `samplesheet_*` functions in `bin/lib/samplesheet.sh` are not used for this internal EPI2ME file.
+
+#### Pipeline Version Pinning
+
+The `wf_version` key in config controls which release of wf-transcriptomes Nextflow fetches. Default is `v1.7.2`. Nextflow caches the workflow locally under `$NXF_HOME`, so the first run on a given node will be slower while it fetches; subsequent runs use the cache.
+
+#### Config Validation (`_validate_wf_transcriptomes`, validate.sh)
+
+Required: `sample_sheet`, `outdir`, `ref_genome`, `ref_annotation`
+
+Path checks: `sample_sheet`, `ref_genome`, `ref_annotation` must exist
+
+Format check: `wf_version` (if set) must match `v[0-9]+\.[0-9]+\.[0-9]+`
+
+---
+
 ## 5. Pipeline Comparison Matrix
 
 ### Execution Model
@@ -731,6 +1109,9 @@ Note: uses `INPUT_DIR` instead of `FASTQ_DIR` for archiving (Xenium input is a b
 | Cell Ranger | Native binary | Self-managed | None (pass YAML) | Yes |
 | Space Ranger | Native binary | Self-managed | None (pass YAML) | Yes |
 | Xenium Ranger | Native binary | Self-managed | None (pass YAML) | Yes |
+| Virome | Per-process `.sif` | Nextflow (native head) | None (params-file passthrough) | No |
+| SQANTI3 | `.sif` (submodule) | SLURM DAG (orchestrator) | None (pass YAML) | No |
+| wf-transcriptomes | Nextflow-managed | Nextflow (SLURM executor) | None (params-file passthrough) | No |
 
 ### Data Flow
 
@@ -742,6 +1123,9 @@ Note: uses `INPUT_DIR` instead of `FASTQ_DIR` for archiving (Xenium input is a b
 | Cell Ranger | FASTQs | `cellranger count` | Transcriptome reference |
 | Space Ranger | FASTQs + Image | `spaceranger count` | Slide/area + microscope image |
 | Xenium Ranger | Xenium bundle | `xeniumranger resegment` or `import-segmentation` | Segmentation file (import only) |
+| Virome | FASTQs | `nextflow run` (Kraken2/MetaPhlAn3) | Kraken2 database |
+| SQANTI3 | Isoform GTF + FASTA | `python SQANTI3_qc.py` (4 stages) | Reference GTF |
+| wf-transcriptomes | ONT FASTQ dirs | `nextflow run` (wf-transcriptomes) | EPI2ME samplesheet, genome + annotation |
 
 ### Container Flags
 
@@ -751,8 +1135,22 @@ Note: uses `INPUT_DIR` instead of `FASTQ_DIR` for archiving (Xenium input is a b
 | `--env PYTHONNOUSERSITE=1` | Block host Python packages | BulkRNASeq, Psoma |
 | `--env HOME=/tmp` | Writable home for Nextflow | Psoma |
 | `--env _JAVA_OPTIONS=-Xmx16g` | Java heap limit | Psoma |
-| `--bind` | Mount host paths into container | All container pipelines |
-| `--exclusive` | Full node access | All native pipelines |
+| `--bind` | Mount host paths into container | All container pipelines, SQANTI3 |
+| `--exclusive` | Full node access | All native pipelines (10x) |
+
+### Stage-Out Behavior
+
+| Pipeline | Outputs Written To | Archived to Work Dir? |
+|----------|-------------------|----------------------|
+| AddOne | Scratch (via config) | No (addone is a demo) |
+| BulkRNASeq | Scratch → `outputs/` | Yes (rsync + checksum) |
+| Psoma | Scratch → `outputs/` | Yes (rsync + checksum) |
+| Cell Ranger | Scratch → `outputs/` | Yes (rsync + checksum) |
+| Space Ranger | Scratch → `outputs/` | Yes (rsync + checksum) |
+| Xenium Ranger | Scratch → `outputs/` | Yes (rsync + checksum) |
+| Virome | `outdir:` from config | No (user sets outdir directly) |
+| SQANTI3 | `outdir:` from config | No (user sets outdir directly) |
+| wf-transcriptomes | `outdir:` from config | No (user sets outdir directly) |
 
 ---
 
@@ -764,7 +1162,7 @@ Verifies a pipeline works end-to-end with pre-bundled test data on the dev parti
 
 **Currently supported:** `psoma`, `bulkrnaseq`, `cellranger`, `spaceranger`
 
-**Not yet supported:** `xeniumranger` (infrastructure exists, not wired up), `addone`
+**Not yet supported:** `xeniumranger` (infrastructure exists, not wired up), `addone`, `virome`, `sqanti3`, `wf-transcriptomes` (test data must be staged on HPC first)
 
 **How it works:**
 
@@ -782,6 +1180,8 @@ Verifies a pipeline works end-to-end with pre-bundled test data on the dev parti
 - RNA-seq: `$REPO_ROOT/test_data/rnaseq/fastq/` (gitignored, generated on HPC)
 - 10x: `$REPO_ROOT/test_data/10x/<tool>/`
 - Space Ranger: uses bundled tiny inputs from SpaceRanger install dir
+- SQANTI3: `containers/sqanti3/SQANTI3/data/` (must be staged manually on HPC)
+- wf-transcriptomes: `containers/sqanti3/test_data/wf_transcriptomes/` (must be staged manually on HPC)
 
 ### Output Validation (`tjp-test-validate`)
 
@@ -845,6 +1245,38 @@ Same as above, plus:
 5. Add SLURM template with `--exclusive` flag
 6. Add `is_native_pipeline()` gates in any shared code that assumes containers
 
+### For All Pipeline Types
+
+After completing the type-specific steps above, complete these framework-wide registrations:
+
+**`bin/lib/common.sh`:**
+- Add to `KNOWN_PIPELINES` array (required for all validation and dispatch)
+- Add container/tool path to `PIPELINE_CONTAINERS` or `PIPELINE_TOOL_PATHS`
+- If using Nextflow as the head-job executor, add to `NEXTFLOW_MANAGED_PIPELINES`
+
+**`bin/lib/samplesheet.sh`:**
+- Add required samplesheet columns to `_SAMPLESHEET_REQUIRED_COLS[<name>]`
+- If `tjp-batch` needs special per-row or per-sheet logic, add a case to the batch dispatch
+
+**`bin/lib/validate.sh`:**
+- Add a `_validate_<name>()` function implementing all required-key and path checks
+- Wire into the `validate_config()` dispatcher
+
+**`bin/tjp-batch`:**
+- Add the pipeline to either the per-row or per-sheet dispatch case
+- Implement any per-row config injection or per-sheet config augmentation needed
+
+**Templates:**
+- Add config template at `templates/<name>/config.yaml` with the Titan block:
+  ```yaml
+  # Optional: Titan metadata fields (leave blank to skip registration)
+  titan_project_id:
+  titan_sample_id:
+  titan_library_id:
+  titan_run_id:
+  ```
+- Add samplesheet template at `templates/<name>/samplesheet.csv` with all required columns as a header row plus one example data row
+
 ---
 
 ## 8. HPC Environment
@@ -860,6 +1292,7 @@ Same as above, plus:
 | User pipeline workspace | `/work/$USER/pipelines/<pipeline>/` |
 | Run archives | `/work/$USER/pipelines/<pipeline>/runs/<timestamp>/` |
 | Pipeline execution | `/scratch/juno/$USER/pipelines/<pipeline>/runs/<timestamp>/` |
+| Metadata store | `/work/$USER/pipelines/metadata/` |
 
 ### Run Directory Structure
 
@@ -869,18 +1302,24 @@ Each `tjp-launch` creates a timestamped run directory:
 /work/$USER/pipelines/<pipeline>/runs/<timestamp>/
 ├── config.yaml              ← snapshot of config at launch time
 ├── pipeline.config          ← generated Nextflow config (container pipelines only)
-├── manifest.json            ← reproducibility record
+├── manifest.json            ← reproducibility record (includes titan_pipeline_run_id if registered)
 ├── slurm_<jobid>.out        ← SLURM stdout
 ├── slurm_<jobid>.err        ← SLURM stderr
-├── inputs/                  ← archived input files (post-run rsync)
-└── outputs/                 ← archived results (post-run rsync)
+├── inputs/                  ← archived input files (post-run rsync, where applicable)
+└── outputs/                 ← archived results (post-run rsync, where applicable)
 ```
+
+Pipelines that write directly to `outdir:` (virome, sqanti3, wf-transcriptomes) do not populate `inputs/` or `outputs/` subdirectories.
 
 ### Important: Symlinked Home Directories
 
 Juno uses symlinked home directories. Apptainer bind mounts require **real paths** — always resolve with `readlink -f` before passing to Apptainer. The SLURM templates handle this by using absolute paths (`/groups/tprice/pipelines`, `/scratch/juno/$USER`, `/work/$USER`), not `$HOME`-relative paths.
 
 This is also why Psoma's SLURM template sets `--env HOME=/tmp` — Nextflow tries to write to `~/.nextflow`, but `~` resolves to a symlink that Apptainer cannot follow.
+
+### Bash Gotcha: Arithmetic in `set -e` Scripts
+
+`((var++))` returns exit code 1 when `var` equals 0, which causes immediate script termination under `set -e`. Use `var=$((var + 1))` instead. This applies to all counter increments in SLURM templates and CLI tools.
 
 ---
 
@@ -892,9 +1331,11 @@ This is also why Psoma's SLURM template sets `--env HOME=/tmp` — Nextflow trie
 |------|---------|
 | `bin/tjp-setup` | One-time workspace initialization |
 | `bin/tjp-launch` | Main launch orchestrator |
+| `bin/tjp-batch` | Batch submission from CSV samplesheet |
 | `bin/tjp-test` | Smoke test with bundled data |
 | `bin/tjp-test-validate` | Verify smoke test outputs |
 | `bin/tjp-validate` | Config-only validation |
+| `bin/labdata` | Metadata management CLI (find/show PLR-xxxx records) |
 
 ### Shared Libraries
 
@@ -904,6 +1345,8 @@ This is also why Psoma's SLURM template sets `--env HOME=/tmp` — Nextflow trie
 | `bin/lib/validate.sh` | Per-pipeline config validators |
 | `bin/lib/manifest.sh` | Reproducibility manifest generation |
 | `bin/lib/branding.sh` | Hyperion Compute themed output |
+| `bin/lib/samplesheet.sh` | CSV samplesheet validation and parsing |
+| `bin/lib/metadata.sh` | PLR-xxxx generation and local JSON metadata store |
 
 ### SLURM Templates
 
@@ -915,6 +1358,9 @@ This is also why Psoma's SLURM template sets `--env HOME=/tmp` — Nextflow trie
 | `slurm_templates/cellranger_slurm_template.sh` | 24h, 16 CPU, 128GB, exclusive |
 | `slurm_templates/spaceranger_slurm_template.sh` | 24h, 16 CPU, 128GB, exclusive |
 | `slurm_templates/xeniumranger_slurm_template.sh` | 12h, 16 CPU, 128GB, exclusive |
+| `slurm_templates/virome_slurm_template.sh` | 12h, 20 CPU, 64GB |
+| `slurm_templates/sqanti3_slurm_template.sh` | 1h orchestrator; stage resources dynamic |
+| `slurm_templates/wf_transcriptomes_slurm_template.sh` | 24h head job, 2 CPU, 8GB |
 
 ### Config Templates
 
@@ -926,6 +1372,22 @@ This is also why Psoma's SLURM template sets `--env HOME=/tmp` — Nextflow trie
 | `templates/cellranger/config.yaml` | `sample_id`, `fastq_dir`, `transcriptome`, `create_bam` |
 | `templates/spaceranger/config.yaml` | `sample_id`, `fastq_dir`, `transcriptome`, `image`, `slide`/`area` |
 | `templates/xeniumranger/config.yaml` | `sample_id`, `command`, `xenium_bundle` |
+| `templates/virome/config.yaml` | `outdir`, `kraken2_db`, `fastq_dir` |
+| `templates/sqanti3/config.yaml` | `isoform_gtf`, `isoform_fasta`, `reference_gtf`, `outdir` |
+| `templates/wf_transcriptomes/config.yaml` | `sample_sheet`, `outdir`, `ref_genome`, `ref_annotation` |
+
+### Samplesheet Templates
+
+| File | Required Columns |
+|------|-----------------|
+| `templates/bulkrnaseq/samplesheet.csv` | `sample_name`, `fastq_1`, `fastq_2` |
+| `templates/psoma/samplesheet.csv` | `sample_name`, `fastq_1`, `fastq_2` |
+| `templates/cellranger/samplesheet.csv` | `sample_id`, `sample_name`, `fastq_dir`, `transcriptome` |
+| `templates/spaceranger/samplesheet.csv` | `sample_id`, `sample_name`, `fastq_dir`, `transcriptome`, `image` |
+| `templates/xeniumranger/samplesheet.csv` | `sample_id`, `command`, `xenium_bundle` |
+| `templates/virome/samplesheet.csv` | `sample_id`, `fastq_1`, `fastq_2` |
+| `templates/sqanti3/samplesheet.csv` | `sample_id`, `isoform_gtf`, `isoform_fasta` |
+| `templates/wf_transcriptomes/samplesheet.csv` | `sample_id`, `barcode_dir` (EPI2ME format) |
 
 ### Submodules
 
@@ -934,6 +1396,8 @@ This is also why Psoma's SLURM template sets `--env HOME=/tmp` — Nextflow trie
 | `containers/bulkrnaseq/` | `mwilde49/bulkseq` | v1.0.0 | Container def + build scripts |
 | `containers/psoma/` | `mwilde49/psoma` | v1.0.0 | Container def + pipeline code + adapters |
 | `containers/10x/` | `mwilde49/10x` | v1.1.0 | Wrapper scripts, validators, tests |
+| `containers/virome/` | `mwilde49/virome` | v1.4.0 | Nextflow workflow + per-process container defs |
+| `containers/sqanti3/` | `mwilde49/longreads` | current | SQANTI3 + wf-transcriptomes configs + stage scripts |
 
 ### Pipeline Code
 
@@ -945,6 +1409,8 @@ This is also why Psoma's SLURM template sets `--env HOME=/tmp` — Nextflow trie
 | `containers/10x/bin/cellranger-run.sh` | Bash | Cell Ranger wrapper |
 | `containers/10x/bin/spaceranger-run.sh` | Bash | Space Ranger wrapper |
 | `containers/10x/bin/xeniumranger-run.sh` | Bash | Xenium Ranger wrapper |
+| `containers/virome/main.nf` | Nextflow | Virome viral profiling workflow |
+| `containers/sqanti3/slurm_templates/` | Bash | SQANTI3 stage scripts (4 stages) |
 
 ### References (Shared Data)
 
@@ -955,6 +1421,13 @@ This is also why Psoma's SLURM template sets `--env HOME=/tmp` — Nextflow trie
 | `/groups/tprice/pipelines/references/blacklist.bed` | Blacklisted regions |
 | `/groups/tprice/pipelines/references/hisat2_index/` | HISAT2 genome index |
 | `/groups/tprice/pipelines/references/star_index/` | STAR genome index |
+
+### Metadata
+
+| Path | Purpose |
+|------|---------|
+| `/work/$USER/pipelines/metadata/` | Local PLR-xxxx JSON records |
+| `metadata/SCHEMA.md` | Titan metadata format reference |
 
 ---
 
@@ -968,7 +1441,7 @@ Detailed nesting and timeline for each pipeline, showing every layer from user c
 USER LOGIN NODE
 │
 ├─ tjp-launch addone
-│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh
+│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh, metadata.sh
 │   ├─ 2. validate_config() → _validate_addone()
 │   │      checks: input file exists, output key present
 │   ├─ 3. create /work/$USER/pipelines/addone/runs/<timestamp>/
@@ -979,7 +1452,7 @@ USER LOGIN NODE
 │   │      HANDOFF — control leaves login node, enters SLURM queue
 │   │      ════════════════════════════════════════════════
 │   └─ 7. extract job ID, update manifest, print summary
-│
+
 COMPUTE NODE (allocated by SLURM: 1 CPU, 1GB, 5min)
 │
 ├─ addone_slurm_template.sh
@@ -1013,7 +1486,7 @@ Nesting depth: 3 layers
 USER LOGIN NODE
 │
 ├─ tjp-launch bulkrnaseq
-│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh
+│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh, metadata.sh
 │   ├─ 2. validate_config() → _validate_bulkrnaseq()
 │   │      checks: fastq_dir exists, samples_file exists,
 │   │      star_index exists, reference_gtf exists
@@ -1032,8 +1505,8 @@ USER LOGIN NODE
 │   │      ════════════════════════════════════════════════
 │   │      HANDOFF — control leaves login node, enters SLURM queue
 │   │      ════════════════════════════════════════════════
-│   └─ 10. extract job ID, update manifest, print summary
-│
+│   └─ 10. extract job ID, update manifest, register Titan metadata (if titan_* present)
+
 COMPUTE NODE (allocated by SLURM: 40 CPU, 128GB, 12h)
 │
 ├─ bulkrnaseq_slurm_template.sh
@@ -1104,7 +1577,7 @@ Nesting depth: 4 layers
 USER LOGIN NODE
 │
 ├─ tjp-launch psoma
-│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh
+│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh, metadata.sh
 │   ├─ 2. validate_config() → _validate_psoma()
 │   │      checks: fastq_dir, samples_file, reference_gtf exist
 │   │      checks: hisat2_index prefix valid (${index}.1.ht2 exists)
@@ -1123,8 +1596,8 @@ USER LOGIN NODE
 │   │      ════════════════════════════════════════════════
 │   │      HANDOFF — control leaves login node, enters SLURM queue
 │   │      ════════════════════════════════════════════════
-│   └─ 9. extract job ID, update manifest, print summary
-│
+│   └─ 9. extract job ID, update manifest, register Titan metadata (if titan_* present)
+
 COMPUTE NODE (allocated by SLURM: 40 CPU, 128GB, 12h)
 │
 ├─ psoma_slurm_template.sh
@@ -1211,7 +1684,7 @@ Key differences from BulkRNASeq:
 USER LOGIN NODE
 │
 ├─ tjp-launch cellranger
-│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh
+│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh, metadata.sh
 │   ├─ 2. validate_config() → _validate_cellranger()
 │   │      checks: sample_id, sample_name, fastq_dir, transcriptome,
 │   │      localcores, localmem, create_bam present
@@ -1230,8 +1703,8 @@ USER LOGIN NODE
 │   │      ════════════════════════════════════════════════
 │   │      HANDOFF — control leaves login node, enters SLURM queue
 │   │      ════════════════════════════════════════════════
-│   └─ 10. extract job ID, update manifest, print summary
-│
+│   └─ 10. extract job ID, update manifest, register Titan metadata (if titan_* present)
+
 COMPUTE NODE (allocated by SLURM: 16 CPU, 128GB, 24h, EXCLUSIVE)
 │
 ├─ cellranger_slurm_template.sh
@@ -1304,7 +1777,7 @@ Key differences from container pipelines:
 USER LOGIN NODE
 │
 ├─ tjp-launch spaceranger
-│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh
+│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh, metadata.sh
 │   ├─ 2. validate_config() → _validate_spaceranger()
 │   │      checks: sample_id, sample_name, fastq_dir, transcriptome,
 │   │      image, localcores, localmem, create_bam present
@@ -1316,7 +1789,7 @@ USER LOGIN NODE
 │   │      ════════════════════════════════════════════════
 │   │      HANDOFF — enters SLURM queue
 │   │      ════════════════════════════════════════════════
-│
+
 COMPUTE NODE (allocated by SLURM: 16 CPU, 128GB, 24h, EXCLUSIVE)
 │
 ├─ spaceranger_slurm_template.sh
@@ -1363,7 +1836,7 @@ COMPUTE NODE (allocated by SLURM: 16 CPU, 128GB, 24h, EXCLUSIVE)
 │   │   └─ 23. exit with spaceranger's exit code
 │   │
 │   ├─ 24-27. archive + verification (same as Cell Ranger)
-│
+
 DONE
 
 Nesting depth: 3 layers
@@ -1382,7 +1855,7 @@ Key differences from Cell Ranger:
 USER LOGIN NODE
 │
 ├─ tjp-launch xeniumranger
-│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh
+│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh, metadata.sh
 │   ├─ 2. validate_config() → _validate_xeniumranger()
 │   │      checks: sample_id, command, xenium_bundle, localcores, localmem
 │   │      checks: command ∈ {resegment, import-segmentation}
@@ -1392,7 +1865,7 @@ USER LOGIN NODE
 │   │      ════════════════════════════════════════════════
 │   │      HANDOFF — enters SLURM queue
 │   │      ════════════════════════════════════════════════
-│
+
 COMPUTE NODE (allocated by SLURM: 16 CPU, 128GB, 12h, EXCLUSIVE)
 │
 ├─ xeniumranger_slurm_template.sh
@@ -1441,7 +1914,7 @@ COMPUTE NODE (allocated by SLURM: 16 CPU, 128GB, 12h, EXCLUSIVE)
 │   │   └─ 20. exit with xeniumranger's exit code
 │   │
 │   ├─ 21-24. archive + verification (INPUT_DIR instead of FASTQ_DIR)
-│
+
 DONE
 
 Nesting depth: 3 layers
@@ -1456,15 +1929,214 @@ Key differences from Cell Ranger / Space Ranger:
   - No smoke test support in tjp-test (infrastructure ready but not wired)
 ```
 
-### A.7 Nesting Depth Summary
+### A.7 Virome (Native Nextflow + Per-Process Containers)
 
 ```
-Pipeline        Nesting                                              Depth
-──────────────  ───────────────────────────────────────────────────   ─────
-AddOne          tjp-launch → SLURM → Apptainer → Python              3
-BulkRNASeq      tjp-launch → SLURM → Apptainer → Nextflow → tools   4
-Psoma           tjp-launch → SLURM → Apptainer → Nextflow → tools   4
-Cell Ranger     tjp-launch → SLURM → wrapper → cellranger            3
-Space Ranger    tjp-launch → SLURM → wrapper → spaceranger           3
-Xenium Ranger   tjp-launch → SLURM → wrapper → xeniumranger          3
+USER LOGIN NODE
+│
+├─ tjp-launch virome
+│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh, metadata.sh
+│   ├─ 2. validate_config() → _validate_virome()
+│   │      checks: outdir, kraken2_db present; fastq_dir or samplesheet present
+│   │      checks: kraken2_db path exists
+│   ├─ 3. is_nextflow_managed_pipeline("virome") → true
+│   │      no container SIF path check
+│   ├─ 4. create /work/$USER/pipelines/virome/runs/<timestamp>/
+│   ├─ 5. cp config.yaml → run dir (snapshot)
+│   ├─ 6. SBATCH_CONFIG_ARG = config.yaml (no translation)
+│   ├─ 7. generate_manifest() → manifest.json
+│   ├─ 8. sbatch virome_slurm_template.sh config.yaml run_dir scratch_dir
+│   │      ════════════════════════════════════════════════
+│   │      HANDOFF — control leaves login node, enters SLURM queue
+│   │      ════════════════════════════════════════════════
+│   └─ 9. extract job ID, update manifest, register Titan metadata (if titan_* present)
+
+COMPUTE NODE (allocated by SLURM: 20 CPU, 64GB, 12h)
+│
+├─ virome_slurm_template.sh
+│   ├─ 10. module load nextflow apptainer
+│   ├─ 11. pre-flight: verify *.sif files exist in containers/virome/containers/
+│   ├─ 12. nextflow run $PROJECT_ROOT/containers/virome/main.nf \
+│   │       -profile juno \
+│   │       --params-file "$CONFIG" \
+│   │       -w "$SCRATCH_OUTPUT_DIR/work"
+│   │       ════════════════════════════════════════════════
+│   │       HANDOFF — Nextflow orchestrates per-process containers
+│   │       ════════════════════════════════════════════════
+│   │
+│   │   NEXTFLOW MANAGES THESE PROCESSES (each in own .sif):
+│   │   │
+│   │   ├─ 13. FASTQC (containers/virome/containers/fastqc.sif)
+│   │   │      reads: input FASTQs
+│   │   │      → QC reports
+│   │   │
+│   │   ├─ 14. Kraken2 classification (containers/virome/containers/kraken2.sif)
+│   │   │      reads: input FASTQs
+│   │   │      uses:  kraken2_db
+│   │   │      → taxonomic classification report
+│   │   │
+│   │   └─ 15. MetaPhlAn3 abundance (containers/virome/containers/metaphlan.sif)
+│   │          reads: input FASTQs
+│   │          → relative abundance table
+│   │
+│   └─ Nextflow exits (outputs already at outdir: from config)
+│
+DONE — job exits, SLURM releases node
+  (no separate stage-out: output written directly to outdir:)
+
+Nesting depth: 3 layers
+  tjp-launch → SLURM template → Nextflow → per-process containers
+
+Key differences from BulkRNASeq/Psoma:
+  - No Apptainer wrapper for head process (Nextflow runs natively)
+  - Each Nextflow process uses its own .sif (not one shared container)
+  - No config translation — user YAML is passed directly as --params-file
+  - Output goes directly to outdir: (no scratch staging or rsync)
+  - Pre-flight checks for per-process SIF files (not a single container file)
+```
+
+### A.8 SQANTI3 (4-Stage SLURM DAG)
+
+```
+USER LOGIN NODE
+│
+├─ tjp-launch sqanti3
+│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh, metadata.sh
+│   ├─ 2. validate_config() → _validate_sqanti3()
+│   │      checks: isoform_gtf, isoform_fasta, reference_gtf, outdir present
+│   │      checks: isoform_gtf, isoform_fasta, reference_gtf paths exist
+│   ├─ 3. create /work/$USER/pipelines/sqanti3/runs/<timestamp>/
+│   ├─ 4. cp config.yaml → run dir (snapshot)
+│   ├─ 5. SBATCH_CONFIG_ARG = config.yaml (no translation)
+│   ├─ 6. generate_manifest() → manifest.json
+│   ├─ 7. sbatch sqanti3_slurm_template.sh config.yaml run_dir scratch_dir
+│   │      ════════════════════════════════════════════════
+│   │      HANDOFF — enters SLURM queue
+│   │      ════════════════════════════════════════════════
+│   └─ 8. extract orchestrator job ID, update manifest
+
+COMPUTE NODE (orchestrator: 1 CPU, 4GB, 1h)
+│
+├─ sqanti3_slurm_template.sh  ← ORCHESTRATOR
+│   ├─ 9.  count transcripts in isoform_gtf → N_TX
+│   ├─ 10. compute STAGE_CPUS, STAGE_MEM from N_TX
+│   ├─ 11. JOB_1A = sbatch --parsable ... stage_1a_qc_longreads.sh "$CONFIG" "$SCRATCH"
+│   ├─ 12. JOB_1B = sbatch --parsable ... stage_1b_qc_reference.sh "$CONFIG" "$SCRATCH"
+│   ├─ 13. JOB_2  = sbatch --parsable --dependency=afterok:${JOB_1A}:${JOB_1B} \
+│   │               ... stage_2_filter.sh "$CONFIG" "$SCRATCH"
+│   ├─ 14. JOB_3  = sbatch --parsable --dependency=afterok:${JOB_2} \
+│   │               ... stage_3_rescue.sh "$CONFIG" "$SCRATCH"
+│   └─ 15. log job IDs and exit
+│          ════════════════════════════════════════════════
+│          ORCHESTRATOR EXITS — 4 stage jobs now in queue
+│          ════════════════════════════════════════════════
+
+STAGE JOBS (run on separate compute nodes, dynamically allocated)
+│
+├─ stage_1a_qc_longreads.sh  (no dependencies)
+│   └─ apptainer exec sqanti3_v5.5.4.sif python SQANTI3_qc.py [long-read args]
+│      → isoform classification report
+│
+├─ stage_1b_qc_reference.sh  (no dependencies, runs in parallel with 1a)
+│   └─ apptainer exec sqanti3_v5.5.4.sif python SQANTI3_qc.py [reference args]
+│      → reference annotation QC
+│
+├─ stage_2_filter.sh  (depends: 1a + 1b)
+│   └─ apptainer exec sqanti3_v5.5.4.sif python SQANTI3_filter.py [filter args]
+│      → filtered isoforms
+│
+└─ stage_3_rescue.sh  (depends: 2)
+    └─ apptainer exec sqanti3_v5.5.4.sif python SQANTI3_rescue.py [rescue args]
+       → final rescued isoform set (written to outdir:)
+
+DONE — all stage jobs exit, outputs in outdir: from config
+
+Nesting depth: orchestrator + 3 (each stage: tjp-launch → SLURM → Apptainer → SQANTI3)
+
+Key differences from all other pipelines:
+  - SLURM template is an orchestrator, not an executor
+  - Jobs run as a DAG with SLURM --dependency flags
+  - Stages 1a and 1b run in parallel
+  - Dynamic resource allocation based on transcript count
+  - Output goes directly to outdir: (no scratch staging or rsync)
+  - SIF must be pre-pulled (not built from local .def)
+```
+
+### A.9 wf-transcriptomes (Nextflow SLURM Executor)
+
+```
+USER LOGIN NODE
+│
+├─ tjp-launch wf_transcriptomes
+│   ├─ 1. source lib/common.sh, validate.sh, manifest.sh, metadata.sh
+│   ├─ 2. validate_config() → _validate_wf_transcriptomes()
+│   │      checks: sample_sheet, outdir, ref_genome, ref_annotation present
+│   │      checks: paths exist; wf_version format valid
+│   ├─ 3. is_nextflow_managed_pipeline("wf_transcriptomes") → true
+│   ├─ 4. create /work/$USER/pipelines/wf_transcriptomes/runs/<timestamp>/
+│   ├─ 5. cp config.yaml → run dir (snapshot)
+│   ├─ 6. SBATCH_CONFIG_ARG = config.yaml (no translation)
+│   ├─ 7. generate_manifest() → manifest.json
+│   ├─ 8. sbatch wf_transcriptomes_slurm_template.sh config.yaml run_dir scratch_dir
+│   │      ════════════════════════════════════════════════
+│   │      HANDOFF — enters SLURM queue
+│   │      ════════════════════════════════════════════════
+│   └─ 9. extract head job ID, update manifest
+
+HEAD JOB COMPUTE NODE (2 CPU, 8GB, 24h)
+│
+├─ wf_transcriptomes_slurm_template.sh
+│   ├─ 10. module load nextflow
+│   ├─ 11. read wf_version from config (default: v1.7.2)
+│   ├─ 12. nextflow run epi2me-labs/wf-transcriptomes \
+│   │       -r "$wf_version" \
+│   │       -c "$PROJECT_ROOT/containers/sqanti3/configs/wf_transcriptomes/juno.config" \
+│   │       --params-file "$CONFIG" \
+│   │       -w "$SCRATCH_OUTPUT_DIR/work"
+│   │       ════════════════════════════════════════════════
+│   │       HANDOFF — Nextflow submits sub-jobs to SLURM
+│   │       HEAD JOB MUST STAY ALIVE UNTIL ALL SUB-JOBS COMPLETE
+│   │       ════════════════════════════════════════════════
+│   │
+│   │   NEXTFLOW SLURM EXECUTOR (jobs on separate compute nodes):
+│   │   │
+│   │   ├─ sbatch → minimap2 alignment (one job per sample)
+│   │   ├─ sbatch → StringTie assembly
+│   │   ├─ sbatch → salmon quantification
+│   │   ├─ sbatch → JAFFAL fusion detection
+│   │   ├─ sbatch → differential expression (if groups configured)
+│   │   └─ ... (process graph determined by wf-transcriptomes version)
+│   │
+│   └─ Nextflow collects results, exits
+│      (outputs already at outdir: — no separate rsync)
+│
+DONE
+
+Nesting depth: head job + dynamic sub-jobs
+  tjp-launch → SLURM head job → Nextflow → SLURM sub-jobs → tools
+
+Key differences from all other pipelines:
+  - Most complex job topology: head job coordinates dozens of SLURM sub-jobs
+  - Head job must outlast all sub-jobs (24h walltime)
+  - Nextflow fetches workflow from GitHub at runtime (cached in $NXF_HOME)
+  - sub-job containers managed by Nextflow, not by the framework
+  - Output goes directly to outdir: (no scratch staging)
+  - EPI2ME samplesheet format (distinct from framework CSV samplesheet)
+  - Pipeline version pinned via wf_version key (default: v1.7.2)
+```
+
+### A.10 Nesting Depth Summary
+
+```
+Pipeline          Nesting                                                        Depth
+────────────────  ─────────────────────────────────────────────────────────────  ─────
+AddOne            tjp-launch → SLURM → Apptainer → Python                        3
+BulkRNASeq        tjp-launch → SLURM → Apptainer → Nextflow → tools             4
+Psoma             tjp-launch → SLURM → Apptainer → Nextflow → tools             4
+Cell Ranger       tjp-launch → SLURM → wrapper → cellranger                      3
+Space Ranger      tjp-launch → SLURM → wrapper → spaceranger                     3
+Xenium Ranger     tjp-launch → SLURM → wrapper → xeniumranger                    3
+Virome            tjp-launch → SLURM → Nextflow → per-process containers         3
+SQANTI3           tjp-launch → SLURM orchestrator → 4 stage SLURM jobs → tool   3+
+wf-transcriptomes tjp-launch → SLURM head job → Nextflow → SLURM sub-jobs       3+
 ```

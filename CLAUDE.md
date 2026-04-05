@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HPC pipeline framework for the TJP group on Juno HPC, deployed to the shared group location `/groups/tprice/pipelines`. Uses Apptainer containers + SLURM scheduling + config-driven YAML execution. Has six pipelines: AddOne (inline demo), BulkRNASeq (submoduled container + external Nextflow pipeline), Psoma (submoduled combined container+pipeline repo), and three 10x Genomics native pipelines (Cell Ranger, Space Ranger, Xenium Ranger). Designed to scale horizontally by adding new pipeline directories or container submodules.
+HPC pipeline framework for the TJP group on Juno HPC, deployed to the shared group location `/groups/tprice/pipelines`. Uses Apptainer containers + SLURM scheduling + config-driven YAML execution. Has nine pipelines: AddOne (inline demo), BulkRNASeq (submoduled container + external Nextflow), Psoma (submoduled combined container+pipeline), Virome (submoduled Nextflow + per-process containers), SQANTI3 (submoduled 4-stage SLURM DAG), wf-transcriptomes (submoduled Nextflow SLURM executor), and three 10x Genomics native pipelines (Cell Ranger, Space Ranger, Xenium Ranger). Designed to scale horizontally by adding new pipeline directories or container submodules. Version 6.0.0 adds samplesheet-driven batch execution (`tjp-batch`), local Titan metadata prototype (`labdata`/PLR-xxxx records), and Titan integration fields in all configs.
 
 ## Build and Run Commands
 
@@ -43,12 +43,19 @@ Four-layer stack where each layer has a single responsibility:
 
 Supporting layers:
 
-- **`bin/`** — user-facing CLI tools (`tjp-setup`, `tjp-launch`, `tjp-test`, `tjp-test-validate`) with `hyperion-*` and `biocruiser-*` symlink aliases, plus shared libraries (`bin/lib/` including `branding.sh` for Hyperion Compute themed output)
-- **`templates/`** — per-pipeline config templates with `__USER__`/`__SCRATCH__`/`__WORK__` placeholders, plus the Nextflow config template (`pipeline.config.tmpl`)
+- **`bin/`** — user-facing CLI tools (`tjp-setup`, `tjp-launch`, `tjp-test`, `tjp-test-validate`, `tjp-batch`, `labdata`) with `hyperion-*` and `biocruiser-*` symlink aliases, plus shared libraries in `bin/lib/`:
+  - `branding.sh` — Hyperion Compute themed output (banners, colored log tags, sign-off)
+  - `common.sh` — pipeline registry, path resolution, `is_native_pipeline()`, `is_nextflow_managed_pipeline()`, `is_multicontainer_pipeline()`
+  - `validate.sh` — per-pipeline config validation
+  - `samplesheet.sh` — CSV samplesheet validation and parsing (`_SAMPLESHEET_REQUIRED_COLS`)
+  - `metadata.sh` — Titan metadata prototype (PLR-xxxx JSON records)
+- **`templates/`** — per-pipeline config templates with `__USER__`/`__SCRATCH__`/`__WORK__` placeholders, plus the Nextflow config template (`pipeline.config.tmpl`) and per-pipeline `samplesheet.csv` templates (9 pipelines)
+- **`metadata/`** — `SCHEMA.md` (Titan metadata format reference); runtime records stored under `/work/$USER/pipelines/metadata/`
+- **`docs/`** — architecture diagrams (Mermaid source + rendered SVG)
 
 Execution flow: `sbatch template.sh config.yaml` → SLURM allocates node → Apptainer runs container → pipeline executes → writes to scratch → archives inputs/outputs to work run directory.
 
-Pipelines can be **inline** (code in `pipelines/<name>/`, e.g., addone), **submoduled** (container repo in `containers/<name>/` with external pipeline code, e.g., bulkrnaseq), or **native** (no container, tool manages its own execution, e.g., cellranger).
+Pipelines can be **inline** (code in `pipelines/<name>/`, e.g., addone), **submoduled** (container repo in `containers/<name>/` with external pipeline code, e.g., bulkrnaseq), **native** (no container, tool manages its own execution, e.g., cellranger), or **multi-container** (Nextflow on host with per-process `.sif` files, e.g., virome).
 
 ## User Workflow (Recommended)
 
@@ -63,9 +70,16 @@ vi /work/$USER/pipelines/addone/config.yaml
 
 # Launch (creates timestamped run, snapshots config, submits job)
 tjp-launch addone
+
+# Batch launch from samplesheet
+tjp-batch cellranger /work/$USER/pipelines/cellranger/samplesheet.csv
+
+# Monitor runs with labdata
+labdata find runs --pipeline psoma
+labdata show PLR-xxxx
 ```
 
-Each launch creates a timestamped run directory under `/work/$USER/pipelines/<pipeline>/runs/` containing a config snapshot, reproducibility manifest (`manifest.json`), and SLURM logs. After a successful pipeline run, inputs (FASTQs) and outputs are automatically archived from scratch to `inputs/` and `outputs/` subdirectories in the run directory via rsync with checksum verification. See `ONBOARDING.md` for full details.
+Each launch creates a timestamped run directory under `/work/$USER/pipelines/<pipeline>/runs/` containing a config snapshot, reproducibility manifest (`manifest.json`), SLURM logs, and a PLR-xxxx Titan metadata record. After a successful pipeline run, inputs (FASTQs) and outputs are automatically archived from scratch to `inputs/` and `outputs/` subdirectories in the run directory via rsync with checksum verification. See `ONBOARDING.md` for full details.
 
 ### Smoke Testing
 
@@ -93,6 +107,41 @@ Juno uses symlinked home directories. Apptainer bind mounts require **real paths
 
 The SLURM templates auto-detect user paths via `$USER` (`PROJECT_ROOT=/groups/tprice/pipelines`, `SCRATCH_ROOT=/scratch/juno/$USER`, `WORK_ROOT=/work/$USER`).
 
+## Batch Launching (tjp-batch)
+
+`tjp-batch <pipeline> <samplesheet.csv> [options]` launches multiple runs from a samplesheet.
+
+Two modes:
+- **Per-row**: cellranger, spaceranger, xeniumranger, sqanti3, wf-transcriptomes — one SLURM job per CSV row
+- **Per-sheet**: bulkrnaseq, psoma, virome — one SLURM job for all rows (Nextflow handles internal parallelism)
+
+Options:
+- `--config <base.yaml>` — merge a base config with samplesheet row values
+- `--dry-run` — print what would be submitted without submitting
+- `--dev` — submit to the dev partition
+
+Batch run directories: `$USER_PIPELINES/$PIPELINE/batch_runs/$BATCH_TS/` (one subdirectory per row for per-row mode).
+
+Samplesheet CSV columns use unprefixed Titan field names (`project_id`, `sample_id`, etc.) — unambiguous in CSV context. Pipeline-required columns are defined in `_SAMPLESHEET_REQUIRED_COLS` in `bin/lib/samplesheet.sh`.
+
+## Titan Metadata Prototype (labdata)
+
+Every `tjp-launch` and `tjp-batch` run automatically generates a local PLR-xxxx metadata record stored as a JSON file at `/work/$USER/pipelines/metadata/pipeline_runs/PLR-xxxx.json`. When Titan comes online (~6 months from v6.0.0 release), `labdata` will switch to writing to the PostgreSQL database with no user-visible change.
+
+Config fields (all optional, use `titan_` prefix in YAML configs to avoid naming collisions with native tool fields like `sample_id` in cellranger/spaceranger/xeniumranger):
+- `titan_project_id` → PRJ-xxxx
+- `titan_sample_id` → SMP-xxxx
+- `titan_library_id` → LIB-xxxx
+- `titan_run_id` → RUN-xxxx
+
+`labdata` commands:
+- `labdata find runs [--pipeline <name>] [--status <status>] [--format table|json|paths]`
+- `labdata show <PLR-xxxx>`
+- `labdata new-id <TYPE>` — generate a new Titan ID (PRJ, SMP, LIB, RUN, PLR)
+- `labdata status` — metadata store health
+
+See `metadata/SCHEMA.md` for the full JSON schema.
+
 ## BulkRNASeq Pipeline
 
 ### Submodule
@@ -119,6 +168,8 @@ cd /groups/tprice/pipelines
 mkdir -p logs
 sbatch slurm_templates/bulkrnaseq_slurm_template.sh
 ```
+
+Batch mode: **per-sheet** (one SLURM job for all samples; Nextflow handles per-sample parallelism).
 
 See `BULKRNASEQ_HPC_GUIDE.md` for full setup and usage details.
 
@@ -148,10 +199,66 @@ mkdir -p logs
 sbatch slurm_templates/psoma_slurm_template.sh
 ```
 
+Batch mode: **per-sheet** (one SLURM job for all samples; Nextflow handles per-sample parallelism).
+
 ### References
 - Shared Gencode v48 GTF, filter.bed, blacklist.bed from `/groups/tprice/pipelines/references/`
 - HISAT2 index at `/groups/tprice/pipelines/references/hisat2_index/`
 - NexteraPE-PE.fa adapter file lives in the psoma submodule (auto-referenced)
+
+## Virome Pipeline
+
+### Submodule
+
+Container repo `mwilde49/virome-pipeline` is a git submodule at `containers/virome/`, pinned to `v1.4.0`.
+
+### Architecture
+
+Model C — native Nextflow on host with per-process Apptainer containers. Unlike bulkrnaseq/psoma, Nextflow does not run inside a single container; instead each Nextflow process pulls its own `.sif` from `containers/virome/containers/`. Gated in shared code by `is_multicontainer_pipeline()`.
+
+### Key details
+- Input: samplesheet CSV with `sample,fastq_r1,fastq_r2` columns, passed as `--input` to Nextflow
+- Config passes directly as `--params-file` to Nextflow (no translation layer)
+- Batch mode: **per-sheet** (one SLURM job; Nextflow handles per-sample parallelism)
+- SLURM resources: 12h, 16 CPU, 128GB, non-exclusive
+- `.sif` files live in `containers/virome/containers/` — must be staged on HPC
+
+### Submit on HPC
+```bash
+cd /groups/tprice/pipelines
+mkdir -p logs
+sbatch slurm_templates/virome_slurm_template.sh
+```
+
+## Long-Read Pipelines (SQANTI3 and wf-transcriptomes)
+
+### Submodule
+
+Repo `mwilde49/longreads` is a git submodule at `containers/sqanti3/`, pinned to the current release. Both long-read pipelines live in this single submodule.
+
+### SQANTI3
+
+4-stage SLURM DAG for long-read transcript quality control:
+- Orchestrator: `slurm_templates/sqanti3_slurm_template.sh` — submits dependent SLURM jobs
+- Stage scripts: `containers/sqanti3/slurm_templates/` (stages 1a, 1b, 2, 3)
+- Dynamic resource scaling: CPU/memory allocations derived from GTF transcript count
+- Container SIF: `containers/sqanti3/sqanti3_v5.5.4.sif` — must be pulled on HPC:
+  ```bash
+  apptainer pull containers/sqanti3/sqanti3_v5.5.4.sif docker://anaconesalab/sqanti3:v5.5.4
+  ```
+- Batch mode: **per-row** (one SLURM DAG per CSV row)
+- Test data: `containers/sqanti3/SQANTI3/data/` (must be staged on HPC)
+
+### wf-transcriptomes
+
+Nextflow head-job pipeline using the epi2me-labs/wf-transcriptomes workflow with SLURM executor:
+- SLURM template: `slurm_templates/wf_transcriptomes_slurm_template.sh` — submits Nextflow head job
+- Nextflow submits per-process SLURM jobs via `containers/sqanti3/configs/wf_transcriptomes/juno.config`
+- Registered in `NEXTFLOW_MANAGED_PIPELINES` array; gated by `is_nextflow_managed_pipeline()` in `bin/lib/common.sh`
+- Batch mode: **per-row** (one Nextflow head job per CSV row)
+- Test data: `containers/sqanti3/test_data/wf_transcriptomes/` (must be staged on HPC)
+
+Both long-read pipelines write directly to `outdir:` from config; no scratch staging (unlike bulkrnaseq/psoma).
 
 ## 10x Genomics Pipelines (Cell Ranger, Space Ranger, Xenium Ranger)
 
@@ -185,6 +292,8 @@ The `mwilde49/10x` repo is a git submodule at `containers/10x/`. It contains:
 ### Config-level tool_path override
 Users can set `tool_path` in their config YAML to override the default install location (useful for testing new tool versions).
 
+Batch mode: **per-row** for all three 10x tools (one SLURM job per sample/CSV row).
+
 ## Adding a New Pipeline
 
 ### Inline pipelines (e.g., addone)
@@ -195,7 +304,11 @@ For simple pipelines where code lives directly in this repo:
 2. Create or extend container definition in `containers/` if new dependencies needed, then rebuild .sif
 3. Add `slurm_templates/<name>_slurm_template.sh` (copy addone template, adjust resources)
 4. Add `configs/<name>_example_config.yaml`
-5. .sif files are NOT in git — transfer via `scp` to HPC
+5. Add config template at `templates/<name>/config.yaml` with `titan_*` fields block
+6. Add samplesheet template at `templates/<name>/samplesheet.csv`
+7. Add required samplesheet columns to `_SAMPLESHEET_REQUIRED_COLS` in `bin/lib/samplesheet.sh`
+8. Add batch dispatch logic in `bin/tjp-batch`
+9. .sif files are NOT in git — transfer via `scp` to HPC
 
 ### Submoduled pipelines (e.g., bulkrnaseq)
 
@@ -206,7 +319,11 @@ For pipelines with their own container repo:
 3. Add `slurm_templates/<name>_slurm_template.sh` with pre-flight checks
 4. If pipeline code lives in a third-party repo, document the clone step in a guide
 5. Create a top-level `<NAME>_HPC_GUIDE.md` documenting setup and usage
-6. .sif files are NOT in git — build in submodule dir, transfer via `scp` to HPC
+6. Add config template at `templates/<name>/config.yaml` with `titan_*` fields block
+7. Add samplesheet template at `templates/<name>/samplesheet.csv`
+8. Add required samplesheet columns to `_SAMPLESHEET_REQUIRED_COLS` in `bin/lib/samplesheet.sh`
+9. Add batch dispatch logic in `bin/tjp-batch` (per-sheet vs per-row)
+10. .sif files are NOT in git — build in submodule dir, transfer via `scp` to HPC
 
 ### Native pipelines (e.g., cellranger)
 
@@ -216,8 +333,11 @@ For tools that don't need a container:
 2. Install the tool from tarball to `/groups/tprice/software/<name>/`
 3. Add `PIPELINE_TOOL_PATHS[<name>]` and `NATIVE_PIPELINES+=(<name>)` in `bin/lib/common.sh`
 4. Add `slurm_templates/<name>_slurm_template.sh` calling the wrapper script
-5. Add config template in `templates/<name>/config.yaml`
-6. Add validator in `bin/lib/validate.sh`
+5. Add config template at `templates/<name>/config.yaml` with `titan_*` fields block
+6. Add samplesheet template at `templates/<name>/samplesheet.csv`
+7. Add required samplesheet columns to `_SAMPLESHEET_REQUIRED_COLS` in `bin/lib/samplesheet.sh`
+8. Add batch dispatch logic in `bin/tjp-batch` (native pipelines are always per-row)
+9. Add validator in `bin/lib/validate.sh`
 
 ## Key Constraints
 
@@ -226,3 +346,5 @@ For tools that don't need a container:
 - Container-based SLURM templates must bind `PROJECT_ROOT`, `SCRATCH_ROOT`, and `WORK_ROOT` into the container
 - Native pipeline SLURM templates use `--exclusive` and call wrapper scripts directly
 - Outputs go to scratch space, never to the project directory
+- Titan fields use `titan_` prefix in YAML configs to avoid naming collisions (cellranger/spaceranger/xeniumranger already use `sample_id` natively)
+- Samplesheet CSV columns use unprefixed names (`project_id`, `sample_id`, etc.) — unambiguous in CSV context

@@ -469,3 +469,50 @@ sbatch slurm_templates/bulkrnaseq_slurm_template.sh
 ### "gocryptfs not found" warning
 
 Informational message from Apptainer. Ignore it — it's a warning, not an error.
+
+---
+
+## Batch Execution (v6.0.0)
+
+Run all samples from a CSV samplesheet in one command:
+
+```bash
+# Edit the samplesheet template (created by tjp-setup)
+vi /work/$USER/pipelines/bulkrnaseq/samplesheet.csv
+
+# Launch all rows as a single SLURM job
+tjp-batch bulkrnaseq /work/$USER/pipelines/bulkrnaseq/samplesheet.csv \
+    --config /work/$USER/pipelines/bulkrnaseq/config.yaml
+```
+
+Samplesheet format (one sample per row):
+
+```
+sample,fastq_1,fastq_2
+Patient01,/scratch/juno/$USER/fastq/Patient01_R1_001.fastq.gz,/scratch/juno/$USER/fastq/Patient01_R2_001.fastq.gz
+Patient02,/scratch/juno/$USER/fastq/Patient02_R1_001.fastq.gz,/scratch/juno/$USER/fastq/Patient02_R2_001.fastq.gz
+```
+
+The batch launcher automatically:
+- Infers `fastq_dir` from the first row's `fastq_1` path
+- Generates a `samples_file` from the `sample` column
+- Submits one SLURM job for all samples (Nextflow handles per-sample parallelism)
+
+Optional Titan metadata columns: `project_id,sample_id,library_id,run_id`
+
+---
+
+## Titan Integration (v6.0.0)
+
+Add optional Titan metadata fields to your `config.yaml` to associate runs with Titan IDs:
+
+```yaml
+# ── Titan Integration (optional) ─────────────────────────────────────────────
+titan_project_id:   # PRJ-xxxx
+titan_sample_id:    # SMP-xxxx
+titan_library_id:   # LIB-xxxx
+titan_run_id:       # RUN-xxxx
+```
+
+These fields are recorded in a local PLR-xxxx metadata record (viewable with `labdata show PLR-xxxx`)
+and will sync to the Titan database when it comes online. They are not passed to the Nextflow pipeline.

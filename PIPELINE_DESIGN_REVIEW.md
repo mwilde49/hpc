@@ -33,6 +33,8 @@ well, and what to do differently next time.
 | Cell Ranger | Native | No | None (proprietary binary) | Direct YAML → wrapper script |
 | Space Ranger | Native | No | None (proprietary binary) | Direct YAML → wrapper script |
 | Xenium Ranger | Native | No | None (proprietary binary) | Direct YAML → wrapper script |
+| SQANTI3 | Submoduled | No | Monolithic `.sif` (Apptainer) | Direct YAML → SLURM stage scripts (4-stage DAG) |
+| wf-transcriptomes | Submoduled | Native on host (head job) | No container for head; Nextflow manages own containers | User YAML as params-file (no generation); Nextflow-managed SLURM executor |
 
 ### Resources & Dependencies
 
@@ -45,6 +47,8 @@ well, and what to do differently next time.
 | Cell Ranger | 24h | 16 | 128 GB | Yes | Tool tarball at `/groups/tprice/opt/` |
 | Space Ranger | 24h | 16 | 128 GB | Yes | Tool tarball at `/groups/tprice/opt/` |
 | Xenium Ranger | 12h | 16 | 128 GB | Yes | Tool tarball at `/groups/tprice/opt/` |
+| SQANTI3 | varies | varies | varies | No | Container SIF (must be pulled: `apptainer pull ... docker://anaconesalab/sqanti3:v5.5.4`) |
+| wf-transcriptomes | 24h head + sub-jobs | 8 head | 32 GB head | No | Nextflow on host; epi2me-labs/wf-transcriptomes (auto-fetched) |
 
 ### Input & Output
 
@@ -57,21 +61,24 @@ well, and what to do differently next time.
 | Cell Ranger | `fastq_dir` + `sample_name` prefix | Proprietary | Feature-barcode matrix, web summary |
 | Space Ranger | `fastq_dir` + image + slide | Proprietary | Feature-barcode matrix + spatial coords |
 | Xenium Ranger | `xenium_bundle` directory | Proprietary | Resegmented Xenium output |
+| SQANTI3 | `isoforms` GTF + `ref_gtf` + `ref_fasta` | SQANTI3 classification | Filtered isoforms GTF, QC plots, classification TSV |
+| wf-transcriptomes | `fastq_dir` + `sample_sheet` (EPI2ME) | Minimap2 + StringTie2 | Collapsed isoforms, expression matrix, QC report |
 
 ### Submodule Versioning
 
 | Submodule | Repo | Current pin | Pin strategy |
 |---|---|---|---|
 | BulkRNASeq | `mwilde49/bulkseq` | v1.0.0 | Tag |
-| Psoma | `mwilde49/psoma` | v1.0.0 | Tag |
-| Virome | `mwilde49/virome-pipeline` | v1.0.0 | Tag |
+| Psoma | `mwilde49/psoma` | v2.0.0 | Tag |
+| Virome | `mwilde49/virome-pipeline` | v1.4.0 | Tag |
 | 10x | `mwilde49/10x` | v1.1.0 | Tag |
+| longreads (SQANTI3 + wf-tx) | `mwilde49/longreads` | current HEAD | Tag pending |
 
 ---
 
 ## 2. Execution Model Breakdown
 
-There are four distinct execution models in the framework. Every pipeline falls
+There are six distinct execution models in the framework. Every pipeline falls
 into exactly one:
 
 ### Model A — Direct script (AddOne)
@@ -108,6 +115,29 @@ SLURM node → bash wrapper.sh → cellranger count [args...]
 No containers, no Nextflow. Proprietary tools manage their own
 parallelism via `--localcores`/`--localmem`. The `--exclusive` SLURM
 flag gives them full node access.
+
+### Model E — SLURM DAG (SQANTI3)
+```
+SLURM node (orchestrator) → sbatch stage_1a.sh
+                           → sbatch stage_1b.sh
+                           → sbatch stage_2.sh (depends on 1a+1b)
+                           → sbatch stage_3.sh (depends on 2)
+```
+Orchestrator job submits 4 stage jobs via `sbatch --dependency`. Each stage
+runs `apptainer exec sqanti3.sif`. Resources scale dynamically by transcript
+count.
+
+### Model F — Nextflow SLURM Executor (wf-transcriptomes)
+```
+SLURM head job → nextflow run wf-transcriptomes
+                     → [SLURM job: pychopper]
+                     → [SLURM job: minimap2]
+                     → [SLURM job: stringtie2]
+                     → [SLURM job: ...per-process]
+```
+Nextflow runs natively on the head node and submits per-process SLURM jobs
+via the `executor = 'slurm'` configuration in
+`containers/sqanti3/configs/wf_transcriptomes/juno.config`.
 
 ---
 
@@ -178,7 +208,7 @@ most fragile pipeline to deploy to a new HPC environment.
 
 **What to fix:** The generated config is the main debt. Virome's approach
 (params-file passthrough) is strictly better and should be the model for
-any Psoma v2.
+any Psoma v3.
 
 ---
 
@@ -209,8 +239,8 @@ any Psoma v2.
 - The pre-flight check in the SLURM template only verifies `*.sif` files
   exist — it doesn't verify that all 6 expected containers are present
   by name.
-- **Active development** (v1.0.0 just landed) means the pipeline is less
-  battle-tested than BulkRNASeq/Psoma.
+- **Active development** (v1.4.0) means the pipeline is less battle-tested
+  than BulkRNASeq/Psoma.
 
 **What to fix:** Add named container existence checks to the SLURM
 pre-flight (check for `fastqc.sif`, `star.sif`, etc. explicitly rather
@@ -250,6 +280,58 @@ upgrade procedure.
 
 ---
 
+### SQANTI3
+**Purpose:** Long-read isoform quality control and filtering.
+
+**Strengths:**
+- SLURM DAG model avoids a persistent Nextflow process — each stage submits
+  the next via `sbatch --dependency`, which is robust to head-node
+  instability.
+- Dynamic resource scaling: the orchestrator counts transcripts in the
+  isoform GTF and adjusts memory/CPU requests for downstream stages.
+- Stage granularity (1a QC long-read, 1b QC reference, 2 filter, 3 rescue)
+  gives clear checkpointing — if stage 2 fails, restart from stage 2 only.
+
+**Weaknesses:**
+- SIF must be manually pulled (not auto-built):
+  `apptainer pull docker://anaconesalab/sqanti3:v5.5.4`
+- No sjdb-based short-read integration is currently set up (coverage column
+  accepted but optional).
+- Test data (UHR chr22) not yet staged on HPC.
+
+**Verdict:** Solid architecture for a 4-stage pipeline. The main outstanding
+work is SIF staging and test data setup.
+
+---
+
+### wf-transcriptomes
+**Purpose:** ONT full-length transcript analysis (assembly + quantification).
+
+**Strengths:**
+- **Model F is the most scalable design in the framework.** Nextflow's SLURM
+  executor distributes each process to its own SLURM job — this is how
+  Nextflow is designed to run at scale. Each process gets exactly the
+  CPUs/memory it needs, and Nextflow handles retries and resume.
+- Zero HPC repo coupling: the pipeline is a pure EPI2ME Nextflow workflow;
+  `tjp-launch` just sets up the head job. Adding a new pipeline parameter
+  requires no changes to the HPC repo.
+- Barcode-level samplesheet design (EPI2ME format) is already the standard
+  for ONT demultiplexed data.
+
+**Weaknesses:**
+- Head job must remain running throughout — if the head node goes down,
+  in-flight sub-jobs orphan. Use `screen` or `tmux` if the head job is on a
+  login node, or ensure it runs on a compute node (as our SLURM template
+  does).
+- Version must be pinned (currently v1.7.2) — EPI2ME pipelines auto-update
+  unless pinned.
+- Test ONT FASTQs not yet staged on HPC.
+
+**Verdict:** Best long-term design pattern in the framework. Should be the
+model for any future Nextflow pipeline.
+
+---
+
 ## 4. Cross-Cutting Observations
 
 ### The translation layer problem
@@ -280,35 +362,50 @@ Virome uses a CSV samplesheet (explicit paths). The 10x pipelines use a
 isn't a problem today but will matter when users move between pipelines.
 
 ### Submodule discipline is good
-All submodules are tag-pinned, self-contained (except BulkRNASeq), and have
-their own `CLAUDE.md` for AI-assisted development. This is the right pattern
-and should be maintained.
+All submodules are tag-pinned (except longreads which is tag-pending),
+self-contained (except BulkRNASeq), and have their own `CLAUDE.md` for
+AI-assisted development. This is the right pattern and should be maintained.
+
+### Samplesheet standardization achieved (v6.0.0)
+All 9 pipelines now support CSV samplesheets with a consistent structure:
+- Required columns per pipeline defined in `bin/lib/samplesheet.sh`
+- Optional Titan ID columns (`project_id`, `sample_id`, `library_id`,
+  `run_id`) on every sheet
+- `tjp-batch` dispatches per-row (10x, long-read) or per-sheet (RNA-seq)
+  based on pipeline type
+- R3 (CSV samplesheets), R4 (SQANTI3/wf-tx use per-process or DAG model),
+  and R1 (params-file passthrough for new pipelines) from the existing
+  recommendations are now implemented
+
+### Note on R2 (BulkRNASeq UTDal dependency)
+Still unresolved. BulkRNASeq remains the only pipeline with a split
+dependency (UTDal repo clone). Still the top debt item.
 
 ---
 
 ## 5. Recommendations for Parallel Development
 
-### R1 — Use params-file passthrough for all new Nextflow pipelines
+### R1 — Use params-file passthrough for all new Nextflow pipelines ✓ Implemented in v6.0.0
 Do not add a `_generate_<pipeline>_config()` function to `tjp-launch` for
 new pipelines. The user YAML should go directly to Nextflow via
 `-params-file`. This keeps the HPC repo ignorant of pipeline-internal
 parameters and eliminates the coupling that makes BulkRNASeq and Psoma
 maintenance-heavy.
 
-### R2 — Make every submodule self-contained
+### R2 — Make every submodule self-contained (Outstanding — tracked as top debt)
 The submodule should contain everything needed to run the pipeline:
 container definitions, pipeline scripts, adapter/reference files that are
 small enough to version. No external clones, no assumed directory structure
 outside the submodule. Psoma and Virome do this correctly; BulkRNASeq does
 not.
 
-### R3 — Standardize on CSV samplesheets
+### R3 — Standardize on CSV samplesheets ✓ Implemented in v6.0.0
 The `samples.txt` format is implicit and fragile. New pipelines should use
 a CSV samplesheet (like Virome) with explicit column headers and absolute
 paths. This is more verbose but eliminates a class of "wrong suffix" and
 "wrong directory" errors.
 
-### R4 — Prefer per-process containers for new pipelines
+### R4 — Prefer per-process containers for new pipelines ✓ Implemented in v6.0.0
 New Nextflow pipelines should use per-process containers managed by Nextflow
 (Virome model) rather than a monolithic container that runs Nextflow inside
 itself. This requires Nextflow on the host but produces more maintainable
@@ -357,4 +454,4 @@ clear warning when the UTDal clone is missing, not just a passive `warn`.
 
 ---
 
-*Last updated: 2026-03-24*
+*Last updated: 2026-04-05*

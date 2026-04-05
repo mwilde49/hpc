@@ -1,19 +1,32 @@
 # Hyperion Compute — User Guide
 
-### Next Generation Bulk RNA-Seq Pipelines, High Performance Computing Edition
+### Next Generation Bioinformatics Pipelines, High Performance Computing Edition
 
-This guide covers how to configure and run the two bulk RNA-seq pipelines available on the HPC system (Juno). You do **not** need admin access, any special training, or to build anything — containers and references are already installed. All you need is this guide. Feel free to reach out to me (Michael) with any questions.
+This guide covers how to configure and run bioinformatics pipelines available on the HPC system (Juno). You do **not** need admin access, any special training, or to build anything — containers and references are already installed. All you need is this guide. Feel free to reach out to me (Michael) with any questions.
 
 > **Note:** The CLI tools are available as `tjp-*`, `hyperion-*`, or `biocruiser-*` — they're all identical. Use whichever you prefer. This guide uses `tjp-*` throughout, but you can substitute freely (e.g., `hyperion-launch psoma` instead of `tjp-launch psoma`).
 
-|    **Component**       |    **BulkRNASeq (UTDal)**          |    **Psoma (Psomagen)**         |
-|------------------------|------------------------------------|---------------------------------|
-| Aligner                | STAR                               | HISAT2                          |
-| Trimming               | Clip-based (5'/3' hard trim)       | Trimmomatic (adapter + quality) |
-| Typical data source    | Standard Illumina sequencing cores | Psomagen sequencing service     |
-| Read suffix convention | `_R1_001` / `_R2_001`              | `_1` / `_2`                     |
+### Short-read RNA-seq
 
-Also available: **10x Genomics** native pipelines (no container needed):
+|    **Pipeline**             |    **Aligner**                     |    **Trimming**                 |    **Typical data source**          |
+|-----------------------------|------------------------------------|---------------------------------|-------------------------------------|
+| BulkRNASeq (UTDal)          | STAR                               | Clip-based (5'/3' hard trim)    | Standard Illumina sequencing cores  |
+| Psoma (Psomagen)            | HISAT2                             | Trimmomatic (adapter + quality) | Psomagen sequencing service         |
+
+### Long-read / Nanopore
+
+|    **Pipeline**             |    **Purpose**                                            |
+|-----------------------------|-----------------------------------------------------------|
+| wf-transcriptomes           | ONT full-length transcript analysis (collapsed isoforms)  |
+| SQANTI3                     | Isoform quality control and filtering (4-stage DAG)       |
+
+### Viral profiling
+
+|    **Pipeline**    |    **Purpose**                                               |
+|--------------------|--------------------------------------------------------------|
+| Virome             | Host depletion + Kraken2-based viral abundance profiling     |
+
+### 10x Genomics (native, no container)
 
 |    **Pipeline**    |    **Purpose**                    |    **SLURM Resources**           |
 |--------------------|-----------------------------------|----------------------------------|
@@ -30,13 +43,18 @@ Also available: **10x Genomics** native pipelines (no container needed):
 3. [Uploading Your Data](#3-uploading-your-data)
 4. [BulkRNASeq Pipeline (UTDal/STAR)](#4-bulkrnaseq-pipeline-utdalstar)
 5. [Psoma Pipeline (HISAT2/Trimmomatic)](#5-psoma-pipeline-hisat2trimmomatic)
-6. [10x Genomics Pipelines](#6-10x-genomics-pipelines)
-7. [Launching a Pipeline](#7-launching-a-pipeline)
-8. [Monitoring Your Job](#8-monitoring-your-job)
-9. [Finding Your Results](#9-finding-your-results)
-10. [Smoke Testing](#10-smoke-testing)
-11. [Re-running and Reproducibility](#11-re-running-and-reproducibility)
-12. [Troubleshooting](#12-troubleshooting)
+6. [Virome Pipeline (Viral Profiling)](#6-virome-pipeline-viral-profiling)
+7. [wf-transcriptomes (ONT Full-Length Transcript Analysis)](#7-wf-transcriptomes-ont-full-length-transcript-analysis)
+8. [SQANTI3 (Long-Read Isoform QC)](#8-sqanti3-long-read-isoform-qc)
+9. [10x Genomics Pipelines](#9-10x-genomics-pipelines)
+10. [Batch Launching (Multiple Samples)](#10-batch-launching-multiple-samples)
+11. [Launching a Pipeline](#11-launching-a-pipeline)
+12. [Monitoring Your Job](#12-monitoring-your-job)
+13. [Run Metadata (labdata)](#13-run-metadata-labdata)
+14. [Finding Your Results](#14-finding-your-results)
+15. [Smoke Testing](#15-smoke-testing)
+16. [Re-running and Reproducibility](#16-re-running-and-reproducibility)
+17. [Troubleshooting](#17-troubleshooting)
 
 ---
 
@@ -66,20 +84,29 @@ This creates:
 
 ```
 /work/$USER/pipelines/
-├── addone/          ← demo pipeline (ignore)
-│   └── config.yaml
-├── bulkrnaseq/      ← UTDal/STAR pipeline
+├── addone/              ← demo pipeline (ignore)
+├── bulkrnaseq/          ← UTDal/STAR pipeline
 │   ├── config.yaml
 │   └── samples.txt
-├── psoma/           ← Psomagen/HISAT2 pipeline
+├── psoma/               ← Psomagen/HISAT2 pipeline
 │   ├── config.yaml
 │   └── samples.txt
-├── cellranger/      ← 10x single-cell
+├── virome/              ← viral profiling
+│   ├── config.yaml
+│   └── samplesheet.csv
+├── sqanti3/             ← long-read isoform QC
+│   ├── config.yaml
+│   └── samplesheet.csv
+├── wf-transcriptomes/   ← ONT full-length RNA
+│   ├── config.yaml
+│   └── samplesheet.csv
+├── cellranger/          ← 10x single-cell
 │   └── config.yaml
-├── spaceranger/     ← 10x spatial
+├── spaceranger/         ← 10x spatial
 │   └── config.yaml
-└── xeniumranger/    ← 10x in situ
-    └── config.yaml
+├── xeniumranger/        ← 10x in situ
+│   └── config.yaml
+└── metadata/            ← local run records (PLR-xxxx)
 ```
 
 Setup automatically adds the pipeline tools to your `~/.bashrc`, so they'll be available in every future session. Log out and back in (or run `source ~/.bashrc`) to activate.
@@ -99,9 +126,6 @@ Or use `rsync` for large transfers (in case it crashes):
 ```bash
 rsync -avP /path/to/fastq_files/ YOUR_NETID@juno.hpcre.utdallas.edu:/scratch/juno/YOUR_NETID/myproject/fastq/
 ```
-
-
-
 
 Verify on Juno:
 
@@ -132,7 +156,7 @@ vi /work/$USER/pipelines/bulkrnaseq/samples.txt
 ```
 or
 ```bash
-nono /work/$USER/pipelines/bulkrnaseq/samples.txt
+nano /work/$USER/pipelines/bulkrnaseq/samples.txt
 ```
 (I would suggest nano)
 
@@ -152,11 +176,11 @@ Patient01_S1
 Patient02_S2
 ```
 
-(Alternatively, you can create this file on your own work station and then ship it in with a scp command; this is easiest, will add later)
+Alternatively, you can create this file on your own workstation and ship it over with scp:
 
-(add command here)
-
-
+```bash
+scp samples.txt YOUR_NETID@juno.hpcre.utdallas.edu:/work/YOUR_NETID/pipelines/bulkrnaseq/samples.txt
+```
 
 ### Step 2: Edit your config
 
@@ -194,11 +218,11 @@ exclude_bed_file_path: /groups/tprice/pipelines/references/filter.bed
 blacklist_bed_file_path: /groups/tprice/pipelines/references/blacklist.bed
 ```
 
-Alternatively, you can create these file on your own work station and then ship it in with a scp command
+Alternatively, you can create these files on your own workstation and ship them over with scp:
 
 ```bash
-scp config.yaml NETID@juno.hpcre.utdallas.edu:/work/NETID/pipelines/bulkrnaseq/config.yaml
-scp samples.txt NETID@juno.hpcre.utdallas.edu:/work/NETID/pipelines/bulkrnaseq/samples.txt
+scp config.yaml YOUR_NETID@juno.hpcre.utdallas.edu:/work/YOUR_NETID/pipelines/bulkrnaseq/config.yaml
+scp samples.txt YOUR_NETID@juno.hpcre.utdallas.edu:/work/YOUR_NETID/pipelines/bulkrnaseq/samples.txt
 ```
 
 ### Step 3: Launch
@@ -234,8 +258,6 @@ Then your `samples.txt` should contain:
 Sample_19
 Sample_20
 ```
-
-
 
 ### Step 2: Edit your config
 
@@ -282,11 +304,11 @@ exclude_bed_file_path: /groups/tprice/pipelines/references/filter.bed
 blacklist_bed_file_path: /groups/tprice/pipelines/references/blacklist.bed
 ```
 
-Alternatively, you can create these files on your own computer and then ship it in with an scp command
+Alternatively, you can create these files on your own computer and ship them over with scp:
 
 ```bash
-scp config.yaml NETID@juno.hpcre.utdallas.edu:/work/NETID/pipelines/psoma/config.yaml
-scp samples.txt NETID@juno.hpcre.utdallas.edu:/work/NETID/pipelines/psoma/samples.txt
+scp config.yaml YOUR_NETID@juno.hpcre.utdallas.edu:/work/YOUR_NETID/pipelines/psoma/config.yaml
+scp samples.txt YOUR_NETID@juno.hpcre.utdallas.edu:/work/YOUR_NETID/pipelines/psoma/samples.txt
 ```
 
 ### Step 3: Launch
@@ -297,7 +319,102 @@ tjp-launch psoma
 
 ---
 
-## 6. 10x Genomics Pipelines
+## 6. Virome Pipeline (Viral Profiling)
+
+Use this pipeline for viral abundance analysis from paired-end bulk RNA-seq data. It performs host read depletion followed by Kraken2-based viral classification.
+
+### Step 1: Prepare your samplesheet
+
+```bash
+vi /work/$USER/pipelines/virome/samplesheet.csv
+```
+
+Format: one sample per row with columns `sample,fastq_r1,fastq_r2`.
+
+### Step 2: Edit your config
+
+```bash
+vi /work/$USER/pipelines/virome/config.yaml
+```
+
+Key fields:
+
+| Field | Description |
+|-------|-------------|
+| `outdir` | Output directory (on scratch) |
+| `kraken2_db` | Path to Kraken2 database |
+| `ref_genome` | Reference genome for host removal |
+
+### Step 3: Launch
+
+```bash
+tjp-launch virome                    # single run
+tjp-batch virome samplesheet.csv     # all samples at once
+```
+
+---
+
+## 7. wf-transcriptomes (ONT Full-Length Transcript Analysis)
+
+Use this pipeline for Oxford Nanopore full-length RNA-seq data. It runs the EPI2ME wf-transcriptomes workflow and produces collapsed isoforms.
+
+### Step 1: Prepare your samplesheet (for batch)
+
+```bash
+vi /work/$USER/pipelines/wf-transcriptomes/samplesheet.csv
+```
+
+Columns: `sample,fastq_dir,sample_sheet,ref_genome,ref_annotation,direct_rna`
+
+| Column | Description |
+|--------|-------------|
+| `fastq_dir` | ONT fastq_pass directory (with barcode subdirectories) |
+| `sample_sheet` | EPI2ME barcode samplesheet CSV (`barcode,alias`) |
+| `direct_rna` | `true` for direct RNA, `false` for cDNA/PCR |
+
+### Step 2: Edit your config
+
+```bash
+vi /work/$USER/pipelines/wf-transcriptomes/config.yaml
+```
+
+### Step 3: Launch
+
+```bash
+tjp-launch wf-transcriptomes                        # single run
+tjp-batch wf-transcriptomes samplesheet.csv         # one job per experiment row
+```
+
+---
+
+## 8. SQANTI3 (Long-Read Isoform QC)
+
+Use this pipeline to assess and filter isoform models from long-read data, typically following a wf-transcriptomes or FLAIR run. It runs as a 4-stage SLURM DAG — stages are submitted automatically in order, with each stage depending on the previous.
+
+### Step 1: Prepare your samplesheet
+
+```bash
+vi /work/$USER/pipelines/sqanti3/samplesheet.csv
+```
+
+Columns: `sample,isoforms,ref_gtf,ref_fasta` (plus optional `coverage`, `fl_count`)
+
+### Step 2: Edit your config
+
+```bash
+vi /work/$USER/pipelines/sqanti3/config.yaml
+```
+
+### Step 3: Launch
+
+```bash
+tjp-launch sqanti3                          # single isoform GTF
+tjp-batch sqanti3 samplesheet.csv           # one job per GTF
+```
+
+---
+
+## 9. 10x Genomics Pipelines
 
 These pipelines use 10x Genomics tools installed natively on the cluster — no container needed. They request exclusive node access and manage their own multithreading.
 
@@ -376,16 +493,44 @@ tjp-launch xeniumranger
 
 ---
 
-## 7. Launching a Pipeline
+## 10. Batch Launching (Multiple Samples)
+
+`tjp-batch` launches the same pipeline on multiple samples from a samplesheet. This is the recommended way to process a cohort all at once rather than submitting jobs one at a time.
+
+```bash
+# Edit your samplesheet template
+vi /work/$USER/pipelines/cellranger/samplesheet.csv
+
+# Launch all rows
+tjp-batch cellranger /work/$USER/pipelines/cellranger/samplesheet.csv
+
+# Use a base config for shared settings
+tjp-batch bulkrnaseq samplesheet.csv --config /work/$USER/pipelines/bulkrnaseq/config.yaml
+
+# Preview without submitting
+tjp-batch psoma samplesheet.csv --dry-run
+```
+
+| Mode | Pipelines | Behavior |
+|------|-----------|----------|
+| Per-row | cellranger, spaceranger, xeniumranger, sqanti3, wf-transcriptomes | One SLURM job per CSV row |
+| Per-sheet | bulkrnaseq, psoma, virome | One SLURM job for all rows |
+
+---
+
+## 11. Launching a Pipeline
 
 All pipelines are launched the same way:
 
 ```bash
-tjp-launch bulkrnaseq     # UTDal/STAR pipeline
-tjp-launch psoma           # Psomagen/HISAT2 pipeline
-tjp-launch cellranger      # 10x single-cell
-tjp-launch spaceranger     # 10x spatial
-tjp-launch xeniumranger    # 10x in situ
+tjp-launch bulkrnaseq        # UTDal/STAR pipeline
+tjp-launch psoma              # Psomagen/HISAT2 pipeline
+tjp-launch virome             # viral profiling
+tjp-launch wf-transcriptomes  # ONT full-length RNA
+tjp-launch sqanti3            # long-read isoform QC
+tjp-launch cellranger         # 10x single-cell
+tjp-launch spaceranger        # 10x spatial
+tjp-launch xeniumranger       # 10x in situ
 ```
 
 You'll see the Hyperion banner followed by timestamped output:
@@ -427,7 +572,8 @@ tjp-launch psoma --config /path/to/my_custom_config.yaml
 
 ---
 
-## 8. Monitoring Your Job
+## 12. Monitoring Your Job
+
 You will want to monitor the tail of 99% of jobs to ensure they have launched properly.
 
 ### Check job status
@@ -458,7 +604,32 @@ scancel <JOBID>
 
 ---
 
-## 9. Finding Your Results
+## 13. Run Metadata (labdata)
+
+Every launch automatically creates a local metadata record with a unique run ID (PLR-xxxx). You can use `labdata` to look up any run, check its status, or find outputs without having to remember timestamps.
+
+```bash
+labdata find runs                    # list all runs
+labdata find runs --pipeline psoma   # filter by pipeline
+labdata find runs --status completed # filter by status
+labdata show PLR-xxxx               # full run record
+labdata status                       # metadata store health
+```
+
+Run records include: pipeline name, SLURM job ID, status, config snapshot path, input/output paths, and (optionally) Titan project/sample IDs. Records will sync to the Titan database when Titan comes online.
+
+To attach Titan project metadata to a run, add these optional fields to your config.yaml:
+
+```yaml
+titan_project_id:   # PRJ-xxxx
+titan_sample_id:    # SMP-xxxx
+titan_library_id:   # LIB-xxxx
+titan_run_id:       # RUN-xxxx
+```
+
+---
+
+## 14. Finding Your Results
 
 Pipeline outputs are written to your **scratch** directory during execution, then automatically **archived to your work directory** after a successful run. Scratch is fast but wiped every 45 days — the work archive is durable.
 
@@ -523,7 +694,7 @@ Each run is fully self-contained in your **work** directory — metadata, logs, 
 
 ---
 
-## 10. Smoke Testing
+## 15. Smoke Testing
 
 You can quickly verify that a pipeline works end-to-end using pre-configured test data (2 samples submitted to the dev partition):
 
@@ -551,7 +722,7 @@ tjp-test-validate psoma --run 2026-03-05_14-00-55
 
 ---
 
-## 11. Re-running and Reproducibility
+## 16. Re-running and Reproducibility
 
 - Each launch creates a **new** timestamped run directory. Previous runs are never overwritten.
 - The `manifest.json` file records the exact git commit, container checksum, config, and paths used — so any run can be reproduced.
@@ -563,18 +734,20 @@ tjp-launch psoma --config /work/$USER/pipelines/psoma/runs/2026-03-04_14-30-00/c
 
 ---
 
-## 12. Troubleshooting
+## 17. Troubleshooting
 
-|         Problem                     |                                 Solution                                                           |
-|-------------------------------------|----------------------------------------------------------------------------------------------------|
-| `tjp-launch: command not found`     | Run: `export PATH="/groups/tprice/pipelines/bin:$PATH"`                                            |
-| `Config file not found`             | Run `tjp-setup` first to create your workspace                                                     |
-| `Container not found`               | Contact the pipeline administrator — the `.sif` file needs to be transferred to HPC                |
-| Job fails immediately               | Check the `.err` file: `cat /work/$USER/pipelines/<pipeline>/runs/<timestamp>/slurm_*.err`         |
-| `No fastq.gz files found`           | Verify `fastq_dir` path in your config points to the right directory                               |
-| Wrong sample names                  | Each line in `samples.txt` must match the FASTQ filename prefix exactly (before `_R1_001` or `_1`) |
-| Job runs but produces empty outputs | Check that `run_rna_pipeline: true` is set in your config                                          |
-| `module: command not found`         | You may be on a login node that doesn't support modules — try a different login node               |
+|         Problem                                         |                                 Solution                                                           |
+|---------------------------------------------------------|----------------------------------------------------------------------------------------------------|
+| `tjp-launch: command not found`                         | Run: `export PATH="/groups/tprice/pipelines/bin:$PATH"`                                            |
+| `Config file not found`                                 | Run `tjp-setup` first to create your workspace                                                     |
+| `Container not found`                                   | Contact the pipeline administrator — the `.sif` file needs to be transferred to HPC                |
+| Job fails immediately                                   | Check the `.err` file: `cat /work/$USER/pipelines/<pipeline>/runs/<timestamp>/slurm_*.err`         |
+| `No fastq.gz files found`                               | Verify `fastq_dir` path in your config points to the right directory                               |
+| Wrong sample names                                      | Each line in `samples.txt` must match the FASTQ filename prefix exactly (before `_R1_001` or `_1`) |
+| Job runs but produces empty outputs                     | Check that `run_rna_pipeline: true` is set in your config                                          |
+| `module: command not found`                             | You may be on a login node that doesn't support modules — try a different login node               |
+| `labdata find runs` returns empty                       | Not an error — no runs have been submitted yet from this workspace                                 |
+| SQANTI3 job stuck pending                               | Check that `sqanti3_v5.5.4.sif` exists in `containers/sqanti3/` — it must be built on the HPC    |
 
 ### Getting help
 
@@ -583,4 +756,4 @@ You can contact me or another member of Price Lab's Compute Team for help with a
 
 Michael Wilde
 281-793-3180
-maw210003@utdalls.edu
+maw210003@utdallas.edu

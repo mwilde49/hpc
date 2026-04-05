@@ -1,3 +1,17 @@
+> **ARCHIVED — v1.0 Historical Document**
+> 
+> This document describes the initial MVP architecture (AddOne demo pipeline only). It has been
+> superseded by the following current documentation:
+> 
+> - **[USER_GUIDE.md](USER_GUIDE.md)** — End-user guide for all pipelines
+> - **[DEVELOPER_ONBOARDING.md](DEVELOPER_ONBOARDING.md)** — Developer technical reference  
+> - **[PIPELINE_DESIGN_REVIEW.md](PIPELINE_DESIGN_REVIEW.md)** — Architecture decisions
+> - **[HPC_SYSTEM_MAP.md](HPC_SYSTEM_MAP.md)** — Cluster and filesystem reference
+> 
+> Current framework version: **v6.0.0** (9 pipelines, samplesheet-driven batch execution, Titan metadata prototype)
+> 
+> ---
+
 # TJP HPC Pipeline Framework
 ## MVP Architecture, Design Principles, and Operational Guide
 
