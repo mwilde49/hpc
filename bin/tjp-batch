@@ -1,0 +1,350 @@
+#!/usr/bin/env bash
+# tjp-batch — samplesheet-driven batch submission
+# Reads a CSV samplesheet and submits pipeline runs.
+#
+#   Per-row  (one SLURM job per sample): cellranger, spaceranger, xeniumranger
+#   Per-sheet (one SLURM job for all):   bulkrnaseq, psoma, virome
+#
+# Usage: tjp-batch <pipeline> <samplesheet.csv> [options]
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
+
+# ── Pipeline categories ───────────────────────────────────────────────────────
+# Per-row: each samplesheet row → one SLURM job (single-sample tools)
+_BATCH_PER_ROW=(cellranger spaceranger xeniumranger)
+# Per-sheet: whole samplesheet → one SLURM job (multi-sample Nextflow pipelines)
+_BATCH_PER_SHEET=(bulkrnaseq psoma virome)
+
+_is_per_row() {
+    local n="$1"
+    for p in "${_BATCH_PER_ROW[@]}"; do [[ "$p" == "$n" ]] && return 0; done
+    return 1
+}
+_is_per_sheet() {
+    local n="$1"
+    for p in "${_BATCH_PER_SHEET[@]}"; do [[ "$p" == "$n" ]] && return 0; done
+    return 1
+}
+
+# ── Usage ─────────────────────────────────────────────────────────────────────
+usage() {
+    cat <<EOF
+Usage: tjp-batch <pipeline> <samplesheet.csv> [options]
+
+Submit pipeline runs from a samplesheet CSV.
+  Per-row  (one job per sample): cellranger, spaceranger, xeniumranger
+  Per-sheet (one job for all):   bulkrnaseq, psoma, virome
+
+Options:
+  --config <path>   Base config YAML for pipeline-level settings
+                    (default: $USER_PIPELINES/<pipeline>/config.yaml)
+  --dry-run         Print what would be submitted without submitting
+  --dev             Submit to dev partition (2-hour limit)
+  --help            Show this help
+
+Samplesheet column schemas (see templates/<pipeline>/samplesheet.csv):
+  cellranger:   sample, fastqs, transcriptome [, sample_name, create_bam, titan_*]
+  spaceranger:  sample, fastqs, transcriptome, image, slide, area [, titan_*]
+  xeniumranger: sample, xenium_bundle, command [, segmentation_file, titan_*]
+  bulkrnaseq:   sample, fastq_1, fastq_2 [, titan_*]
+  psoma:        sample, fastq_1, fastq_2 [, titan_*]
+  virome:       sample, fastq_r1, fastq_r2 [, titan_*]
+EOF
+    exit "${1:-0}"
+}
+
+# ── Argument parsing ──────────────────────────────────────────────────────────
+PIPELINE=""
+SAMPLESHEET=""
+BASE_CONFIG=""
+DRY_RUN=false
+DEV_FLAG=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --config)
+            [[ $# -lt 2 ]] && die "--config requires a path argument"
+            BASE_CONFIG="$2"; shift 2 ;;
+        --dry-run)  DRY_RUN=true; shift ;;
+        --dev)      DEV_FLAG="--dev"; shift ;;
+        --help|-h)  usage 0 ;;
+        -*)         die "Unknown option: $1" ;;
+        *)
+            if   [[ -z "$PIPELINE" ]];    then PIPELINE="$1"
+            elif [[ -z "$SAMPLESHEET" ]]; then SAMPLESHEET="$1"
+            else die "Unexpected argument: $1"
+            fi
+            shift ;;
+    esac
+done
+
+[[ -z "$PIPELINE" ]]    && { error "Pipeline name required."; usage 1; }
+[[ -z "$SAMPLESHEET" ]] && { error "Samplesheet path required."; usage 1; }
+
+# ── Validate pipeline ─────────────────────────────────────────────────────────
+if ! _is_per_row "$PIPELINE" && ! _is_per_sheet "$PIPELINE"; then
+    die "Batch submission not supported for: $PIPELINE
+  Supported per-row:   ${_BATCH_PER_ROW[*]}
+  Supported per-sheet: ${_BATCH_PER_SHEET[*]}
+  For sqanti3 / wf-transcriptomes, use tjp-launch directly."
+fi
+
+# ── Validate samplesheet ──────────────────────────────────────────────────────
+[[ ! -f "$SAMPLESHEET" ]] && die "Samplesheet not found: $SAMPLESHEET"
+SAMPLESHEET="$(readlink -f "$SAMPLESHEET")"
+
+validate_samplesheet "$PIPELINE" "$SAMPLESHEET" || die "Samplesheet validation failed."
+
+ROW_COUNT=$(samplesheet_row_count "$SAMPLESHEET")
+[[ "$ROW_COUNT" -eq 0 ]] && die "Samplesheet has no data rows: $SAMPLESHEET"
+
+# ── Resolve base config ───────────────────────────────────────────────────────
+if [[ -z "$BASE_CONFIG" ]]; then
+    BASE_CONFIG="$USER_PIPELINES/$PIPELINE/config.yaml"
+fi
+[[ ! -f "$BASE_CONFIG" ]] && die "Base config not found: $BASE_CONFIG
+  Run 'tjp-setup' first, or specify one with --config <path>"
+BASE_CONFIG="$(readlink -f "$BASE_CONFIG")"
+
+# ── Batch working directory ───────────────────────────────────────────────────
+BATCH_TS=$(timestamp)
+BATCH_DIR="$USER_PIPELINES/$PIPELINE/batch_runs/$BATCH_TS"
+[[ "$DRY_RUN" == false ]] && mkdir -p "$BATCH_DIR"
+
+hyperion_banner "BATCH"
+info "Pipeline:    $PIPELINE"
+info "Samplesheet: $SAMPLESHEET  ($ROW_COUNT sample(s))"
+info "Base config: $BASE_CONFIG"
+[[ "$DRY_RUN" == true ]] && warn "DRY RUN — no jobs will be submitted"
+
+# ── Internal: read Titan ID columns from a samplesheet row ───────────────────
+_titan_ids_from_row() {
+    local row="$1"
+    TITAN_PROJECT=$(samplesheet_get_col "$SAMPLESHEET" "project_id"  "$row" 2>/dev/null || echo "")
+    TITAN_SAMPLE=$(samplesheet_get_col  "$SAMPLESHEET" "sample_id"   "$row" 2>/dev/null || echo "")
+    TITAN_LIBRARY=$(samplesheet_get_col "$SAMPLESHEET" "library_id"  "$row" 2>/dev/null || echo "")
+    TITAN_RUN=$(samplesheet_get_col     "$SAMPLESHEET" "run_id"      "$row" 2>/dev/null || echo "")
+}
+
+# _titan_block: emit Titan Integration YAML lines to stdout
+_titan_block() {
+    cat <<YAML
+
+# ── Titan Integration (optional) ──────────────────────────────────────────────
+titan_project_id: ${TITAN_PROJECT:-}
+titan_sample_id: ${TITAN_SAMPLE:-}
+titan_library_id: ${TITAN_LIBRARY:-}
+titan_run_id: ${TITAN_RUN:-}
+YAML
+}
+
+# ── Internal: submit via tjp-launch ──────────────────────────────────────────
+_submit() {
+    local config="$1"
+    local label="$2"
+    if [[ "$DRY_RUN" == true ]]; then
+        info "  [DRY RUN] $SCRIPT_DIR/tjp-launch $PIPELINE --config $config${DEV_FLAG:+ $DEV_FLAG}"
+    else
+        info "Submitting: $label"
+        "$SCRIPT_DIR/tjp-launch" "$PIPELINE" --config "$config" ${DEV_FLAG:+$DEV_FLAG}
+    fi
+}
+
+# ── Per-row dispatch: 10x single-sample tools ────────────────────────────────
+_batch_per_row() {
+    local submitted=0
+
+    for (( row=1; row<=ROW_COUNT; row++ )); do
+        local sample
+        sample=$(samplesheet_get_col "$SAMPLESHEET" "sample" "$row")
+        [[ -z "$sample" ]] && die "Row $row: 'sample' column is empty"
+
+        header "Sample [$row/$ROW_COUNT]: $sample"
+
+        # Shared resource defaults from base config
+        local localcores localmem
+        localcores=$(yaml_get "$BASE_CONFIG" "localcores" 2>/dev/null || echo "16")
+        localmem=$(yaml_get   "$BASE_CONFIG" "localmem"   2>/dev/null || echo "120")
+        [[ -z "$localcores" ]] && localcores="16"
+        [[ -z "$localmem" ]]   && localmem="120"
+
+        _titan_ids_from_row "$row"
+
+        local sample_config="$BATCH_DIR/${sample}_config.yaml"
+        [[ "$DRY_RUN" == true ]] && sample_config="/tmp/tjp-batch-dryrun-${PIPELINE}-${sample}.yaml"
+
+        case "$PIPELINE" in
+            cellranger)   _gen_cellranger_config   "$row" "$sample" "$localcores" "$localmem" "$sample_config" ;;
+            spaceranger)  _gen_spaceranger_config  "$row" "$sample" "$localcores" "$localmem" "$sample_config" ;;
+            xeniumranger) _gen_xeniumranger_config "$row" "$sample" "$localcores" "$localmem" "$sample_config" ;;
+        esac
+
+        _submit "$sample_config" "$sample"
+        submitted=$((submitted + 1))
+    done
+
+    [[ "$DRY_RUN" == false ]] && \
+        hyperion_milestone "Batch Complete — $submitted/$ROW_COUNT jobs submitted for $PIPELINE"
+    [[ "$DRY_RUN" == true  ]] && \
+        info "[DRY RUN] Would submit $ROW_COUNT job(s) for $PIPELINE"
+}
+
+# ── Per-sample config generators (10x) ───────────────────────────────────────
+
+_gen_cellranger_config() {
+    local row="$1" sample="$2" localcores="$3" localmem="$4" output="$5"
+
+    local fastqs transcriptome sample_name create_bam
+    fastqs=$(samplesheet_get_col        "$SAMPLESHEET" "fastqs"        "$row")
+    transcriptome=$(samplesheet_get_col "$SAMPLESHEET" "transcriptome" "$row" 2>/dev/null || \
+                    yaml_get "$BASE_CONFIG" "transcriptome" 2>/dev/null || echo "")
+    sample_name=$(samplesheet_get_col   "$SAMPLESHEET" "sample_name"   "$row" 2>/dev/null || echo "")
+    create_bam=$(samplesheet_get_col    "$SAMPLESHEET" "create_bam"    "$row" 2>/dev/null || \
+                 yaml_get "$BASE_CONFIG" "create_bam" 2>/dev/null || echo "true")
+    [[ -z "$sample_name" ]] && sample_name="$sample"
+    [[ -z "$create_bam"  ]] && create_bam="true"
+    [[ -z "$transcriptome" ]] && die "Row $row ($sample): 'transcriptome' is required for cellranger"
+
+    {
+        printf '# Generated by tjp-batch — %s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+        printf '# Samplesheet: %s (row %d)\n' "$SAMPLESHEET" "$row"
+        printf 'sample_id: %s\n'       "$sample"
+        printf 'sample_name: %s\n'     "$sample_name"
+        printf 'fastq_dir: %s\n'       "$fastqs"
+        printf 'transcriptome: %s\n'   "$transcriptome"
+        printf 'localcores: %s\n'      "$localcores"
+        printf 'localmem: %s\n'        "$localmem"
+        printf 'create_bam: %s\n'      "$create_bam"
+        _titan_block
+    } > "$output"
+}
+
+_gen_spaceranger_config() {
+    local row="$1" sample="$2" localcores="$3" localmem="$4" output="$5"
+
+    local fastqs transcriptome sample_name image slide area create_bam unknown_slide
+    fastqs=$(samplesheet_get_col          "$SAMPLESHEET" "fastqs"        "$row")
+    transcriptome=$(samplesheet_get_col   "$SAMPLESHEET" "transcriptome" "$row" 2>/dev/null || \
+                    yaml_get "$BASE_CONFIG" "transcriptome" 2>/dev/null || echo "")
+    sample_name=$(samplesheet_get_col     "$SAMPLESHEET" "sample_name"   "$row" 2>/dev/null || echo "")
+    image=$(samplesheet_get_col           "$SAMPLESHEET" "image"         "$row" 2>/dev/null || \
+            yaml_get "$BASE_CONFIG" "image" 2>/dev/null || echo "")
+    slide=$(samplesheet_get_col           "$SAMPLESHEET" "slide"         "$row" 2>/dev/null || echo "")
+    area=$(samplesheet_get_col            "$SAMPLESHEET" "area"          "$row" 2>/dev/null || echo "")
+    unknown_slide=$(samplesheet_get_col   "$SAMPLESHEET" "unknown_slide" "$row" 2>/dev/null || echo "")
+    create_bam=$(samplesheet_get_col      "$SAMPLESHEET" "create_bam"    "$row" 2>/dev/null || \
+                 yaml_get "$BASE_CONFIG" "create_bam" 2>/dev/null || echo "true")
+    [[ -z "$sample_name" ]] && sample_name="$sample"
+    [[ -z "$create_bam"  ]] && create_bam="true"
+    [[ -z "$transcriptome" ]] && die "Row $row ($sample): 'transcriptome' is required for spaceranger"
+
+    {
+        printf '# Generated by tjp-batch — %s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+        printf '# Samplesheet: %s (row %d)\n' "$SAMPLESHEET" "$row"
+        printf 'sample_id: %s\n'     "$sample"
+        printf 'sample_name: %s\n'   "$sample_name"
+        printf 'fastq_dir: %s\n'     "$fastqs"
+        printf 'transcriptome: %s\n' "$transcriptome"
+        printf 'image: %s\n'         "$image"
+        printf 'localcores: %s\n'    "$localcores"
+        printf 'localmem: %s\n'      "$localmem"
+        printf 'create_bam: %s\n'    "$create_bam"
+        if [[ -n "$unknown_slide" ]]; then
+            printf 'unknown_slide: %s\n' "$unknown_slide"
+        else
+            [[ -n "$slide" ]] && printf 'slide: %s\n' "$slide"
+            [[ -n "$area"  ]] && printf 'area: %s\n'  "$area"
+        fi
+        _titan_block
+    } > "$output"
+}
+
+_gen_xeniumranger_config() {
+    local row="$1" sample="$2" localcores="$3" localmem="$4" output="$5"
+
+    local xenium_bundle command segmentation_file
+    xenium_bundle=$(samplesheet_get_col     "$SAMPLESHEET" "xenium_bundle"     "$row")
+    command=$(samplesheet_get_col           "$SAMPLESHEET" "command"           "$row")
+    segmentation_file=$(samplesheet_get_col "$SAMPLESHEET" "segmentation_file" "$row" 2>/dev/null || echo "")
+
+    {
+        printf '# Generated by tjp-batch — %s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+        printf '# Samplesheet: %s (row %d)\n' "$SAMPLESHEET" "$row"
+        printf 'sample_id: %s\n'      "$sample"
+        printf 'xenium_bundle: %s\n'  "$xenium_bundle"
+        printf 'command: %s\n'        "$command"
+        printf 'localcores: %s\n'     "$localcores"
+        printf 'localmem: %s\n'       "$localmem"
+        [[ -n "$segmentation_file" ]] && printf 'segmentation_file: %s\n' "$segmentation_file"
+        _titan_block
+    } > "$output"
+}
+
+# ── Per-sheet dispatch: Nextflow multi-sample tools ───────────────────────────
+_batch_per_sheet() {
+    local generated_config="$BATCH_DIR/config.yaml"
+    [[ "$DRY_RUN" == true ]] && generated_config="/tmp/tjp-batch-dryrun-${PIPELINE}.yaml"
+
+    _titan_ids_from_row 1   # project-level Titan IDs from first row
+
+    case "$PIPELINE" in
+        bulkrnaseq|psoma) _gen_rnaseq_sheet_config  "$generated_config" ;;
+        virome)           _gen_virome_sheet_config   "$generated_config" ;;
+    esac
+
+    _submit "$generated_config" "$PIPELINE ($ROW_COUNT samples)"
+
+    [[ "$DRY_RUN" == false ]] && \
+        hyperion_milestone "Batch Complete — $PIPELINE job submitted ($ROW_COUNT samples)"
+    [[ "$DRY_RUN" == true  ]] && \
+        info "[DRY RUN] Would submit 1 job for $PIPELINE ($ROW_COUNT samples)"
+}
+
+_gen_rnaseq_sheet_config() {
+    local output="$1"
+
+    # Write samples_file to batch dir
+    local samples_file="$BATCH_DIR/samples.txt"
+    [[ "$DRY_RUN" == true ]] && samples_file="/tmp/tjp-batch-dryrun-${PIPELINE}-samples.txt"
+    samplesheet_to_samples_file "$SAMPLESHEET" "$samples_file"
+
+    # Infer fastq_dir from samplesheet (dirname of first fastq_1 path)
+    local fastq_dir
+    fastq_dir=$(samplesheet_infer_fastq_dir "$SAMPLESHEET")
+
+    # Copy base config then override per-batch fields
+    cp "$BASE_CONFIG" "$output"
+    sed -i "s|^fastq_dir:.*|fastq_dir: $fastq_dir|"       "$output"
+    sed -i "s|^samples_file:.*|samples_file: $samples_file|" "$output"
+    _apply_titan_to_config "$output"
+}
+
+_gen_virome_sheet_config() {
+    local output="$1"
+
+    # Copy base config and point samplesheet to the provided CSV
+    cp "$BASE_CONFIG" "$output"
+    sed -i "s|^samplesheet:.*|samplesheet: $SAMPLESHEET|" "$output"
+    _apply_titan_to_config "$output"
+}
+
+# _apply_titan_to_config: write Titan IDs into a copied config if the block exists
+_apply_titan_to_config() {
+    local config="$1"
+    if grep -q "^titan_project_id" "$config" 2>/dev/null; then
+        sed -i "s|^titan_project_id:.*|titan_project_id: ${TITAN_PROJECT:-}|" "$config"
+        sed -i "s|^titan_sample_id:.*|titan_sample_id: ${TITAN_SAMPLE:-}|"   "$config"
+        sed -i "s|^titan_library_id:.*|titan_library_id: ${TITAN_LIBRARY:-}|" "$config"
+        sed -i "s|^titan_run_id:.*|titan_run_id: ${TITAN_RUN:-}|"            "$config"
+    fi
+}
+
+# ── Main dispatch ─────────────────────────────────────────────────────────────
+if _is_per_row "$PIPELINE"; then
+    _batch_per_row
+else
+    _batch_per_sheet
+fi

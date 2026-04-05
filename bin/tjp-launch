@@ -433,10 +433,10 @@ update_manifest_job_id "$RUN_DIR" "$JOB_ID"
 
 # ── Titan metadata registration ──────────────────────────────────────────────
 # Read optional Titan ID fields from config (empty string = legacy mode)
-TITAN_PROJECT=$(yaml_get "$RUN_DIR/config.yaml" "project_id" 2>/dev/null || echo "")
-TITAN_SAMPLE=$(yaml_get  "$RUN_DIR/config.yaml" "sample_id"  2>/dev/null || echo "")
-TITAN_LIBRARY=$(yaml_get "$RUN_DIR/config.yaml" "library_id" 2>/dev/null || echo "")
-TITAN_RUN=$(yaml_get     "$RUN_DIR/config.yaml" "run_id"     2>/dev/null || echo "")
+TITAN_PROJECT=$(yaml_get "$RUN_DIR/config.yaml" "titan_project_id" 2>/dev/null || echo "")
+TITAN_SAMPLE=$(yaml_get  "$RUN_DIR/config.yaml" "titan_sample_id"  2>/dev/null || echo "")
+TITAN_LIBRARY=$(yaml_get "$RUN_DIR/config.yaml" "titan_library_id" 2>/dev/null || echo "")
+TITAN_RUN=$(yaml_get     "$RUN_DIR/config.yaml" "titan_run_id"     2>/dev/null || echo "")
 
 PIPELINE_VERSION=$(get_pipeline_version "$PIPELINE" "$CONTAINER" 2>/dev/null || echo "unknown")
 

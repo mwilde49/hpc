@@ -44,7 +44,7 @@ outdir:         /work/__USER__/pipelines/wf-transcriptomes/my_project
 # ── Titan Integration (optional) ──────────────────────────────────────────────
 # Leave blank until Titan is available. When populated, enables metadata
 # generation and future database registration.
-project_id:   # PRJ-xxxx  — Titan project identifier
-sample_id:    # SMP-xxxx  — Titan biological sample identifier
-library_id:   # LIB-xxxx  — Titan library identifier
-run_id:       # RUN-xxxx  — Titan sequencing run identifier
+titan_project_id:   # PRJ-xxxx  — Titan project identifier
+titan_sample_id:    # SMP-xxxx  — Titan biological sample identifier
+titan_library_id:   # LIB-xxxx  — Titan library identifier
+titan_run_id:       # RUN-xxxx  — Titan sequencing run identifier
