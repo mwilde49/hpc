@@ -19,3 +19,9 @@ files_for_hpc/
 
 # Subsampled test FASTQs (generated on HPC, too large for git)
 test_data/rnaseq/fastq/
+
+# Presentation and design files
+*_presentation.pdf
+*_presentation.pptx
+*_diagram.pdf
+*_styling.txt
