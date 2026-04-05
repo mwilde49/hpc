@@ -67,3 +67,11 @@ rescue_mode: automatic
 #   outdir/filter/    - filtered transcriptome
 #   outdir/rescue/    - rescued transcriptome (final output)
 outdir: /work/__USER__/sqanti3/my_sample
+
+# ── Titan Integration (optional) ──────────────────────────────────────────────
+# Leave blank until Titan is available. When populated, enables metadata
+# generation and future database registration.
+project_id:   # PRJ-xxxx  — Titan project identifier
+sample_id:    # SMP-xxxx  — Titan biological sample identifier
+library_id:   # LIB-xxxx  — Titan library identifier
+run_id:       # RUN-xxxx  — Titan sequencing run identifier

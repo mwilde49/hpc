@@ -143,6 +143,43 @@ get_slurm_template() {
     printf '%s' "$REPO_ROOT/${PIPELINE_TEMPLATES[$name]}"
 }
 
+# get_pipeline_version <pipeline> <container>
+# Returns a version string for a pipeline, extracted from the container path
+# or tool binary. Used for Titan metadata records.
+get_pipeline_version() {
+    local pipeline="$1"
+    local container="$2"
+
+    if [[ "$container" == native:* ]]; then
+        # Extract version from tool dir name: cellranger-10.0.0 → 10.0.0
+        local tool_dir="${container#native:}"
+        printf '%s' "$(basename "$tool_dir" | grep -oE '[0-9]+\.[0-9]+[^ ]*$' || echo 'unknown')"
+        return
+    fi
+
+    if [[ "$pipeline" == "wf-transcriptomes" ]]; then
+        # Version is per-run via wf_version config key; not knowable at launch time
+        printf 'nextflow-managed'
+        return
+    fi
+
+    if [[ -d "$container" ]]; then
+        # Multi-container pipeline (virome): use git describe on submodule
+        git -C "$container" describe --tags --abbrev=0 2>/dev/null || printf 'unknown'
+        return
+    fi
+
+    if [[ -f "$container" ]]; then
+        # Single SIF: extract from filename e.g. bulkrnaseq_v1.0.0.sif → 1.0.0
+        local sif_name
+        sif_name=$(basename "$container" .sif)
+        printf '%s' "$(printf '%s' "$sif_name" | grep -oE 'v[0-9]+\.[0-9]+[^ ]*$' | sed 's/^v//' || echo 'unknown')"
+        return
+    fi
+
+    printf 'unknown'
+}
+
 # ── Branding ────────────────────────────────────────────────────────────────
 source "$(dirname "${BASH_SOURCE[0]}")/branding.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/samplesheet.sh"

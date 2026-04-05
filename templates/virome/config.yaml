@@ -25,3 +25,11 @@ trim_minlen: 36
 # Kraken2 classification parameters
 kraken2_confidence: 0.1
 min_reads_per_taxon: 5
+
+# ── Titan Integration (optional) ──────────────────────────────────────────────
+# Leave blank until Titan is available. When populated, enables metadata
+# generation and future database registration.
+project_id:   # PRJ-xxxx  — Titan project identifier
+sample_id:    # SMP-xxxx  — Titan biological sample identifier
+library_id:   # LIB-xxxx  — Titan library identifier
+run_id:       # RUN-xxxx  — Titan sequencing run identifier

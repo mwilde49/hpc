@@ -108,10 +108,20 @@ generate_manifest() {
 MANIFEST_EOF
 }
 
-# ── Post-submission update ───────────────────────────────────────────────────
+# ── Post-submission updates ──────────────────────────────────────────────────
+
 # update_manifest_job_id <run_dir> <job_id>
 update_manifest_job_id() {
     local run_dir="$1"
     local job_id="$2"
     sed -i "s/\"slurm_job_id\": \"pending\"/\"slurm_job_id\": \"$job_id\"/" "$run_dir/manifest.json"
+}
+
+# update_manifest_titan_id <run_dir> <plr_id>
+# Cross-references the Titan PLR-xxxx ID into manifest.json.
+update_manifest_titan_id() {
+    local run_dir="$1"
+    local plr_id="$2"
+    sed -i "s/\"slurm_template\":/\"titan_pipeline_run_id\": \"$plr_id\",\n    \"slurm_template\":/" \
+        "$run_dir/manifest.json"
 }

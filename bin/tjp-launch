@@ -431,6 +431,41 @@ fi
 # ── Update manifest with job ID ─────────────────────────────────────────────
 update_manifest_job_id "$RUN_DIR" "$JOB_ID"
 
+# ── Titan metadata registration ──────────────────────────────────────────────
+# Read optional Titan ID fields from config (empty string = legacy mode)
+TITAN_PROJECT=$(yaml_get "$RUN_DIR/config.yaml" "project_id" 2>/dev/null || echo "")
+TITAN_SAMPLE=$(yaml_get  "$RUN_DIR/config.yaml" "sample_id"  2>/dev/null || echo "")
+TITAN_LIBRARY=$(yaml_get "$RUN_DIR/config.yaml" "library_id" 2>/dev/null || echo "")
+TITAN_RUN=$(yaml_get     "$RUN_DIR/config.yaml" "run_id"     2>/dev/null || echo "")
+
+PIPELINE_VERSION=$(get_pipeline_version "$PIPELINE" "$CONTAINER" 2>/dev/null || echo "unknown")
+
+TITAN_REGISTER_ARGS=(
+    --pipeline     "$PIPELINE"
+    --version      "$PIPELINE_VERSION"
+    --output-path  "${SCRATCH_OUTPUT_DIR:-$RUN_DIR}"
+    --status       "pending"
+    --slurm-job-id "$JOB_ID"
+    --container    "$CONTAINER"
+    --run-dir      "$RUN_DIR"
+)
+[[ -n "$TITAN_PROJECT" ]]  && TITAN_REGISTER_ARGS+=(--project  "$TITAN_PROJECT")
+[[ -n "$TITAN_SAMPLE" ]]   && TITAN_REGISTER_ARGS+=(--sample   "$TITAN_SAMPLE")
+[[ -n "$TITAN_LIBRARY" ]]  && TITAN_REGISTER_ARGS+=(--library  "$TITAN_LIBRARY")
+[[ -n "$TITAN_RUN" ]]      && TITAN_REGISTER_ARGS+=(--run-id   "$TITAN_RUN")
+
+PLR_ID=""
+if PLR_ID=$(register_pipeline_run "${TITAN_REGISTER_ARGS[@]}" 2>/dev/null); then
+    info "Metadata record: $PLR_ID  (labdata show $PLR_ID)"
+    update_manifest_titan_id "$RUN_DIR" "$PLR_ID"
+    if [[ -n "$TITAN_PROJECT" ]]; then
+        _TITAN_SAMPLE_KEY="${TITAN_SAMPLE:-$PIPELINE}"
+        info "Titan output path (future): /store/processed/$TITAN_PROJECT/$PIPELINE/$PIPELINE_VERSION/$_TITAN_SAMPLE_KEY"
+    fi
+else
+    warn "Metadata registration skipped — run 'labdata status' to check store"
+fi
+
 # ── Print summary ────────────────────────────────────────────────────────────
 hyperion_milestone "Warp Drive Engaged — $PIPELINE job $JOB_ID submitted"
 

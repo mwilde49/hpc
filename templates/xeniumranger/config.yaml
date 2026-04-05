@@ -25,3 +25,11 @@ localmem: 120                           # GB — leave headroom below SLURM --me
 # For import-segmentation:
 # segmentation_file: /path/to/cells.csv.gz  # Required for import-segmentation command
 # units: microns                        # Coordinate units (microns or pixels)
+
+# ── Titan Integration (optional) ──────────────────────────────────────────────
+# Leave blank until Titan is available. When populated, enables metadata
+# generation and future database registration.
+project_id:   # PRJ-xxxx  — Titan project identifier
+sample_id:    # SMP-xxxx  — Titan biological sample identifier
+library_id:   # LIB-xxxx  — Titan library identifier
+run_id:       # RUN-xxxx  — Titan sequencing run identifier

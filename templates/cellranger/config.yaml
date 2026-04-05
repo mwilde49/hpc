@@ -27,3 +27,11 @@ create_bam: true
 # force_cells: 5000                     # Force a specific number of cells
 # include_introns: true                 # Include intronic reads (default: true for Cell Ranger 7+)
 # no_bam: false                         # Skip BAM generation (mutually exclusive with create_bam)
+
+# ── Titan Integration (optional) ──────────────────────────────────────────────
+# Leave blank until Titan is available. When populated, enables metadata
+# generation and future database registration.
+project_id:   # PRJ-xxxx  — Titan project identifier
+sample_id:    # SMP-xxxx  — Titan biological sample identifier
+library_id:   # LIB-xxxx  — Titan library identifier
+run_id:       # RUN-xxxx  — Titan sequencing run identifier

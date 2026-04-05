@@ -30,3 +30,11 @@ create_bam: true
 # colorizedimage: /path/to/color_image.tif   # Colorized fluorescence image
 # reorient_images: true                      # Auto-reorient images
 # loupe_alignment: /path/to/alignment.json   # Manual Loupe alignment file
+
+# ── Titan Integration (optional) ──────────────────────────────────────────────
+# Leave blank until Titan is available. When populated, enables metadata
+# generation and future database registration.
+project_id:   # PRJ-xxxx  — Titan project identifier
+sample_id:    # SMP-xxxx  — Titan biological sample identifier
+library_id:   # LIB-xxxx  — Titan library identifier
+run_id:       # RUN-xxxx  — Titan sequencing run identifier

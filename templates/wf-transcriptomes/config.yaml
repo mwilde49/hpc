@@ -40,3 +40,11 @@ outdir:         /work/__USER__/pipelines/wf-transcriptomes/my_project
 #   barcode,alias,type
 #   barcode09,sample1,test
 #   barcode10,sample2,control
+
+# ── Titan Integration (optional) ──────────────────────────────────────────────
+# Leave blank until Titan is available. When populated, enables metadata
+# generation and future database registration.
+project_id:   # PRJ-xxxx  — Titan project identifier
+sample_id:    # SMP-xxxx  — Titan biological sample identifier
+library_id:   # LIB-xxxx  — Titan library identifier
+run_id:       # RUN-xxxx  — Titan sequencing run identifier
