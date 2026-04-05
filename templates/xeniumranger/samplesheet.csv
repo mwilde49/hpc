@@ -1,0 +1,20 @@
+# Xenium Ranger pipeline samplesheet
+# Format: CSV with header row. One sample per line.
+# Use this for batch runs; single-sample runs can use config.yaml directly.
+#
+# Required columns:
+#   sample         - output directory name for this Xenium Ranger run
+#   xenium_bundle  - path to Xenium output bundle directory
+#   command        - Xenium Ranger command: resegment or import-segmentation
+#
+# Optional columns:
+#   segmentation_file - required when command=import-segmentation; path to cells.csv.gz
+#
+# Optional: Titan integration (append to each row; leave blank if unused)
+#   project_id    - Titan project identifier (e.g., PRJ-0001)
+#   sample_id     - Titan sample identifier  (e.g., SMP-0001)
+#   library_id    - Titan library identifier (e.g., LIB-0001)
+#   run_id        - Titan run identifier     (e.g., RUN-0001)
+#
+sample,xenium_bundle,command,segmentation_file,project_id,sample_id,library_id,run_id
+my_sample,__SCRATCH__/myproject/xenium_bundle,resegment,,,,,

@@ -1,0 +1,23 @@
+# Psoma (Psomagen) Bulk RNA-Seq pipeline samplesheet
+# Format: CSV with header row. One sample per line.
+# The framework will:
+#   - write one sample name per line to the 'samples_file:' path in your config
+#   - infer 'fastq_dir:' as the parent directory of the first fastq_1 path
+#
+# Required columns:
+#   sample    - sample name matching FASTQ filename prefix
+#               Psomagen naming convention: files end in _1.fastq.gz / _2.fastq.gz
+#               (e.g., sample_01 matches sample_01_1.fastq.gz)
+#   fastq_1   - absolute path to R1 (forward) FASTQ file (.fastq.gz)
+#   fastq_2   - absolute path to R2 (reverse) FASTQ file (.fastq.gz)
+#
+# All FASTQs should reside in the same directory; fastq_dir is inferred from fastq_1.
+#
+# Optional: Titan integration (append to each row; leave blank if unused)
+#   project_id  - Titan project identifier (e.g., PRJ-0001)
+#   sample_id   - Titan sample identifier  (e.g., SMP-0001)
+#   library_id  - Titan library identifier (e.g., LIB-0001)
+#   run_id      - Titan run identifier     (e.g., RUN-0001)
+#
+sample,fastq_1,fastq_2,project_id,sample_id,library_id,run_id
+sample_01,__SCRATCH__/myproject/fastq/sample_01_1.fastq.gz,__SCRATCH__/myproject/fastq/sample_01_2.fastq.gz,,,,

@@ -145,3 +145,5 @@ get_slurm_template() {
 
 # ── Branding ────────────────────────────────────────────────────────────────
 source "$(dirname "${BASH_SOURCE[0]}")/branding.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/samplesheet.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/metadata.sh"

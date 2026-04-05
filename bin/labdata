@@ -1,0 +1,379 @@
+#!/usr/bin/env bash
+# labdata — Titan local metadata store CLI
+# Manages pipeline run records on the filesystem, mirroring the Titan DB schema.
+# When Titan comes online, records with titan_registered=false can be migrated.
+#
+# Usage: labdata <command> [options]
+#   labdata new-id <TYPE>
+#   labdata register-run [options]
+#   labdata find runs [--pipeline <name>] [--status <status>] [--format table|json|paths]
+#   labdata show <PLR-xxxx>
+#   labdata status
+#   labdata --help
+
+set -euo pipefail
+
+# ── Bootstrap: locate bin/lib relative to this script (symlink-safe) ─────────
+_LABDATA_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}")"
+_LABDATA_BIN="$(cd "$(dirname "$_LABDATA_SCRIPT")" && pwd)"
+_LABDATA_LIB="$_LABDATA_BIN/lib"
+
+if [[ ! -f "$_LABDATA_LIB/common.sh" ]]; then
+    printf 'labdata: cannot find bin/lib/common.sh relative to %s\n' "$_LABDATA_BIN" >&2
+    exit 1
+fi
+
+source "$_LABDATA_LIB/common.sh"
+# metadata.sh is sourced by common.sh — no need to source it again.
+
+# ── Usage ─────────────────────────────────────────────────────────────────────
+usage() {
+    cat <<EOF
+Usage: labdata <command> [options]
+
+Commands:
+  new-id <TYPE>
+      Generate and print a new Titan-format ID (no record is created).
+      TYPE: PRJ | SMP | LIB | RUN | PLR | REF | ANN
+      Example: labdata new-id PLR  →  PLR-a4f2
+
+  register-run [options]
+      Register a pipeline run in the local metadata store.
+      Options:
+        --pipeline <name>        required
+        --version <ver>          required
+        --output-path <path>     required
+        --status <status>        required (pending|running|completed|failed|cancelled)
+        --project <PRJ-xxxx>     optional
+        --sample  <SMP-xxxx>     optional
+        --library <LIB-xxxx>     optional
+        --run-id  <RUN-xxxx>     optional
+        --slurm-job-id <id>      optional
+        --container <image>      optional (e.g. "native:/groups/tprice/opt/cellranger-10.0.0")
+        --params <json_string>   optional (JSON object, default: {})
+        --run-dir <path>         optional (also writes titan_metadata.json there)
+        --started-at <iso8601>   optional
+      Prints the generated PLR-xxxx on stdout.
+
+  find runs [--pipeline <name>] [--status <status>] [--format table|json|paths]
+      Query the local metadata store.
+      Default format: table
+      Table columns: PLR-xxxx | pipeline | version | status | registered_at | output_path
+
+  show <PLR-xxxx>
+      Pretty-print the full JSON record for a pipeline run.
+
+  status
+      Print summary counts: total runs, by pipeline, by status.
+
+  --help
+      Print this message.
+
+Metadata store: \$WORK_ROOT/pipelines/metadata/pipeline_runs/
+EOF
+    exit "${1:-0}"
+}
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+# _json_field <file> <field>
+# Extracts a scalar JSON field value using awk. Returns empty string if null.
+_json_field() {
+    local file="$1"
+    local field="$2"
+    awk -v field="$field" '
+        $0 ~ "\"" field "\":" {
+            match($0, "\"" field "\":[[:space:]]*(.+)", a)
+            val = a[1]
+            # Strip trailing comma
+            sub(/,[[:space:]]*$/, "", val)
+            # Strip surrounding quotes if present
+            if (val ~ /^"/) {
+                gsub(/^"|"$/, "", val)
+                print val
+            } else if (val == "null" || val == "false" || val == "true") {
+                print val
+            } else {
+                print val
+            }
+            exit
+        }
+    ' "$file"
+}
+
+# _list_plr_files
+# Prints full paths to all PLR-*.json files in the store.
+_list_plr_files() {
+    local store
+    store=$(metadata_get_store)
+    local dir="$store/pipeline_runs"
+    if [[ ! -d "$dir" ]]; then
+        return 0
+    fi
+    # Use find with sort for reproducible order
+    find "$dir" -maxdepth 1 -name 'PLR-*.json' | sort
+}
+
+# ── Command: new-id ───────────────────────────────────────────────────────────
+_cmd_new_id() {
+    local type="${1:-}"
+    if [[ -z "$type" ]]; then
+        printf 'labdata new-id: TYPE is required (PRJ|SMP|LIB|RUN|PLR|REF|ANN)\n' >&2
+        exit 1
+    fi
+    generate_titan_id "$type"
+    printf '\n'
+}
+
+# ── Command: register-run ─────────────────────────────────────────────────────
+_cmd_register_run() {
+    local pipeline_name=""
+    local pipeline_version=""
+    local output_path=""
+    local status="pending"
+    local project_id=""
+    local sample_id=""
+    local library_id=""
+    local run_id=""
+    local slurm_job_id=""
+    local container_image=""
+    local parameters="{}"
+    local run_dir=""
+    local started_at=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --pipeline)      pipeline_name="$2";   shift 2 ;;
+            --version)       pipeline_version="$2"; shift 2 ;;
+            --output-path)   output_path="$2";     shift 2 ;;
+            --status)        status="$2";           shift 2 ;;
+            --project)       project_id="$2";       shift 2 ;;
+            --sample)        sample_id="$2";        shift 2 ;;
+            --library)       library_id="$2";       shift 2 ;;
+            --run-id)        run_id="$2";           shift 2 ;;
+            --slurm-job-id)  slurm_job_id="$2";    shift 2 ;;
+            --container)     container_image="$2";  shift 2 ;;
+            --params)        parameters="$2";       shift 2 ;;
+            --run-dir)       run_dir="$2";          shift 2 ;;
+            --started-at)    started_at="$2";       shift 2 ;;
+            *) printf 'labdata register-run: unknown option: %s\n' "$1" >&2; exit 1 ;;
+        esac
+    done
+
+    # Required fields
+    local missing=()
+    [[ -z "$pipeline_name" ]]  && missing+=(--pipeline)
+    [[ -z "$pipeline_version" ]] && missing+=(--version)
+    [[ -z "$output_path" ]]   && missing+=(--output-path)
+    [[ -z "$status" ]]        && missing+=(--status)
+
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        printf 'labdata register-run: missing required options: %s\n' "${missing[*]}" >&2
+        exit 1
+    fi
+
+    register_pipeline_run \
+        --pipeline     "$pipeline_name" \
+        --version      "$pipeline_version" \
+        --output-path  "$output_path" \
+        --status       "$status" \
+        --project      "$project_id" \
+        --sample       "$sample_id" \
+        --library      "$library_id" \
+        --run-id       "$run_id" \
+        --slurm-job-id "$slurm_job_id" \
+        --container    "$container_image" \
+        --params       "$parameters" \
+        --run-dir      "$run_dir" \
+        --started-at   "$started_at"
+}
+
+# ── Command: find runs ────────────────────────────────────────────────────────
+_cmd_find_runs() {
+    local filter_pipeline=""
+    local filter_status=""
+    local format="table"
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --pipeline) filter_pipeline="$2"; shift 2 ;;
+            --status)   filter_status="$2";   shift 2 ;;
+            --format)   format="$2";          shift 2 ;;
+            *) printf 'labdata find runs: unknown option: %s\n' "$1" >&2; exit 1 ;;
+        esac
+    done
+
+    # Collect matching files
+    local files=()
+    local f
+    while IFS= read -r f; do
+        [[ -z "$f" ]] && continue
+        # Apply pipeline filter
+        if [[ -n "$filter_pipeline" ]]; then
+            local p
+            p=$(_json_field "$f" "pipeline_name")
+            [[ "$p" != "$filter_pipeline" ]] && continue
+        fi
+        # Apply status filter
+        if [[ -n "$filter_status" ]]; then
+            local s
+            s=$(_json_field "$f" "status")
+            [[ "$s" != "$filter_status" ]] && continue
+        fi
+        files+=("$f")
+    done < <(_list_plr_files)
+
+    if [[ ${#files[@]} -eq 0 ]]; then
+        case "$format" in
+            table) printf 'No records found.\n' ;;
+            json)  printf '[]\n' ;;
+            paths) : ;;
+        esac
+        return 0
+    fi
+
+    case "$format" in
+        paths)
+            for f in "${files[@]}"; do
+                printf '%s\n' "$f"
+            done
+            ;;
+        json)
+            local first=true
+            printf '[\n'
+            for f in "${files[@]}"; do
+                if [[ "$first" == true ]]; then
+                    first=false
+                else
+                    printf ',\n'
+                fi
+                # Indent each record with 4 spaces
+                sed 's/^/    /' "$f"
+            done
+            printf '\n]\n'
+            ;;
+        table)
+            # Header
+            printf '%-12s  %-16s  %-12s  %-12s  %-25s  %s\n' \
+                "ID" "PIPELINE" "VERSION" "STATUS" "REGISTERED_AT" "OUTPUT_PATH"
+            printf '%s\n' "$(printf '─%.0s' {1..100})"
+            for f in "${files[@]}"; do
+                local plr_id pipeline_name pipeline_version st reg_at out_path
+                plr_id=$(_json_field "$f" "pipeline_run_id")
+                pipeline_name=$(_json_field "$f" "pipeline_name")
+                pipeline_version=$(_json_field "$f" "pipeline_version")
+                st=$(_json_field "$f" "status")
+                reg_at=$(_json_field "$f" "registered_at")
+                out_path=$(_json_field "$f" "output_path")
+                printf '%-12s  %-16s  %-12s  %-12s  %-25s  %s\n' \
+                    "$plr_id" "$pipeline_name" "$pipeline_version" \
+                    "$st" "$reg_at" "$out_path"
+            done
+            ;;
+        *)
+            printf 'labdata find runs: unknown format: %s (use table|json|paths)\n' "$format" >&2
+            exit 1
+            ;;
+    esac
+}
+
+# ── Command: show ─────────────────────────────────────────────────────────────
+_cmd_show() {
+    local plr_id="${1:-}"
+    if [[ -z "$plr_id" ]]; then
+        printf 'labdata show: PLR-xxxx ID is required\n' >&2
+        exit 1
+    fi
+
+    local store
+    store=$(metadata_get_store)
+    local record_path="$store/pipeline_runs/${plr_id}.json"
+
+    if [[ ! -f "$record_path" ]]; then
+        printf 'labdata show: record not found: %s\n' "$plr_id" >&2
+        exit 1
+    fi
+
+    cat "$record_path"
+}
+
+# ── Command: status ───────────────────────────────────────────────────────────
+_cmd_status() {
+    local total=0
+    local -A by_pipeline=()
+    local -A by_status=()
+
+    local f
+    while IFS= read -r f; do
+        [[ -z "$f" ]] && continue
+        total=$((total + 1))
+
+        local p s
+        p=$(_json_field "$f" "pipeline_name")
+        s=$(_json_field "$f" "status")
+
+        [[ -z "$p" ]] && p="(unknown)"
+        [[ -z "$s" ]] && s="(unknown)"
+
+        by_pipeline["$p"]=$(( ${by_pipeline["$p"]:-0} + 1 ))
+        by_status["$s"]=$(( ${by_status["$s"]:-0} + 1 ))
+    done < <(_list_plr_files)
+
+    printf 'Titan Metadata Store — %s/pipelines/metadata\n' "$WORK_ROOT"
+    printf '\n'
+    printf 'Total pipeline runs: %d\n' "$total"
+
+    if [[ $total -eq 0 ]]; then
+        return 0
+    fi
+
+    printf '\nBy pipeline:\n'
+    local k
+    for k in $(printf '%s\n' "${!by_pipeline[@]}" | sort); do
+        printf '  %-20s %d\n' "$k" "${by_pipeline[$k]}"
+    done
+
+    printf '\nBy status:\n'
+    for k in $(printf '%s\n' "${!by_status[@]}" | sort); do
+        printf '  %-20s %d\n' "$k" "${by_status[$k]}"
+    done
+}
+
+# ── Argument dispatch ─────────────────────────────────────────────────────────
+[[ $# -eq 0 ]] && usage 1
+
+case "$1" in
+    new-id)
+        shift
+        _cmd_new_id "$@"
+        ;;
+    register-run)
+        shift
+        _cmd_register_run "$@"
+        ;;
+    find)
+        shift
+        # Expect "runs" as the next subcommand
+        if [[ "${1:-}" != "runs" ]]; then
+            printf 'labdata find: expected "runs" subcommand\n' >&2
+            exit 1
+        fi
+        shift
+        _cmd_find_runs "$@"
+        ;;
+    show)
+        shift
+        _cmd_show "$@"
+        ;;
+    status)
+        _cmd_status
+        ;;
+    --help|-h|help)
+        usage 0
+        ;;
+    *)
+        printf 'labdata: unknown command: %s\n' "$1" >&2
+        printf "Run 'labdata --help' for usage.\n" >&2
+        exit 1
+        ;;
+esac

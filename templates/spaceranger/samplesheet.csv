@@ -1,0 +1,23 @@
+# Space Ranger pipeline samplesheet
+# Format: CSV with header row. One sample per line.
+# Use this for batch runs; single-sample runs can use config.yaml directly.
+#
+# Required columns:
+#   sample        - output directory name for this Space Ranger run
+#   fastqs        - directory containing FASTQ files for this sample
+#   transcriptome - path to Space Ranger-compatible reference transcriptome
+#   image         - absolute path to brightfield or fluorescence microscope image (.tif)
+#   slide         - Visium slide serial number (e.g., V19J25-123)
+#   area          - capture area on the slide: A1, B1, C1, or D1
+#
+# Note: for test/validation runs without a physical slide, you may replace
+# 'slide' and 'area' with a single 'unknown_slide' column (value: visium-1).
+#
+# Optional: Titan integration (append to each row; leave blank if unused)
+#   project_id    - Titan project identifier (e.g., PRJ-0001)
+#   sample_id     - Titan sample identifier  (e.g., SMP-0001)
+#   library_id    - Titan library identifier (e.g., LIB-0001)
+#   run_id        - Titan run identifier     (e.g., RUN-0001)
+#
+sample,fastqs,transcriptome,image,slide,area,project_id,sample_id,library_id,run_id
+my_sample,__SCRATCH__/myproject/fastq,/groups/tprice/pipelines/references/refdata-gex-GRCh38-2024-A,__SCRATCH__/myproject/image.tif,V19J25-123,A1,,,,

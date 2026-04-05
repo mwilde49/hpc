@@ -25,3 +25,6 @@ test_data/rnaseq/fastq/
 *_presentation.pptx
 *_diagram.pdf
 *_styling.txt
+
+# Metadata store data (lives on HPC work filesystem, not in repo)
+metadata/pipeline_runs/

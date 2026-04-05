@@ -1,0 +1,23 @@
+# Cell Ranger pipeline samplesheet
+# Format: CSV with header row. One sample per line.
+# Use this for batch runs; single-sample runs can use config.yaml directly.
+#
+# Required columns:
+#   sample        - output directory name for this Cell Ranger run
+#   fastqs        - directory containing FASTQ files for this sample
+#   transcriptome - path to Cell Ranger-compatible reference transcriptome
+#
+# Optional columns:
+#   sample_name   - sample name matching FASTQ filename prefix
+#                   (e.g., MySample matches MySample_S1_L001_R1_001.fastq.gz)
+#                   defaults to value of 'sample' if omitted
+#   create_bam    - true/false; required true for Cell Ranger 10+ (default: true)
+#
+# Optional: Titan integration (append to each row; leave blank if unused)
+#   project_id    - Titan project identifier (e.g., PRJ-0001)
+#   sample_id     - Titan sample identifier  (e.g., SMP-0001)
+#   library_id    - Titan library identifier (e.g., LIB-0001)
+#   run_id        - Titan run identifier     (e.g., RUN-0001)
+#
+sample,fastqs,transcriptome,sample_name,create_bam,project_id,sample_id,library_id,run_id
+my_sample,__SCRATCH__/myproject/fastq,/groups/tprice/pipelines/references/refdata-gex-GRCh38-2024-A,MySample,true,,,,

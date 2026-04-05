@@ -1,0 +1,17 @@
+# Virome pipeline samplesheet
+# Format: CSV with header row. One sample per line.
+# Pass the path to this file as 'samplesheet:' in your config.yaml.
+#
+# Required columns:
+#   sample      - unique sample identifier (used in output filenames)
+#   fastq_r1    - absolute path to R1 (forward) FASTQ file (.fastq.gz)
+#   fastq_r2    - absolute path to R2 (reverse) FASTQ file (.fastq.gz)
+#
+# Optional: Titan integration (append to each row; leave blank if unused)
+#   project_id  - Titan project identifier (e.g., PRJ-0001)
+#   sample_id   - Titan sample identifier  (e.g., SMP-0001)
+#   library_id  - Titan library identifier (e.g., LIB-0001)
+#   run_id      - Titan run identifier     (e.g., RUN-0001)
+#
+sample,fastq_r1,fastq_r2,project_id,sample_id,library_id,run_id
+sample_01,__SCRATCH__/virome/fastq/sample_01_R1.fastq.gz,__SCRATCH__/virome/fastq/sample_01_R2.fastq.gz,,,,
