@@ -1,0 +1,30 @@
+# wf-transcriptomes batch samplesheet
+# Format: CSV with header row. One wf-transcriptomes run per line.
+# Use with: tjp-batch wf-transcriptomes samplesheet.csv --config base_config.yaml
+#
+# Each row submits one wf-transcriptomes run for a different experiment.
+# Each experiment has its own FASTQ directory and barcode samplesheet.
+# Shared settings (wf_version, min_read_length, min_qscore, etc.) come from
+# the base config and are applied to all rows.
+#
+# Required columns:
+#   sample        - experiment name (used in output directory)
+#   fastq_dir     - parent directory containing barcode subdirectories (fastq_pass/)
+#   sample_sheet  - EPI2ME barcode samplesheet CSV for this experiment
+#                   format: barcode,alias[,type]
+#                   example: barcode09,sample1 / barcode10,sample2
+#   ref_genome    - reference genome FASTA
+#   ref_annotation - reference annotation GTF
+#
+# Optional columns:
+#   direct_rna    - true for direct RNA; false (default) for cDNA/PCR
+#   wf_version    - override pipeline version (default: from base config)
+#
+# Optional: Titan integration (leave blank if not yet configured)
+#   project_id    - Titan project identifier (PRJ-xxxx)
+#   sample_id     - Titan biological sample identifier (SMP-xxxx)
+#   library_id    - Titan library identifier (LIB-xxxx)
+#   run_id        - Titan sequencing run identifier (RUN-xxxx)
+#
+sample,fastq_dir,sample_sheet,ref_genome,ref_annotation,direct_rna,wf_version,project_id,sample_id,library_id,run_id
+experiment_01,__SCRATCH__/ont/experiment_01/fastq_pass,__SCRATCH__/ont/experiment_01/barcodes.csv,/groups/tprice/pipelines/references/GRCh38.primary_assembly.genome.fa,/groups/tprice/pipelines/references/gencode.v47.primary_assembly.annotation.gtf,false,v2.3.0,,,,

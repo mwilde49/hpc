@@ -151,16 +151,16 @@ else
     info "Created: $virome_config"
 fi
 
-# Virome samplesheet example
+# Virome samplesheet
 virome_samplesheet="$USER_PIPELINES/virome/samplesheet.csv"
 if [[ -f "$virome_samplesheet" ]]; then
     warn "Samplesheet already exists, skipping: $virome_samplesheet"
 else
-    cp "$REPO_ROOT/templates/virome/samplesheet_example.csv" "$virome_samplesheet"
+    _substitute_placeholders "$REPO_ROOT/templates/virome/samplesheet.csv" > "$virome_samplesheet"
     info "Created: $virome_samplesheet"
 fi
 
-# Cell Ranger config
+# Cell Ranger config + samplesheet
 cellranger_config="$USER_PIPELINES/cellranger/config.yaml"
 if [[ -f "$cellranger_config" ]]; then
     warn "Config already exists, skipping: $cellranger_config"
@@ -168,8 +168,13 @@ else
     _substitute_placeholders "$REPO_ROOT/templates/cellranger/config.yaml" > "$cellranger_config"
     info "Created: $cellranger_config"
 fi
+cellranger_sheet="$USER_PIPELINES/cellranger/samplesheet.csv"
+if [[ ! -f "$cellranger_sheet" ]]; then
+    _substitute_placeholders "$REPO_ROOT/templates/cellranger/samplesheet.csv" > "$cellranger_sheet"
+    info "Created: $cellranger_sheet"
+fi
 
-# Space Ranger config
+# Space Ranger config + samplesheet
 spaceranger_config="$USER_PIPELINES/spaceranger/config.yaml"
 if [[ -f "$spaceranger_config" ]]; then
     warn "Config already exists, skipping: $spaceranger_config"
@@ -177,8 +182,13 @@ else
     _substitute_placeholders "$REPO_ROOT/templates/spaceranger/config.yaml" > "$spaceranger_config"
     info "Created: $spaceranger_config"
 fi
+spaceranger_sheet="$USER_PIPELINES/spaceranger/samplesheet.csv"
+if [[ ! -f "$spaceranger_sheet" ]]; then
+    _substitute_placeholders "$REPO_ROOT/templates/spaceranger/samplesheet.csv" > "$spaceranger_sheet"
+    info "Created: $spaceranger_sheet"
+fi
 
-# Xenium Ranger config
+# Xenium Ranger config + samplesheet
 xeniumranger_config="$USER_PIPELINES/xeniumranger/config.yaml"
 if [[ -f "$xeniumranger_config" ]]; then
     warn "Config already exists, skipping: $xeniumranger_config"
@@ -186,8 +196,27 @@ else
     _substitute_placeholders "$REPO_ROOT/templates/xeniumranger/config.yaml" > "$xeniumranger_config"
     info "Created: $xeniumranger_config"
 fi
+xeniumranger_sheet="$USER_PIPELINES/xeniumranger/samplesheet.csv"
+if [[ ! -f "$xeniumranger_sheet" ]]; then
+    _substitute_placeholders "$REPO_ROOT/templates/xeniumranger/samplesheet.csv" > "$xeniumranger_sheet"
+    info "Created: $xeniumranger_sheet"
+fi
 
-# SQANTI3 config
+# BulkRNASeq samplesheet
+bulkrnaseq_sheet="$USER_PIPELINES/bulkrnaseq/samplesheet.csv"
+if [[ ! -f "$bulkrnaseq_sheet" ]]; then
+    _substitute_placeholders "$REPO_ROOT/templates/bulkrnaseq/samplesheet.csv" > "$bulkrnaseq_sheet"
+    info "Created: $bulkrnaseq_sheet"
+fi
+
+# Psoma samplesheet
+psoma_sheet="$USER_PIPELINES/psoma/samplesheet.csv"
+if [[ ! -f "$psoma_sheet" ]]; then
+    _substitute_placeholders "$REPO_ROOT/templates/psoma/samplesheet.csv" > "$psoma_sheet"
+    info "Created: $psoma_sheet"
+fi
+
+# SQANTI3 config + samplesheet
 sqanti3_config="$USER_PIPELINES/sqanti3/config.yaml"
 if [[ -f "$sqanti3_config" ]]; then
     warn "Config already exists, skipping: $sqanti3_config"
@@ -195,14 +224,24 @@ else
     _substitute_placeholders "$REPO_ROOT/templates/sqanti3/config.yaml" > "$sqanti3_config"
     info "Created: $sqanti3_config"
 fi
+sqanti3_sheet="$USER_PIPELINES/sqanti3/samplesheet.csv"
+if [[ ! -f "$sqanti3_sheet" ]]; then
+    cp "$REPO_ROOT/templates/sqanti3/samplesheet.csv" "$sqanti3_sheet"
+    info "Created: $sqanti3_sheet"
+fi
 
-# wf-transcriptomes config
+# wf-transcriptomes config + samplesheet
 wf_transcriptomes_config="$USER_PIPELINES/wf-transcriptomes/config.yaml"
 if [[ -f "$wf_transcriptomes_config" ]]; then
     warn "Config already exists, skipping: $wf_transcriptomes_config"
 else
     _substitute_placeholders "$REPO_ROOT/templates/wf-transcriptomes/config.yaml" > "$wf_transcriptomes_config"
     info "Created: $wf_transcriptomes_config"
+fi
+wf_transcriptomes_sheet="$USER_PIPELINES/wf-transcriptomes/samplesheet.csv"
+if [[ ! -f "$wf_transcriptomes_sheet" ]]; then
+    _substitute_placeholders "$REPO_ROOT/templates/wf-transcriptomes/samplesheet.csv" > "$wf_transcriptomes_sheet"
+    info "Created: $wf_transcriptomes_sheet"
 fi
 
 # ── Add to PATH ────────────────────────────────────────────────────────────
@@ -227,25 +266,35 @@ Your workspace is ready at: $USER_PIPELINES/
 
 Next steps:
 
-  1. Edit a pipeline config:
+  1. Single-sample launch (edit config, then launch):
 
-     vi $USER_PIPELINES/addone/config.yaml        # simple demo
-     vi $USER_PIPELINES/bulkrnaseq/config.yaml     # RNA-seq (STAR aligner)
+     vi $USER_PIPELINES/bulkrnaseq/config.yaml     # RNA-seq (STAR)
      vi $USER_PIPELINES/psoma/config.yaml          # RNA-seq (HISAT2/Trimmomatic)
-     vi $USER_PIPELINES/virome/config.yaml         # viral profiling from bulk RNA-seq
+     vi $USER_PIPELINES/virome/config.yaml         # viral profiling
      vi $USER_PIPELINES/cellranger/config.yaml     # 10x single-cell
      vi $USER_PIPELINES/spaceranger/config.yaml    # 10x spatial
      vi $USER_PIPELINES/xeniumranger/config.yaml   # 10x in situ
 
-  2. Launch a pipeline:
+     tjp-launch <pipeline>
 
-     tjp-launch addone
-     tjp-launch bulkrnaseq
-     tjp-launch psoma
-     tjp-launch virome
-     tjp-launch cellranger
-     tjp-launch spaceranger
-     tjp-launch xeniumranger
+  2. Batch launch (edit samplesheet, then batch):
 
-See USER_GUIDE.md for detailed documentation.
+     vi $USER_PIPELINES/cellranger/samplesheet.csv     # one sample per row
+     vi $USER_PIPELINES/spaceranger/samplesheet.csv
+     vi $USER_PIPELINES/xeniumranger/samplesheet.csv
+     vi $USER_PIPELINES/sqanti3/samplesheet.csv        # one SQANTI3 run per row
+     vi $USER_PIPELINES/wf-transcriptomes/samplesheet.csv  # one experiment per row
+     vi $USER_PIPELINES/bulkrnaseq/samplesheet.csv     # cohort → one job
+     vi $USER_PIPELINES/psoma/samplesheet.csv
+     vi $USER_PIPELINES/virome/samplesheet.csv
+
+     tjp-batch <pipeline> $USER_PIPELINES/<pipeline>/samplesheet.csv [--dry-run]
+
+  3. Monitor and manage:
+
+     squeue -u \$USER
+     labdata find runs
+     labdata status
+
+See ONBOARDING.md for detailed documentation.
 EOF

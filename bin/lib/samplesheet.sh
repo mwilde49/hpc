@@ -11,7 +11,10 @@ declare -A _SAMPLESHEET_REQUIRED_COLS=(
     [cellranger]="sample fastqs transcriptome"
     [spaceranger]="sample fastqs transcriptome image slide area"
     [xeniumranger]="sample xenium_bundle command"
-    [wf-transcriptomes]="barcode alias"
+    # sqanti3 batch: one row per SQANTI3 run (different isoform GTF inputs)
+    [sqanti3]="sample isoforms ref_gtf ref_fasta"
+    # wf-transcriptomes batch: one row per experiment (each has its own barcode samplesheet)
+    [wf-transcriptomes]="sample fastq_dir sample_sheet ref_genome ref_annotation"
 )
 
 # ── Internal helpers ──────────────────────────────────────────────────────────

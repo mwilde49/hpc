@@ -1,0 +1,26 @@
+# SQANTI3 batch samplesheet
+# Format: CSV with header row. One SQANTI3 run per line.
+# Use with: tjp-batch sqanti3 samplesheet.csv --config base_config.yaml
+#
+# Each row submits one SQANTI3 run against a different isoform GTF input.
+# Pipeline parameters (filter_mode, rescue_mode, resources, etc.) are read
+# from the base config and applied to all samples in the batch.
+#
+# Required columns:
+#   sample      - unique sample identifier (used in output directory and filenames)
+#   isoforms    - collapsed isoforms GTF (from wf-transcriptomes, FLAIR, StringTie2, etc.)
+#   ref_gtf     - reference annotation GTF (e.g., gencode.v48.annotation.gtf)
+#   ref_fasta   - reference genome FASTA (e.g., GRCh38.primary_assembly.genome.fa)
+#
+# Optional columns:
+#   coverage    - STAR SJ.out.tab file for short-read junction support (leave blank to skip)
+#   fl_count    - transcript abundance file from featureCounts or similar
+#
+# Optional: Titan integration (leave blank if not yet configured)
+#   project_id  - Titan project identifier (PRJ-xxxx)
+#   sample_id   - Titan biological sample identifier (SMP-xxxx)
+#   library_id  - Titan library identifier (LIB-xxxx)
+#   run_id      - Titan sequencing run identifier (RUN-xxxx)
+#
+sample,isoforms,ref_gtf,ref_fasta,coverage,fl_count,project_id,sample_id,library_id,run_id
+sample_01,/path/to/sample_01_collapsed.gtf,/groups/tprice/pipelines/references/gencode.v48.primary_assembly.annotation.gtf,/groups/tprice/pipelines/references/GRCh38.primary_assembly.genome.fa,,,,,,

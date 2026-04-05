@@ -14,7 +14,7 @@ source "$SCRIPT_DIR/lib/common.sh"
 
 # ── Pipeline categories ───────────────────────────────────────────────────────
 # Per-row: each samplesheet row → one SLURM job (single-sample tools)
-_BATCH_PER_ROW=(cellranger spaceranger xeniumranger)
+_BATCH_PER_ROW=(cellranger spaceranger xeniumranger sqanti3 wf-transcriptomes)
 # Per-sheet: whole samplesheet → one SLURM job (multi-sample Nextflow pipelines)
 _BATCH_PER_SHEET=(bulkrnaseq psoma virome)
 
@@ -46,12 +46,14 @@ Options:
   --help            Show this help
 
 Samplesheet column schemas (see templates/<pipeline>/samplesheet.csv):
-  cellranger:   sample, fastqs, transcriptome [, sample_name, create_bam, titan_*]
-  spaceranger:  sample, fastqs, transcriptome, image, slide, area [, titan_*]
-  xeniumranger: sample, xenium_bundle, command [, segmentation_file, titan_*]
-  bulkrnaseq:   sample, fastq_1, fastq_2 [, titan_*]
-  psoma:        sample, fastq_1, fastq_2 [, titan_*]
-  virome:       sample, fastq_r1, fastq_r2 [, titan_*]
+  cellranger:       sample, fastqs, transcriptome [, sample_name, create_bam, titan_*]
+  spaceranger:      sample, fastqs, transcriptome, image, slide, area [, titan_*]
+  xeniumranger:     sample, xenium_bundle, command [, segmentation_file, titan_*]
+  sqanti3:          sample, isoforms, ref_gtf, ref_fasta [, coverage, fl_count, titan_*]
+  wf-transcriptomes: sample, fastq_dir, sample_sheet, ref_genome, ref_annotation [, direct_rna, wf_version, titan_*]
+  bulkrnaseq:       sample, fastq_1, fastq_2 [, titan_*]
+  psoma:            sample, fastq_1, fastq_2 [, titan_*]
+  virome:           sample, fastq_r1, fastq_r2 [, titan_*]
 EOF
     exit "${1:-0}"
 }
@@ -177,9 +179,11 @@ _batch_per_row() {
         [[ "$DRY_RUN" == true ]] && sample_config="/tmp/tjp-batch-dryrun-${PIPELINE}-${sample}.yaml"
 
         case "$PIPELINE" in
-            cellranger)   _gen_cellranger_config   "$row" "$sample" "$localcores" "$localmem" "$sample_config" ;;
-            spaceranger)  _gen_spaceranger_config  "$row" "$sample" "$localcores" "$localmem" "$sample_config" ;;
-            xeniumranger) _gen_xeniumranger_config "$row" "$sample" "$localcores" "$localmem" "$sample_config" ;;
+            cellranger)       _gen_cellranger_config       "$row" "$sample" "$localcores" "$localmem" "$sample_config" ;;
+            spaceranger)      _gen_spaceranger_config      "$row" "$sample" "$localcores" "$localmem" "$sample_config" ;;
+            xeniumranger)     _gen_xeniumranger_config     "$row" "$sample" "$localcores" "$localmem" "$sample_config" ;;
+            sqanti3)          _gen_sqanti3_config          "$row" "$sample" "$localcores" "$localmem" "$sample_config" ;;
+            wf-transcriptomes) _gen_wf_transcriptomes_config "$row" "$sample" "$localcores" "$localmem" "$sample_config" ;;
         esac
 
         _submit "$sample_config" "$sample"
@@ -279,6 +283,122 @@ _gen_xeniumranger_config() {
         printf 'localcores: %s\n'     "$localcores"
         printf 'localmem: %s\n'       "$localmem"
         [[ -n "$segmentation_file" ]] && printf 'segmentation_file: %s\n' "$segmentation_file"
+        _titan_block
+    } > "$output"
+}
+
+_gen_sqanti3_config() {
+    local row="$1" sample="$2" localcores="$3" localmem="$4" output="$5"
+
+    local isoforms ref_gtf ref_fasta coverage fl_count
+    isoforms=$(samplesheet_get_col  "$SAMPLESHEET" "isoforms"  "$row")
+    ref_gtf=$(samplesheet_get_col   "$SAMPLESHEET" "ref_gtf"   "$row" 2>/dev/null || \
+              yaml_get "$BASE_CONFIG" "refGTF" 2>/dev/null || echo "")
+    ref_fasta=$(samplesheet_get_col "$SAMPLESHEET" "ref_fasta" "$row" 2>/dev/null || \
+                yaml_get "$BASE_CONFIG" "refFasta" 2>/dev/null || echo "")
+    coverage=$(samplesheet_get_col  "$SAMPLESHEET" "coverage"  "$row" 2>/dev/null || echo "")
+    fl_count=$(samplesheet_get_col  "$SAMPLESHEET" "fl_count"  "$row" 2>/dev/null || echo "")
+
+    [[ -z "$ref_gtf"   ]] && die "Row $row ($sample): ref_gtf is required for sqanti3"
+    [[ -z "$ref_fasta" ]] && die "Row $row ($sample): ref_fasta is required for sqanti3"
+
+    # Carry pipeline-level settings from base config
+    local filter_mode rescue_mode skip_report skip_orf filter_mono_exonic force_id_ignore cpus chunks
+    filter_mode=$(yaml_get          "$BASE_CONFIG" "filter_mode"          2>/dev/null || echo "rules")
+    rescue_mode=$(yaml_get          "$BASE_CONFIG" "rescue_mode"          2>/dev/null || echo "automatic")
+    skip_report=$(yaml_get          "$BASE_CONFIG" "skip_report"          2>/dev/null || echo "true")
+    skip_orf=$(yaml_get             "$BASE_CONFIG" "skip_orf"             2>/dev/null || echo "false")
+    filter_mono_exonic=$(yaml_get   "$BASE_CONFIG" "filter_mono_exonic"   2>/dev/null || echo "false")
+    force_id_ignore=$(yaml_get      "$BASE_CONFIG" "force_id_ignore"      2>/dev/null || echo "true")
+    cpus=$(yaml_get                 "$BASE_CONFIG" "cpus"                 2>/dev/null || echo "0")
+    chunks=$(yaml_get               "$BASE_CONFIG" "chunks"               2>/dev/null || echo "0")
+    [[ -z "$filter_mode"  ]] && filter_mode="rules"
+    [[ -z "$rescue_mode"  ]] && rescue_mode="automatic"
+    [[ -z "$skip_report"  ]] && skip_report="true"
+    [[ -z "$skip_orf"     ]] && skip_orf="false"
+    [[ -z "$force_id_ignore" ]] && force_id_ignore="true"
+    [[ -z "$cpus"         ]] && cpus="0"
+    [[ -z "$chunks"       ]] && chunks="0"
+
+    # Derive outdir from base config pattern, substituting sample name
+    local base_outdir outdir
+    base_outdir=$(yaml_get "$BASE_CONFIG" "outdir" 2>/dev/null || echo "/work/$USER/sqanti3/SAMPLE")
+    outdir="${base_outdir%/*}/$sample"
+
+    {
+        printf '# Generated by tjp-batch — %s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+        printf '# Samplesheet: %s (row %d)\n' "$SAMPLESHEET" "$row"
+        printf 'sample: %s\n'              "$sample"
+        printf 'isoforms: %s\n'            "$isoforms"
+        printf 'refGTF: %s\n'              "$ref_gtf"
+        printf 'refFasta: %s\n'            "$ref_fasta"
+        printf 'coverage: %s\n'            "${coverage:-}"
+        printf 'fl_count: %s\n'            "${fl_count:-}"
+        printf 'force_id_ignore: %s\n'     "$force_id_ignore"
+        printf 'cpus: %s\n'                "$cpus"
+        printf 'chunks: %s\n'              "$chunks"
+        printf 'skip_report: %s\n'         "$skip_report"
+        printf 'skip_orf: %s\n'            "$skip_orf"
+        printf 'filter_mode: %s\n'         "$filter_mode"
+        printf 'filter_mono_exonic: %s\n'  "$filter_mono_exonic"
+        printf 'rescue_mode: %s\n'         "$rescue_mode"
+        printf 'outdir: %s\n'              "$outdir"
+        _titan_block
+    } > "$output"
+}
+
+_gen_wf_transcriptomes_config() {
+    local row="$1" sample="$2" localcores="$3" localmem="$4" output="$5"
+
+    local fastq_dir sample_sheet ref_genome ref_annotation direct_rna wf_version
+    fastq_dir=$(samplesheet_get_col     "$SAMPLESHEET" "fastq_dir"        "$row")
+    sample_sheet=$(samplesheet_get_col  "$SAMPLESHEET" "sample_sheet"     "$row")
+    ref_genome=$(samplesheet_get_col    "$SAMPLESHEET" "ref_genome"       "$row" 2>/dev/null || \
+                 yaml_get "$BASE_CONFIG" "ref_genome" 2>/dev/null || echo "")
+    ref_annotation=$(samplesheet_get_col "$SAMPLESHEET" "ref_annotation"  "$row" 2>/dev/null || \
+                     yaml_get "$BASE_CONFIG" "ref_annotation" 2>/dev/null || echo "")
+    direct_rna=$(samplesheet_get_col    "$SAMPLESHEET" "direct_rna"       "$row" 2>/dev/null || \
+                 yaml_get "$BASE_CONFIG" "direct_rna" 2>/dev/null || echo "false")
+    wf_version=$(samplesheet_get_col    "$SAMPLESHEET" "wf_version"       "$row" 2>/dev/null || \
+                 yaml_get "$BASE_CONFIG" "wf_version" 2>/dev/null || echo "v2.3.0")
+
+    [[ -z "$ref_genome"     ]] && die "Row $row ($sample): ref_genome is required for wf-transcriptomes"
+    [[ -z "$ref_annotation" ]] && die "Row $row ($sample): ref_annotation is required for wf-transcriptomes"
+    [[ -z "$direct_rna"     ]] && direct_rna="false"
+    [[ -z "$wf_version"     ]] && wf_version="v2.3.0"
+
+    # Carry pipeline-level settings from base config
+    local de_analysis minimap2_index_opts min_read_length min_qscore
+    de_analysis=$(yaml_get          "$BASE_CONFIG" "de_analysis"          2>/dev/null || echo "false")
+    minimap2_index_opts=$(yaml_get  "$BASE_CONFIG" "minimap2_index_opts"  2>/dev/null || echo "-k 15")
+    min_read_length=$(yaml_get      "$BASE_CONFIG" "min_read_length"      2>/dev/null || echo "100")
+    min_qscore=$(yaml_get           "$BASE_CONFIG" "min_qscore"           2>/dev/null || echo "9")
+    [[ -z "$de_analysis"         ]] && de_analysis="false"
+    [[ -z "$minimap2_index_opts" ]] && minimap2_index_opts="-k 15"
+    [[ -z "$min_read_length"     ]] && min_read_length="100"
+    [[ -z "$min_qscore"          ]] && min_qscore="9"
+
+    # Derive outdir: base config pattern with sample name substituted
+    local base_outdir outdir
+    base_outdir=$(yaml_get "$BASE_CONFIG" "outdir" 2>/dev/null || \
+                  echo "/work/$USER/pipelines/wf-transcriptomes/SAMPLE")
+    outdir="${base_outdir%/*}/$sample"
+
+    {
+        printf '# Generated by tjp-batch — %s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+        printf '# Samplesheet: %s (row %d)\n' "$SAMPLESHEET" "$row"
+        printf 'sample: %s\n'               "$sample"
+        printf 'fastq_dir: %s\n'            "$fastq_dir"
+        printf 'sample_sheet: %s\n'         "$sample_sheet"
+        printf 'ref_genome: %s\n'           "$ref_genome"
+        printf 'ref_annotation: %s\n'       "$ref_annotation"
+        printf 'wf_version: %s\n'           "$wf_version"
+        printf 'direct_rna: %s\n'           "$direct_rna"
+        printf 'minimap2_index_opts: "%s"\n' "$minimap2_index_opts"
+        printf 'min_read_length: %s\n'      "$min_read_length"
+        printf 'min_qscore: %s\n'           "$min_qscore"
+        printf 'de_analysis: %s\n'          "$de_analysis"
+        printf 'outdir: %s\n'               "$outdir"
         _titan_block
     } > "$output"
 }
