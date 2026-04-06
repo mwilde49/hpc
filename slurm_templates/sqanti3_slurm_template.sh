@@ -103,9 +103,9 @@ if [[ "$USER_CPUS" -gt 0 && "$USER_CHUNKS" -gt 0 ]] 2>/dev/null; then
     CHUNKS_1A=$USER_CHUNKS
     MEM_1A=$(( CHUNKS_1A * 12 ))
 elif [[ $GTF_TRANSCRIPTS -lt 50000 ]]; then
-    CPUS_1A=8;  MEM_1A=16;  CHUNKS_1A=4
+    CPUS_1A=8;  MEM_1A=32;  CHUNKS_1A=4
 elif [[ $GTF_TRANSCRIPTS -lt 200000 ]]; then
-    CPUS_1A=16; MEM_1A=32;  CHUNKS_1A=8
+    CPUS_1A=16; MEM_1A=64;  CHUNKS_1A=8
 elif [[ $GTF_TRANSCRIPTS -lt 1000000 ]]; then
     CPUS_1A=32; MEM_1A=128; CHUNKS_1A=14
 else
