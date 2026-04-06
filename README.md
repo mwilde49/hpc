@@ -185,6 +185,7 @@ For tools that manage their own execution (no container needed):
 
 | Guide | Description |
 |-------|-------------|
+| [COMMAND_REFERENCE.md](COMMAND_REFERENCE.md) | **Complete command reference** — every command, flag, config key, and edge case |
 | [USER_GUIDE.md](USER_GUIDE.md) | End-user guide for all pipelines |
 | [ONBOARDING.md](ONBOARDING.md) | Quick-start for new group members |
 | [DEVELOPER_ONBOARDING.md](DEVELOPER_ONBOARDING.md) | Technical reference for developers |
