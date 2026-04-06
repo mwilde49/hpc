@@ -285,7 +285,7 @@ filter:
       filter_gtf: '${OUTDIR_QC}/${SAMPLE}_corrected.gtf'
       filter_sam: ''
       filter_faa: '${OUTDIR_QC}/${SAMPLE}_corrected.faa'
-      skip_report: true
+      skip_report: ${SKIP_REPORT}
       filter_mono_exonic: ${FILTER_MONO_EXONIC}
     rules:
       enabled: ${FILTER_RULES_ENABLED}
