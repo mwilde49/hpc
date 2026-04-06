@@ -65,6 +65,11 @@ ISOFORMS=$(yaml_get "$USER_CONFIG" "isoforms")
 REF_GTF=$(yaml_get "$USER_CONFIG" "refGTF")
 REF_FASTA=$(yaml_get "$USER_CONFIG" "refFasta")
 COVERAGE=$(yaml_get "$USER_CONFIG" "coverage")
+# SQANTI3 v5.5.4 bug: RTS computation requires a coverage-derived _tmp file
+# that is never created when coverage is absent. Use an empty SJ.out.tab so
+# SQANTI3 creates the _tmp file (with 0 junctions) and RTS can proceed.
+EMPTY_SJ="$PROJECT_ROOT/references/empty.SJ.out.tab"
+[[ -z "$COVERAGE" ]] && COVERAGE="$EMPTY_SJ"
 FL_COUNT=$(yaml_get "$USER_CONFIG" "fl_count")
 CAGE_PEAK=$(yaml_get "$USER_CONFIG" "CAGE_peak")
 POLYA_MOTIF=$(yaml_get "$USER_CONFIG" "polyA_motif_list")
