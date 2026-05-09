@@ -1,0 +1,23 @@
+# Cell Ranger mkfastq Configuration
+# Demultiplexes a BCL run folder into per-sample FASTQs.
+# Edit the paths below, then launch with: tjp-launch cellranger-mkfastq
+
+run_id: my_run               # Output folder name (e.g., run date or project ID)
+
+# Input paths
+run_dir: __SCRATCH__/myproject/bcl_run        # Path to the Illumina BCL run folder
+samplesheet: __SCRATCH__/myproject/SampleSheet.csv   # Illumina-format SampleSheet.csv
+
+# Resource allocation (should match SLURM --cpus-per-task and --mem)
+localcores: 16
+localmem: 120                # GB, leave ~8G headroom below SLURM --mem
+
+# Tool path (pre-installed on HPC)
+tool_path: /groups/tprice/software/cellranger
+
+# Optional parameters (uncomment to use)
+# lanes: 1,2                 # Process specific lanes only (comma-separated)
+# rc_i2_override: true       # Reverse-complement Index 2 (override auto-detection)
+# filter_single_index: true  # Only process single-indexed samples
+# filter_dual_index: true    # Only process dual-indexed samples
+# qc: true                   # Generate QC metrics

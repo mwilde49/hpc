@@ -14,7 +14,8 @@ validate_config() {
         bulkrnaseq) _validate_bulkrnaseq "$config" errors ;;
         psoma)          _validate_psoma "$config" errors ;;
         virome)         _validate_virome "$config" errors ;;
-        cellranger)     _validate_cellranger "$config" errors ;;
+        cellranger)          _validate_cellranger "$config" errors ;;
+        cellranger-mkfastq) _validate_cellranger_mkfastq "$config" errors ;;
         spaceranger)    _validate_spaceranger "$config" errors ;;
         xeniumranger)   _validate_xeniumranger "$config" errors ;;
         sqanti3)           _validate_sqanti3 "$config" errors ;;
@@ -547,5 +548,50 @@ _validate_wf_transcriptomes() {
             true|false) ;;
             *) _errs+=("direct_rna must be 'true' or 'false', got: $dr") ;;
         esac
+    fi
+}
+
+# ── Cell Ranger mkfastq validator ───────────────────────────────────────────
+_validate_cellranger_mkfastq() {
+    local config="$1"
+    local -n _errs=$2
+
+    local required_keys=(run_id run_dir samplesheet localcores localmem)
+    for key in "${required_keys[@]}"; do
+        if ! yaml_has "$config" "$key"; then
+            _errs+=("Missing required key: $key")
+        fi
+    done
+
+    # Path existence
+    local path_keys=(run_dir samplesheet)
+    for key in "${path_keys[@]}"; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            if [[ -n "$val" && "$val" != __* && "$val" != /path/to/* && ! -e "$val" ]]; then
+                _errs+=("Path does not exist for $key: $val")
+            fi
+        fi
+    done
+
+    # Numeric validation
+    for key in localcores localmem; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            if [[ -n "$val" && ! "$val" =~ ^[0-9]+$ ]]; then
+                _errs+=("$key must be a positive integer, got: $val")
+            fi
+        fi
+    done
+
+    # Tool path validation
+    if yaml_has "$config" "tool_path"; then
+        local tp
+        tp=$(yaml_get "$config" "tool_path") || true
+        if [[ -n "$tp" && "$tp" != __* && ! -d "$tp" && ! -x "$tp" ]]; then
+            _errs+=("tool_path does not exist: $tp")
+        fi
     fi
 }
