@@ -373,9 +373,15 @@ case "$PIPELINE" in
         ;;
     cellranger|cellranger-mkfastq|spaceranger|xeniumranger)
         # 10x native pipelines: create scratch output dir, pass config directly
-        SCRATCH_OUTPUT_DIR="$SCRATCH_ROOT/pipelines/$PIPELINE/runs/$TS"
+        _config_scratch=$(yaml_get "$RUN_DIR/config.yaml" "scratch_output_dir" 2>/dev/null || echo "")
+        if [[ -n "$_config_scratch" ]]; then
+            SCRATCH_OUTPUT_DIR="$_config_scratch"
+            info "Scratch output dir (from config): $SCRATCH_OUTPUT_DIR"
+        else
+            SCRATCH_OUTPUT_DIR="$SCRATCH_ROOT/pipelines/$PIPELINE/runs/$TS"
+            info "Scratch output dir: $SCRATCH_OUTPUT_DIR"
+        fi
         mkdir -p "$SCRATCH_OUTPUT_DIR"
-        info "Scratch output dir: $SCRATCH_OUTPUT_DIR"
         SBATCH_CONFIG_ARG="$RUN_DIR/config.yaml"
         ;;
     sqanti3)
