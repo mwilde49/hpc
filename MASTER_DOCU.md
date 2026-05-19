@@ -1,6 +1,6 @@
 # Hyperion Compute — Documentation Master Index
 
-**Version:** v6.1.0 &nbsp;|&nbsp; **Last updated:** 2026-05-19
+**Version:** v6.1.0 &nbsp;|&nbsp; **Last updated:** 2026-05-19 (v6.1.1 — full documentation suite added)
 
 This file is the single entry point for all documentation in the TJP HPC pipeline framework. It describes what every document covers, who should read it, and where to look for specific information.
 
@@ -18,8 +18,15 @@ This file is the single entry point for all documentation in the TJP HPC pipelin
 | Understand design decisions | [PIPELINE_DESIGN_REVIEW.md](#7-pipeline_design_reviewmd) |
 | Check Juno cluster specs | [HPC_SYSTEM_MAP.md](#8-hpc_system_mapmd) |
 | Set up BulkRNASeq specifically | [BULKRNASEQ_HPC_GUIDE.md](#9-bulkrnaseq_hpc_guidemd) |
+| Set up Cell Ranger / multi specifically | [CELLRANGER_GUIDE.md](#15-cellranger_guidemd) |
 | Understand Titan metadata | [metadata/SCHEMA.md](#11-metadataschemamd) |
 | Deploy or develop in this repo | [TJP_HPC_COMPLETE_GUIDE.md](#6-tjp_hpc_complete_guidemd) |
+| Debug a pipeline failure | [TROUBLESHOOTING.md](#16-troubleshootingmd) |
+| Understand an unfamiliar term | [GLOSSARY.md](#17-glossarymd) |
+| See what changed in a release | [CHANGELOG.md](#13-changelogmd) |
+| Contribute a new pipeline | [CONTRIBUTING.md](#14-contributingmd) |
+| Understand a design choice | [docs/decisions/](docs/decisions/README.md) |
+| See all config keys for a pipeline | [templates/schemas/](#20-templatesschemas) |
 
 ---
 
@@ -240,6 +247,137 @@ python3 docs/generate_diagrams.py
 
 ---
 
+### 13. CHANGELOG.md
+
+**Audience:** All users and contributors.
+
+**What it covers:**
+- Version-by-version changelog in [Keep a Changelog](https://keepachangelog.com/) format
+- Sections for every release from v2.0.0 through v6.1.0
+- Added / Changed / Fixed / Removed categories per release
+
+**When to read:** When upgrading to a new framework version to understand what changed.
+
+---
+
+### 14. CONTRIBUTING.md
+
+**Audience:** Contributors adding pipelines, fixing bugs, or maintaining the framework.
+
+**What it covers:**
+- Branch naming conventions (`feat/`, `fix/`, `docs/`, `chore/`)
+- Three pipeline-adding checklists (Pattern A: Inline, B: Submoduled, C: Native)
+- Submodule release procedure (tagging, bumping, version pin updates)
+- PR checklist (code quality, testing, documentation, submodules)
+- Release process (MAJOR/MINOR/PATCH versioning, step-by-step)
+- Documentation standards
+
+**When to read:** Before opening a PR or adding a new pipeline.
+
+---
+
+### 15. CELLRANGER_GUIDE.md
+
+**Audience:** Users running any Cell Ranger pipeline; developers maintaining 10x pipelines.
+
+**What it covers:**
+- Decision tree: mkfastq vs count vs multi
+- Cell Ranger mkfastq: when to use, SampleSheet.csv format, full config reference, output structure
+- Cell Ranger count: pre-installed references, config with all keys annotated, output tree, edge cases (chemistry, SC3Pv3LT, create_bam)
+- Cell Ranger multi: all 8 feature types, feature reference CSV format, 8 use-case config examples (GEX-only, VDJ-T, VDJ-B, CITE-seq, CRISPR, CellPlex, Flex, combined)
+- Shared reference paths and how to verify them
+- Upgrading Cell Ranger (4-step process + per-run tool_path override)
+- Troubleshooting (9 specific error scenarios)
+
+**When to read:** The dedicated reference for all Cell Ranger workflows. More detailed than USER_GUIDE.md §9 for this suite.
+
+---
+
+### 16. TROUBLESHOOTING.md
+
+**Audience:** Anyone debugging a pipeline failure.
+
+**What it covers:**
+- Quick symptom lookup table (37 rows — find your error in one place)
+- SLURM failures (job states, failure causes, pending reasons)
+- Apptainer / container errors (bind mounts, missing SIF, read-only filesystem)
+- RNA-seq pipeline errors (BulkRNASeq, Psoma)
+- 10x Genomics pipeline errors (Cell Ranger, Space Ranger, Xenium Ranger)
+- Long-read pipeline errors (SQANTI3, wf-transcriptomes)
+- Framework CLI errors (tjp-launch, tjp-batch, labdata)
+- Environment and cluster errors (module load, PATH, scratch quota)
+
+**When to read:** When a job fails and the error message is not self-explanatory. Consolidates troubleshooting content from USER_GUIDE.md, COMMAND_REFERENCE.md, TJP_HPC_COMPLETE_GUIDE.md, and BULKRNASEQ_HPC_GUIDE.md into one searchable file.
+
+---
+
+### 17. GLOSSARY.md
+
+**Audience:** New group members and anyone encountering unfamiliar terms.
+
+**What it covers:**
+- ~40 terms covering Apptainer, BCL, CITE-seq, CellPlex, DAG, EPI2ME, Flex, GEX, GTF, Juno, labdata, PLR-xxxx, per-row/per-sheet batch modes, SIF, SLURM, Titan, VDJ, scratch, work directory, yaml_get, and more.
+
+**When to read:** As a reference when you encounter an unfamiliar term in any other document.
+
+---
+
+### 18. test_data/README.md
+
+**Audience:** Developers running smoke tests; anyone staging test data on Juno.
+
+**What it covers:**
+- What test data exists in each subdirectory
+- Which files are in git vs. must be staged on HPC
+- Staging instructions for RNA-seq, 10x, SQANTI3, and wf-transcriptomes test data
+- Current status of each pipeline's smoke test support (including blockers)
+- How to add test data for a new pipeline
+
+**When to read:** When running smoke tests for the first time or adding test data for a new pipeline.
+
+---
+
+### 19. bin/check-docs-freshness
+
+**Audience:** Developers; CI/CD automation.
+
+**What it covers:**
+This is a shell script, not a document. It checks that:
+- Every pipeline in `KNOWN_PIPELINES` appears in `README.md`'s pipeline table
+- Pipeline counts are consistent across key docs
+- SLURM templates, config templates, samplesheet templates, validators, and samplesheet column definitions all exist for every registered pipeline
+
+**When to run:** Before merging any PR that adds or removes a pipeline. Also useful as a pre-push hook.
+
+---
+
+### 20. templates/schemas/
+
+**Audience:** Developers and users who want field-level documentation for config YAMLs.
+
+**What it covers:**
+One annotated YAML schema file per pipeline (11 files). Each schema documents every config key with its type, required/optional status, default value, description, and example.
+
+**When to read:** When writing a config from scratch and you want to understand all available fields beyond what the template shows. Also useful for IDE integration.
+
+---
+
+### 21. docs/decisions/
+
+**Audience:** Developers making architectural changes; anyone wondering "why was it built this way?"
+
+**What it covers:**
+Five Architecture Decision Records (ADRs):
+- [ADR-001](docs/decisions/ADR-001-slurm-vs-nextflow-for-sqanti3.md): Why SQANTI3 uses SLURM DAG instead of Nextflow
+- [ADR-002](docs/decisions/ADR-002-scratch-staging.md): Why outputs stage through scratch before archiving to work
+- [ADR-003](docs/decisions/ADR-003-titan-prefix-convention.md): Why Titan metadata fields use the `titan_` prefix
+- [ADR-004](docs/decisions/ADR-004-per-row-vs-per-sheet-batch.md): Why batch dispatch uses two modes (per-row vs per-sheet)
+- [ADR-005](docs/decisions/ADR-005-native-execution-for-10x.md): Why 10x tools run natively instead of in containers
+
+**When to read:** Before making a change that touches one of these areas — to understand constraints before proposing alternatives.
+
+---
+
 ### 12. CLAUDE.md
 
 **Audience:** Claude Code AI assistant (not a human-facing document).
@@ -288,9 +426,12 @@ These are not documentation but are essential references when developing:
 | `bin/lib/samplesheet.sh` | Required samplesheet columns per pipeline |
 | `bin/tjp-launch` | Main launch dispatcher — pipeline-specific routing logic |
 | `bin/tjp-batch` | Batch launcher — per-row vs per-sheet dispatch |
+| `bin/check-docs-freshness` | Script to verify docs are in sync with the pipeline registry |
 | `templates/<pipeline>/config.yaml` | User-facing config templates with placeholder substitution |
 | `templates/<pipeline>/samplesheet.csv` | Samplesheet column templates |
+| `templates/schemas/<pipeline>.yaml` | Annotated field-level schemas for all config keys |
 | `metadata/SCHEMA.md` | Titan metadata JSON schema |
+| `docs/decisions/` | Architecture Decision Records (ADRs) |
 
 ---
 
@@ -306,34 +447,20 @@ These are not documentation but are essential references when developing:
 
 ---
 
-## Proposed Additions for Industry-Standard Quality
+## Documentation Completeness Status
 
-The following are gaps between the current documentation and what a well-maintained open-source or lab-internal bioinformatics framework would typically have. Listed roughly in priority order:
+All 11 documentation additions originally proposed for industry-standard quality have been implemented as of v6.1.1.
 
-### High priority
-
-1. **CHANGELOG.md** — a version-by-version changelog in [Keep a Changelog](https://keepachangelog.com/) format. Right now version history lives in git tags and memory. A CHANGELOG lets users understand what changed between v6.0.0 and v6.1.0 without reading `git log`. Essential for any multi-user codebase.
-
-2. **Pipeline-specific guides for 10x pipelines** — BULKRNASEQ_HPC_GUIDE.md exists for BulkRNASeq but the 10x pipelines (especially Cell Ranger Multi, which has 8 library-type combinations) have no dedicated guide. A `CELLRANGER_GUIDE.md` covering mkfastq → count vs multi → downstream analysis would be high-value for the typical user.
-
-3. **CONTRIBUTING.md** — how to propose and add a new pipeline, branch naming conventions, PR checklist, how to tag submodule releases. Currently buried in README.md and DEVELOPER_ONBOARDING.md. Should be a top-level file so contributors know the rules without reading 80 pages.
-
-4. **Schema/template for `config.yaml` files** — currently each pipeline's config format is documented only in prose and tables. Adding a brief comment block to every template config (already partially done) with `# Required` / `# Optional` / `# Default: X` annotations would reduce the most common user errors.
-
-### Medium priority
-
-5. **Automated doc freshness check** — a CI hook or script that asserts the `KNOWN_PIPELINES` list in `common.sh` matches the pipeline inventory in README.md. This would prevent the drift that just required this update (cellranger-mkfastq and cellranger-multi were missing from most docs for several weeks after being added to the code).
-
-6. **Troubleshooting runbook as a standalone file** — currently troubleshooting sections exist in USER_GUIDE.md, TJP_HPC_COMPLETE_GUIDE.md, and COMMAND_REFERENCE.md separately. A single `TROUBLESHOOTING.md` with known error messages, root causes, and fixes — searchable in one place — would reduce repeated debugging cycles.
-
-7. **Test data README** — `test_data/` contains 10x scaffold directories and RNA-seq FASTQs, but there is no file explaining what test data exists, where to get it, how to stage it on Juno, and which smoke tests depend on it. A `test_data/README.md` would make the smoke test framework self-contained.
-
-8. **config.yaml schema validation** — the current `validate.sh` validators are hand-written per-pipeline. A lightweight JSON Schema or YAML Schema file per pipeline would allow IDE autocompletion, `yamllint`-style pre-flight checks, and self-documenting format specs without code.
-
-### Lower priority
-
-9. **Glossary** — short definitions of domain terms (PLR-xxxx, Titan, scratch vs work, SIF, SLURM DAG, per-row vs per-sheet) that recur across documents. New lab members without HPC background currently have to piece these together from context.
-
-10. **Decision log** — a lightweight ADR (Architecture Decision Record) file capturing major choices (why SLURM over Nextflow for SQANTI3, why scratch staging instead of writing directly to work, why the `titan_` prefix convention). PIPELINE_DESIGN_REVIEW.md partially fills this role but is structured as assessment rather than formal decision records.
-
-11. **User survey / feedback channel pointer** — a note in ONBOARDING.md and USER_GUIDE.md indicating where users should report bugs or request new pipelines (GitHub Issues, Slack, email). Currently absent, so users with problems have no obvious path to resolution.
+| # | Item | File | Status |
+|---|------|------|--------|
+| 1 | Version changelog | `CHANGELOG.md` | ✓ Done |
+| 2 | Cell Ranger suite guide | `CELLRANGER_GUIDE.md` | ✓ Done |
+| 3 | Contributing guide | `CONTRIBUTING.md` | ✓ Done |
+| 4 | Config schema annotations | `templates/schemas/` (11 files) + `# Required fields` in all templates | ✓ Done |
+| 5 | Automated doc freshness check | `bin/check-docs-freshness` | ✓ Done |
+| 6 | Consolidated troubleshooting | `TROUBLESHOOTING.md` | ✓ Done |
+| 7 | Test data documentation | `test_data/README.md` | ✓ Done |
+| 8 | Per-pipeline YAML schemas | `templates/schemas/*.yaml` (11 files) | ✓ Done |
+| 9 | Glossary | `GLOSSARY.md` | ✓ Done |
+| 10 | Architecture Decision Records | `docs/decisions/` (5 ADRs) | ✓ Done |
+| 11 | Bug reporting / feedback pointer | Added to `ONBOARDING.md` and `USER_GUIDE.md` | ✓ Done |

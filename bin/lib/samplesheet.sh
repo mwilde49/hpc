@@ -9,6 +9,10 @@ declare -A _SAMPLESHEET_REQUIRED_COLS=(
     [bulkrnaseq]="sample fastq_1 fastq_2"
     [psoma]="sample fastq_1 fastq_2"
     [cellranger]="sample fastqs transcriptome"
+    # cellranger-mkfastq batch: one row per BCL run to demultiplex
+    [cellranger-mkfastq]="run_id run_dir samplesheet"
+    # cellranger-multi batch: one row per multiplexed GEM well
+    [cellranger-multi]="sample_id transcriptome libraries_file"
     [spaceranger]="sample fastqs transcriptome image slide area"
     [xeniumranger]="sample xenium_bundle command"
     # sqanti3 batch: one row per SQANTI3 run (different isoform GTF inputs)

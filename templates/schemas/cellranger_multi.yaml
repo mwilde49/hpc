@@ -1,0 +1,95 @@
+# Schema: cellranger-multi config.yaml
+# Pipeline: Cell Ranger multi (multi-modal / multiplexed single-cell)
+# Version: Cell Ranger 10.0.0+
+#
+# Use Cell Ranger multi when your experiment includes any of:
+#   - VDJ-T or VDJ-B (immune profiling)
+#   - CITE-seq (Antibody Capture ADT/HTO)
+#   - CRISPR (CRISPR Screen)
+#   - CellPlex (sample multiplexing via CMOs)
+#   - Flex (Fixed RNA Profiling)
+#   - Combined GEX + feature modalities in one GEM well
+#
+# Fields:
+
+# sample_id:
+#   type:       string
+#   required:   true
+#   description: Output directory name. Matches cellranger multi --id.
+#   example:    PBMC_VDJ_GEX
+
+# localcores:
+#   type:       integer
+#   required:   false
+#   default:    16
+#   description: CPU threads. Set ≤ SLURM --cpus-per-task.
+
+# localmem:
+#   type:       integer
+#   required:   false
+#   default:    120
+#   description: Memory limit in GB. Set ~8 GB below SLURM --mem.
+
+# transcriptome:
+#   type:       path
+#   required:   true (for GEX library)
+#   description: Path to Cell Ranger reference genome.
+#   example:    /groups/tprice/pipelines/references/refdata-gex-GRCh38-2024-A
+
+# create_bam:
+#   type:       boolean
+#   required:   true (Cell Ranger 10+)
+#   default:    true
+#   description: Generate BAM output.
+
+# vdj_reference:
+#   type:       path
+#   required:   true (for VDJ-T or VDJ-B libraries)
+#   description: Path to VDJ reference directory.
+#   example:    /groups/tprice/pipelines/references/refdata-cellranger-vdj-GRCh38-alts-ensembl-7.1.0
+
+# feature_reference:
+#   type:       path
+#   required:   true (for Antibody Capture, CRISPR Screen libraries)
+#   description: CSV with antibody/CRISPR guide definitions (id, name, read, pattern, sequence, feature_type).
+#   example:    /scratch/juno/maw210003/myproject/feature_reference.csv
+
+# cmo_set:
+#   type:       path
+#   required:   false (for CellPlex only)
+#   description: Custom CMO set CSV. Leave blank to use 10x's built-in CMO panel.
+
+# libraries:
+#   type:       list of mappings
+#   required:   true
+#   description: List of library entries, each with fastq_path, sample_name, and feature_types.
+#   structure:
+#     - fastq_path:    path to FASTQ directory for this library
+#       sample_name:   prefix matching FASTQ filenames
+#       feature_types: one of:
+#                      Gene Expression | VDJ-T | VDJ-B | Antibody Capture |
+#                      CRISPR Screen | Multiplexing Capture | Fixed RNA Profiling
+#   example:
+#     libraries:
+#       - fastq_path: /scratch/juno/maw210003/fastq/gex
+#         sample_name: GEX_sample
+#         feature_types: Gene Expression
+#       - fastq_path: /scratch/juno/maw210003/fastq/vdj
+#         sample_name: VDJ_sample
+#         feature_types: VDJ-T
+
+# tool_path:
+#   type:       path
+#   required:   false
+#   default:    /groups/tprice/opt/cellranger-10.0.0
+
+# scratch_output_dir:
+#   type:       path
+#   required:   false
+#   default:    /scratch/juno/$USER/pipelines/cellranger-multi/runs/<timestamp>
+
+# ── Titan fields (all optional) ───────────────────────────────────────────────
+# titan_project_id:  string  PRJ-xxxx
+# titan_sample_id:   string  SMP-xxxx
+# titan_library_id:  string  LIB-xxxx
+# titan_run_id:      string  RUN-xxxx

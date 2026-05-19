@@ -466,3 +466,14 @@ A: It's a locally generated pipeline run ID assigned to every launch. It uniquel
 
 **Q: Can I use Titan IDs with my runs?**
 A: Yes. Add `titan_project_id`, `titan_sample_id`, `titan_library_id`, and/or `titan_run_id` to your `config.yaml` and they will be included in the run record automatically.
+
+---
+
+## Getting Help
+
+If you run into a problem not covered in the FAQ, have a look at `TROUBLESHOOTING.md` for a searchable list of known errors and fixes.
+
+To report a bug or request a new pipeline, open an issue on GitHub:
+**https://github.com/mwilde49/hpc/issues**
+
+Please include: the pipeline name, the error message from the SLURM log, and the config YAML you used (with any sensitive paths redacted).

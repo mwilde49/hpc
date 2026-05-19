@@ -1,0 +1,114 @@
+# Schema: sqanti3 config.yaml
+# Pipeline: SQANTI3 (long-read transcript quality control)
+# Version: SQANTI3 v5.5.4
+
+# sample:
+#   type:       string
+#   required:   true
+#   description: Sample identifier used in output file naming.
+#   example:    my_sample
+
+# isoforms:
+#   type:       path
+#   required:   true
+#   description: Collapsed isoforms GTF from wf-transcriptomes, FLAIR, StringTie2, or IsoSeq3.
+#   example:    /work/maw210003/wf-transcriptomes/my_sample/merged.gtf
+
+# refGTF:
+#   type:       path
+#   required:   true
+#   description: Reference annotation GTF (Gencode/Ensembl).
+#   example:    /groups/tprice/pipelines/references/gencode.v47.primary_assembly.annotation.gtf
+
+# refFasta:
+#   type:       path
+#   required:   true
+#   description: Reference genome FASTA.
+#   example:    /groups/tprice/pipelines/references/GRCh38.primary_assembly.genome.fa
+
+# coverage:
+#   type:       path | ""
+#   required:   false
+#   description: STAR SJ.out.tab junction file for short-read support. Use "" to skip.
+#   example:    /work/maw210003/star/my_sample/SJ.out.tab
+
+# fl_count:
+#   type:       path | ""
+#   required:   false
+#   description: Transcript abundance TSV (columns: id, count) from featureCounts or similar.
+
+# CAGE_peak:
+#   type:       path | ""
+#   required:   false
+#   default:    ""
+#   description: CAGE peak BED file. Leave blank to use built-in database.
+
+# polyA_motif_list:
+#   type:       path | ""
+#   required:   false
+#   default:    ""
+
+# polyA_peak:
+#   type:       path | ""
+#   required:   false
+#   default:    ""
+
+# force_id_ignore:
+#   type:       boolean
+#   required:   false
+#   default:    true
+#   description: true = ONT reads (non-PB.X.Y IDs). false = PacBio IsoSeq (standard PB.X.Y IDs).
+
+# cpus:
+#   type:       integer
+#   required:   false
+#   default:    0
+#   description: CPU count. 0 = auto-scale based on GTF transcript count.
+
+# chunks:
+#   type:       integer
+#   required:   false
+#   default:    0
+#   description: SQANTI3 parallelism chunks. 0 = auto-scale with cpus.
+
+# skip_report:
+#   type:       boolean
+#   required:   false
+#   default:    true
+#   description: Skip the 150-plot HTML QC report (saves ~30 min). Set false if report needed.
+
+# skip_orf:
+#   type:       boolean
+#   required:   false
+#   default:    false
+#   description: Skip TransDecoder ORF prediction. Set true if ORF results are not needed.
+
+# filter_mode:
+#   type:       enum[rules, ml]
+#   required:   false
+#   default:    rules
+#   description: rules = deterministic rule-based filter; ml = random forest (needs TP/TN sets).
+
+# filter_mono_exonic:
+#   type:       boolean
+#   required:   false
+#   default:    false
+#   description: false = keep mono-exonic transcripts in filtered output.
+
+# rescue_mode:
+#   type:       enum[automatic, full]
+#   required:   false
+#   default:    automatic
+#   description: automatic = conservative rescue; full = more aggressive (higher FDR).
+
+# outdir:
+#   type:       path
+#   required:   true
+#   description: Output directory. All 4 stages write subdirectories here.
+#   example:    /work/maw210003/sqanti3/my_sample
+
+# ── Titan fields (all optional) ───────────────────────────────────────────────
+# titan_project_id:  string  PRJ-xxxx
+# titan_sample_id:   string  SMP-xxxx
+# titan_library_id:  string  LIB-xxxx
+# titan_run_id:      string  RUN-xxxx

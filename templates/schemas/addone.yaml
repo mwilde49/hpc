@@ -1,0 +1,20 @@
+# Schema: addone config.yaml
+# Pipeline: AddOne (demo/template pipeline)
+
+# input:
+#   type:       path
+#   required:   true
+#   description: Text file with one integer per line. Each integer is incremented by 1.
+#   example:    /groups/tprice/pipelines/test_data/numbers.txt
+
+# output:
+#   type:       path
+#   required:   true
+#   description: Path for the output file (written to scratch).
+#   example:    /scratch/juno/maw210003/addone_output.txt
+
+# ── Titan fields (all optional) ───────────────────────────────────────────────
+# titan_project_id:  string  PRJ-xxxx
+# titan_sample_id:   string  SMP-xxxx
+# titan_library_id:  string  LIB-xxxx
+# titan_run_id:      string  RUN-xxxx

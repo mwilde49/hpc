@@ -1,0 +1,94 @@
+# Schema: cellranger config.yaml
+# Pipeline: Cell Ranger count (single-cell gene expression)
+# Version: Cell Ranger 10.0.0+
+#
+# Fields:
+
+# sample_id:
+#   type:       string
+#   required:   true
+#   description: ID used as output directory name. No spaces. Matches Cell Ranger --id.
+#   example:    PBMC_3k_GEX
+
+# sample_name:
+#   type:       string
+#   required:   true
+#   description: Prefix matching FASTQ filenames (MySample_S1_L001_R1_001.fastq.gz → MySample).
+#   example:    MySample
+
+# fastq_dir:
+#   type:       path
+#   required:   true
+#   description: Directory containing FASTQ files. Cell Ranger searches recursively.
+#   example:    /scratch/juno/maw210003/myproject/fastq
+
+# transcriptome:
+#   type:       path
+#   required:   true
+#   description: Path to Cell Ranger-compatible reference genome directory.
+#   example:    /groups/tprice/pipelines/references/refdata-gex-GRCh38-2024-A
+
+# localcores:
+#   type:       integer
+#   required:   false
+#   default:    16
+#   description: CPU threads Cell Ranger may use. Set ≤ SLURM --cpus-per-task.
+#   example:    16
+
+# localmem:
+#   type:       integer
+#   required:   false
+#   default:    120
+#   description: Memory limit in GB. Set ~8 GB below SLURM --mem.
+#   example:    120
+
+# create_bam:
+#   type:       boolean
+#   required:   true (Cell Ranger 10+ requires explicit opt-in)
+#   default:    true
+#   description: Generate a BAM file alongside the feature-barcode matrix.
+#   example:    true
+
+# tool_path:
+#   type:       path
+#   required:   false
+#   default:    /groups/tprice/opt/cellranger-10.0.0
+#   description: Override the default Cell Ranger install path. Useful for testing new versions.
+#   example:    /groups/tprice/opt/cellranger-11.0.0
+
+# scratch_output_dir:
+#   type:       path
+#   required:   false
+#   default:    /scratch/juno/$USER/pipelines/cellranger/runs/<timestamp>
+#   description: Override the scratch output location for this run.
+#   example:    /scratch/juno/maw210003/UTDGC589/cellranger
+
+# chemistry:
+#   type:       enum[auto, SC3Pv3, SC3Pv4, SC5P-PE, SC5P-R2, ARC-v1]
+#   required:   false
+#   default:    auto
+#   description: Assay chemistry. auto works for most runs.
+
+# expect_cells:
+#   type:       integer
+#   required:   false
+#   description: Expected number of recovered cells. Overrides auto-detection.
+#   example:    3000
+
+# force_cells:
+#   type:       integer
+#   required:   false
+#   description: Force exactly this many cells. Bypasses knee-point detection.
+#   example:    5000
+
+# include_introns:
+#   type:       boolean
+#   required:   false
+#   default:    true (Cell Ranger 7+)
+#   description: Count intronic reads. Set false for pre-mRNA depleted libraries.
+
+# ── Titan fields (all optional) ───────────────────────────────────────────────
+# titan_project_id:  string  PRJ-xxxx
+# titan_sample_id:   string  SMP-xxxx
+# titan_library_id:  string  LIB-xxxx
+# titan_run_id:      string  RUN-xxxx

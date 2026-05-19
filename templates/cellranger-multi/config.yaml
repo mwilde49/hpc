@@ -1,0 +1,56 @@
+# Cell Ranger Multi Pipeline Configuration
+# Edit the fields below, then launch with: tjp-launch cellranger-multi
+# See CELLRANGER_GUIDE.md for detailed descriptions of all library types.
+#
+# Use Cell Ranger multi when your experiment includes VDJ, CITE-seq, CellPlex,
+# Flex, CRISPR, or any combination of GEX + feature libraries.
+# For GEX-only single-cell experiments, use cellranger (count) instead.
+
+# Required fields
+sample_id: my_sample                    # Output directory name
+
+# Reference genome (required for GEX library)
+transcriptome: /groups/tprice/pipelines/references/refdata-gex-GRCh38-2024-A
+
+# VDJ reference (required for VDJ-T or VDJ-B libraries)
+# vdj_reference: /groups/tprice/pipelines/references/refdata-cellranger-vdj-GRCh38-alts-ensembl-7.1.0
+
+# Feature reference CSV (required for CITE-seq ADT/HTO or CRISPR libraries)
+# feature_reference: __SCRATCH__/myproject/feature_reference.csv
+
+# BAM output (required in Cell Ranger 10+)
+create_bam: true
+
+# Resource limits (match your SLURM allocation)
+localcores: 16
+localmem: 120                           # GB — leave headroom below SLURM --mem
+
+# ── Library definitions ────────────────────────────────────────────────────────
+# List all FASTQ libraries for this GEM well.
+# feature_types options: Gene Expression | VDJ-T | VDJ-B | Antibody Capture |
+#                        CRISPR Screen | Multiplexing Capture | Fixed RNA Profiling
+libraries:
+  - fastq_path: __SCRATCH__/myproject/fastq/gex
+    sample_name: GEX_sample
+    feature_types: Gene Expression
+  # Uncomment and add more library entries as needed:
+  # - fastq_path: __SCRATCH__/myproject/fastq/vdj_t
+  #   sample_name: VDJ_sample
+  #   feature_types: VDJ-T
+  # - fastq_path: __SCRATCH__/myproject/fastq/adt
+  #   sample_name: ADT_sample
+  #   feature_types: Antibody Capture
+
+# Optional: override tool path (default: /groups/tprice/opt/cellranger-10.0.0)
+# tool_path: /groups/tprice/opt/cellranger-10.0.0
+
+# Optional: override scratch output directory
+# scratch_output_dir: __SCRATCH__/myproject/cellranger-multi
+
+# ── Titan Integration (optional) ──────────────────────────────────────────────
+# Leave blank until Titan is available. When populated, enables metadata
+# generation and future database registration.
+titan_project_id:   # PRJ-xxxx  — Titan project identifier
+titan_sample_id:    # SMP-xxxx  — Titan biological sample identifier
+titan_library_id:   # LIB-xxxx  — Titan library identifier
+titan_run_id:       # RUN-xxxx  — Titan sequencing run identifier

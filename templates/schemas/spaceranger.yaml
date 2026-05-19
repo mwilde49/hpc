@@ -1,0 +1,75 @@
+# Schema: spaceranger config.yaml
+# Pipeline: Space Ranger (10x Visium spatial transcriptomics)
+# Version: Space Ranger 4.0.1+
+
+# sample_id:
+#   type:       string
+#   required:   true
+#   description: Output directory name.
+
+# sample_name:
+#   type:       string
+#   required:   true
+#   description: Prefix matching FASTQ filenames.
+
+# fastq_dir:
+#   type:       path
+#   required:   true
+
+# transcriptome:
+#   type:       path
+#   required:   true
+#   default:    /groups/tprice/pipelines/references/refdata-gex-GRCh38-2024-A
+
+# image:
+#   type:       path
+#   required:   true (unless unknown_slide is set)
+#   description: TIFF or JPEG brightfield tissue image.
+
+# slide:
+#   type:       string
+#   required:   true (unless unknown_slide is set)
+#   description: Visium slide serial number (e.g., V19J25-004).
+
+# area:
+#   type:       enum[A1, B1, C1, D1]
+#   required:   true (unless unknown_slide is set)
+#   description: Capture area on the Visium slide.
+
+# unknown_slide:
+#   type:       string
+#   required:   false
+#   description: Use instead of slide + area when slide ID is unknown.
+#                Values: visium-1 (standard), visium-2 (HD), visium-2-large.
+#   example:    visium-1
+
+# localcores:
+#   type:       integer
+#   required:   false
+#   default:    16
+
+# localmem:
+#   type:       integer
+#   required:   false
+#   default:    120
+
+# create_bam:
+#   type:       boolean
+#   required:   true (Space Ranger 3+)
+#   default:    true
+
+# tool_path:
+#   type:       path
+#   required:   false
+#   default:    /groups/tprice/opt/spaceranger-4.0.1
+
+# scratch_output_dir:
+#   type:       path
+#   required:   false
+#   default:    /scratch/juno/$USER/pipelines/spaceranger/runs/<timestamp>
+
+# ── Titan fields (all optional) ───────────────────────────────────────────────
+# titan_project_id:  string  PRJ-xxxx
+# titan_sample_id:   string  SMP-xxxx
+# titan_library_id:  string  LIB-xxxx
+# titan_run_id:      string  RUN-xxxx

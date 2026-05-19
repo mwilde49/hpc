@@ -1,0 +1,103 @@
+# Schema: bulkrnaseq config.yaml
+# Pipeline: BulkRNASeq (STAR + StringTie + HTSeq)
+
+# project_name:
+#   type:       string
+#   required:   true
+#   description: Name used in output directory naming and reports.
+#   example:    My-Experiment
+
+# species:
+#   type:       enum[Human, Mouse, Rattus]
+#   required:   true
+#   description: Species determines reference selection inside the pipeline.
+
+# paired_end:
+#   type:       boolean
+#   required:   true
+#   description: true = paired-end sequencing; false = single-end.
+
+# fastq_dir:
+#   type:       path
+#   required:   true
+#   description: Directory containing all FASTQ files for all samples.
+#   example:    /scratch/juno/maw210003/myproject/fastq
+
+# samples_file:
+#   type:       path
+#   required:   true
+#   description: Text file with one sample name per line (no extension). Must match FASTQ prefixes.
+#   example:    /work/maw210003/pipelines/bulkrnaseq/samples.txt
+
+# star_index:
+#   type:       path
+#   required:   true
+#   default:    /groups/tprice/pipelines/references/star_index
+#   description: Path to STAR genome index directory.
+
+# reference_gtf:
+#   type:       path
+#   required:   true
+#   default:    /groups/tprice/pipelines/references/gencode.v48.primary_assembly.annotation.gtf
+
+# exclude_bed_file_path:
+#   type:       path
+#   required:   true
+#   default:    /groups/tprice/pipelines/references/filter.bed
+
+# blacklist_bed_file_path:
+#   type:       path
+#   required:   true
+#   default:    /groups/tprice/pipelines/references/blacklist.bed
+
+# read1_suffix:
+#   type:       string
+#   required:   false
+#   default:    _R1_001
+#   description: Suffix identifying R1 FASTQ files (before .fastq.gz).
+
+# read2_suffix:
+#   type:       string
+#   required:   false
+#   default:    _R2_001
+
+# clip5_num:
+#   type:       integer
+#   required:   false
+#   default:    11
+#   description: Bases to hard-clip from the 5' end before alignment.
+
+# clip3_num:
+#   type:       integer
+#   required:   false
+#   default:    5
+
+# strand_st:
+#   type:       enum[--rf, --fr, ""]
+#   required:   false
+#   default:    --rf
+#   description: StringTie strandedness flag. --rf = reverse, --fr = forward, "" = unstranded.
+
+# strand_hts:
+#   type:       enum[yes, no, reverse]
+#   required:   false
+#   default:    reverse
+#   description: HTSeq-count strandedness setting.
+
+# paired_hts:
+#   type:       enum[pos, name]
+#   required:   false
+#   default:    pos
+#   description: HTSeq-count sort order (pos = coordinate, name = read name).
+
+# config_directory:
+#   type:       path
+#   required:   false
+#   default:    auto-set by SLURM template
+#   description: Internal — do not override unless you know what you're doing.
+
+# ── Titan fields (all optional) ───────────────────────────────────────────────
+# titan_project_id:  string  PRJ-xxxx
+# titan_sample_id:   string  SMP-xxxx
+# titan_library_id:  string  LIB-xxxx
+# titan_run_id:      string  RUN-xxxx

@@ -1,0 +1,62 @@
+# Schema: xeniumranger config.yaml
+# Pipeline: Xenium Ranger (10x Xenium in situ transcriptomics)
+# Version: Xenium Ranger 4.0+
+
+# sample_id:
+#   type:       string
+#   required:   true
+
+# command:
+#   type:       enum[resegment, import-segmentation]
+#   required:   true
+#   description: >
+#     resegment = re-run Xenium cell segmentation with updated parameters.
+#     import-segmentation = import external segmentation (e.g., Cellpose, StarDist).
+
+# xenium_bundle:
+#   type:       path
+#   required:   true
+#   description: Path to the Xenium instrument output directory.
+
+# localcores:
+#   type:       integer
+#   required:   false
+#   default:    16
+
+# localmem:
+#   type:       integer
+#   required:   false
+#   default:    120
+
+# tool_path:
+#   type:       path
+#   required:   false
+#   default:    /groups/tprice/opt/xeniumranger-xenium4.0
+
+# scratch_output_dir:
+#   type:       path
+#   required:   false
+#   default:    /scratch/juno/$USER/pipelines/xeniumranger/runs/<timestamp>
+
+# expansion_distance:
+#   type:       integer
+#   required:   false
+#   description: Cell expansion distance in microns (resegment only).
+#   example:    5
+
+# segmentation_file:
+#   type:       path
+#   required:   true (import-segmentation only)
+#   description: External segmentation file (CSV or parquet). Required for import-segmentation.
+
+# units:
+#   type:       enum[microns, pixels]
+#   required:   false
+#   default:    microns
+#   description: Coordinate units in the segmentation file (import-segmentation only).
+
+# ── Titan fields (all optional) ───────────────────────────────────────────────
+# titan_project_id:  string  PRJ-xxxx
+# titan_sample_id:   string  SMP-xxxx
+# titan_library_id:  string  LIB-xxxx
+# titan_run_id:      string  RUN-xxxx

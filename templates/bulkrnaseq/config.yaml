@@ -2,15 +2,14 @@
 # Edit the paths below, then launch with: tjp-launch bulkrnaseq
 # See ONBOARDING.md for detailed field descriptions.
 
+# Required fields
 project_name: My-Experiment
 species: Human              # Human, Mouse, or Rattus
 paired_end: true
-
-# Data paths (edit these for your project)
 fastq_dir: __SCRATCH__/myproject/fastq
 samples_file: __WORK__/pipelines/bulkrnaseq/samples.txt
 
-# Shared reference files (pre-installed, most users won't need to change these)
+# Reference files (pre-installed, most users won't need to change these)
 star_index: /groups/tprice/pipelines/references/star_index
 reference_gtf: /groups/tprice/pipelines/references/gencode.v48.primary_assembly.annotation.gtf
 exclude_bed_file_path: /groups/tprice/pipelines/references/filter.bed

@@ -811,9 +811,14 @@ tjp-launch psoma --config /work/$USER/pipelines/psoma/runs/2026-03-04_14-30-00/c
 
 ### Getting help
 
-You can contact me or another member of Price Lab's Compute Team for help with any of this. We're happy to troubleshoot or teach.
+For a searchable list of known errors and fixes, see `TROUBLESHOOTING.md`.
 
+To report a bug or request a new pipeline, open an issue on GitHub:
+**https://github.com/mwilde49/hpc/issues**
+
+Please include: the pipeline name, the error message from the SLURM log, and your config YAML (with sensitive paths redacted).
+
+For urgent issues or in-person help, contact the Price Lab Compute Team:
 
 Michael Wilde
-281-793-3180
 maw210003@utdallas.edu

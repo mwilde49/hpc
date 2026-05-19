@@ -1,0 +1,111 @@
+# Schema: psoma config.yaml
+# Pipeline: Psoma bulk RNA-seq (HISAT2 + Trimmomatic + StringTie + HTSeq)
+
+# project_name:
+#   type:       string
+#   required:   true
+#   example:    My-Psomagen-Experiment
+
+# species:
+#   type:       enum[Human, Mouse, Rattus]
+#   required:   true
+
+# paired_end:
+#   type:       boolean
+#   required:   true
+
+# fastq_dir:
+#   type:       path
+#   required:   true
+#   description: FASTQ directory. Psomagen naming: sample_1.fastq.gz / sample_2.fastq.gz
+
+# samples_file:
+#   type:       path
+#   required:   true
+#   description: One sample name per line (no extension).
+
+# hisat2_index:
+#   type:       path
+#   required:   true
+#   default:    /groups/tprice/pipelines/references/hisat2_index/gencode48
+#   description: HISAT2 index prefix path (not a directory — omit .1.ht2 etc.)
+
+# reference_gtf:
+#   type:       path
+#   required:   true
+#   default:    /groups/tprice/pipelines/references/gencode.v48.primary_assembly.annotation.gtf
+
+# exclude_bed_file_path:
+#   type:       path
+#   required:   true
+#   default:    /groups/tprice/pipelines/references/filter.bed
+
+# blacklist_bed_file_path:
+#   type:       path
+#   required:   true
+#   default:    /groups/tprice/pipelines/references/blacklist.bed
+
+# read1_suffix:
+#   type:       string
+#   required:   false
+#   default:    _1
+#   description: Psomagen R1 suffix. Standard Illumina would be _R1_001.
+
+# read2_suffix:
+#   type:       string
+#   required:   false
+#   default:    _2
+
+# headcrop:
+#   type:       integer
+#   required:   false
+#   default:    10
+#   description: Trimmomatic HEADCROP — bases to remove from read start.
+
+# leading:
+#   type:       integer
+#   required:   false
+#   default:    3
+
+# trailing:
+#   type:       integer
+#   required:   false
+#   default:    3
+
+# slidingwindow:
+#   type:       string
+#   required:   false
+#   default:    "4:15"
+#   description: Trimmomatic SLIDINGWINDOW — window:quality_threshold.
+
+# minlen:
+#   type:       integer
+#   required:   false
+#   default:    36
+
+# illuminaclip_params:
+#   type:       string
+#   required:   false
+#   default:    "2:30:10:5:true"
+#   description: Trimmomatic ILLUMINACLIP parameters after adapter FASTA.
+
+# strand_st:
+#   type:       enum[--rf, --fr, ""]
+#   required:   false
+#   default:    --rf
+
+# strand_hts:
+#   type:       enum[yes, no, reverse]
+#   required:   false
+#   default:    reverse
+
+# paired_hts:
+#   type:       enum[pos, name]
+#   required:   false
+#   default:    pos
+
+# ── Titan fields (all optional) ───────────────────────────────────────────────
+# titan_project_id:  string  PRJ-xxxx
+# titan_sample_id:   string  SMP-xxxx
+# titan_library_id:  string  LIB-xxxx
+# titan_run_id:      string  RUN-xxxx

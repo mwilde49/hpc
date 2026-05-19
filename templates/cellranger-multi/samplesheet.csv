@@ -1,0 +1,22 @@
+# Cell Ranger Multi pipeline samplesheet
+# Format: CSV with header row. One GEM well per line.
+# Use this for batch runs (multiple multi experiments).
+#
+# Required columns:
+#   sample_id      - output directory name for this Cell Ranger multi run
+#   transcriptome  - path to Cell Ranger reference genome (for GEX library)
+#   libraries_file - path to a pre-built libraries CSV for this sample
+#                    The libraries CSV has columns: fastq_path, sample_name, feature_types
+#
+# Note: for complex multi experiments, prepare a per-sample libraries CSV
+# and reference it via the libraries_file column. The config.yaml inline
+# 'libraries:' block is simpler for single-run launches.
+#
+# Optional Titan integration columns (append to each row; leave blank if unused)
+#   project_id   - Titan project identifier (e.g., PRJ-0001)
+#   titan_sample_id - Titan sample identifier (e.g., SMP-0001)
+#   library_id   - Titan library identifier (e.g., LIB-0001)
+#   run_id       - Titan run identifier (e.g., RUN-0001)
+#
+sample_id,transcriptome,libraries_file,project_id,titan_sample_id,library_id,run_id
+my_sample,/groups/tprice/pipelines/references/refdata-gex-GRCh38-2024-A,__SCRATCH__/myproject/libraries.csv,,,,

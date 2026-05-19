@@ -1,0 +1,15 @@
+# Cell Ranger mkfastq pipeline samplesheet
+# Format: CSV with header row. One BCL run per line.
+# Use this for batch demultiplexing of multiple sequencing runs.
+#
+# Required columns:
+#   run_id       - output directory name for this mkfastq run
+#   run_dir      - path to the Illumina BCL run folder
+#   samplesheet  - path to the Illumina-format SampleSheet.csv for this run
+#
+# Optional Titan integration columns
+#   project_id   - Titan project identifier (e.g., PRJ-0001)
+#   run_id_titan - Titan run identifier (e.g., RUN-0001)  [named differently to avoid clash with run_id]
+#
+run_id,run_dir,samplesheet,project_id,run_id_titan
+2024-01-15_run1,__SCRATCH__/bcl/240115_VH00234_42_AABCDE,__SCRATCH__/bcl/SampleSheet_run1.csv,,

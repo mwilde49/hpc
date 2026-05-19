@@ -1,0 +1,81 @@
+# Schema: virome config.yaml
+# Pipeline: Virome (viral metagenomics — STAR + Kraken2 + Bracken)
+
+# project_name:
+#   type:       string
+#   required:   true
+
+# samplesheet:
+#   type:       path
+#   required:   true
+#   description: CSV with columns: sample, fastq_r1, fastq_r2
+
+# outdir:
+#   type:       path
+#   required:   true
+#   description: Nextflow output directory (written to scratch during run).
+
+# star_index:
+#   type:       path
+#   required:   true
+#   default:    /groups/tprice/pipelines/references/star_index
+
+# kraken2_db:
+#   type:       path
+#   required:   true
+#   default:    /groups/tprice/pipelines/references/kraken2_viral_db
+
+# adapters:
+#   type:       path
+#   required:   false
+#   default:    auto (NexteraPE-PE.fa from virome submodule)
+#   description: Adapter FASTA for Trimmomatic. Do not change unless using non-Nextera adapters.
+
+# container_dir:
+#   type:       path
+#   required:   false
+#   default:    auto ($REPO_ROOT/containers/virome)
+#   description: Directory containing per-process SIF files. Do not change.
+
+# trim_headcrop:
+#   type:       integer
+#   required:   false
+#   default:    0
+
+# trim_leading:
+#   type:       integer
+#   required:   false
+#   default:    3
+
+# trim_trailing:
+#   type:       integer
+#   required:   false
+#   default:    3
+
+# trim_slidingwindow:
+#   type:       string
+#   required:   false
+#   default:    "4:15"
+
+# trim_minlen:
+#   type:       integer
+#   required:   false
+#   default:    36
+
+# kraken2_confidence:
+#   type:       float
+#   required:   false
+#   default:    0.1
+#   description: Kraken2 confidence threshold (0.0–1.0). Higher = fewer but more reliable calls.
+
+# min_reads_per_taxon:
+#   type:       integer
+#   required:   false
+#   default:    5
+#   description: Minimum read count to report a taxon in Bracken output.
+
+# ── Titan fields (all optional) ───────────────────────────────────────────────
+# titan_project_id:  string  PRJ-xxxx
+# titan_sample_id:   string  SMP-xxxx
+# titan_library_id:  string  LIB-xxxx
+# titan_run_id:      string  RUN-xxxx

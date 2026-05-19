@@ -1,0 +1,78 @@
+# Schema: wf-transcriptomes config.yaml
+# Pipeline: wf-transcriptomes (EPI2ME ONT long-read assembly via Nextflow SLURM executor)
+
+# sample:
+#   type:       string
+#   required:   true
+#   description: Sample/project identifier used in output naming.
+
+# fastq_dir:
+#   type:       path
+#   required:   true
+#   description: Parent directory containing per-barcode subdirectories of FASTQ files.
+#   example:    /scratch/juno/maw210003/ont/fastq_pass
+
+# sample_sheet:
+#   type:       path
+#   required:   true
+#   description: CSV with columns: barcode, alias (and optionally type for DE analysis).
+#   example:    /scratch/juno/maw210003/ont/sample_sheet.csv
+
+# ref_genome:
+#   type:       path
+#   required:   true
+#   default:    /groups/tprice/pipelines/references/GRCh38.primary_assembly.genome.fa
+
+# ref_annotation:
+#   type:       path
+#   required:   true
+#   default:    /groups/tprice/pipelines/references/gencode.v47.primary_assembly.annotation.gtf
+
+# wf_version:
+#   type:       string
+#   required:   false
+#   default:    v2.3.0
+#   description: EPI2ME wf-transcriptomes release tag. Pin for reproducibility.
+#   example:    v2.3.0
+
+# direct_rna:
+#   type:       boolean
+#   required:   false
+#   default:    false
+#   description: false = cDNA (PCR-amplified); true = direct RNA (native, no PCR).
+
+# minimap2_index_opts:
+#   type:       string
+#   required:   false
+#   default:    "-k 15"
+#   description: minimap2 indexing options. -k 15 recommended for cDNA. Empty string for direct RNA.
+
+# min_read_length:
+#   type:       integer
+#   required:   false
+#   default:    100
+#   description: Minimum read length in bp. Shorter reads are filtered out.
+
+# min_qscore:
+#   type:       integer
+#   required:   false
+#   default:    9
+#   description: Minimum read quality score. Reads below this are filtered.
+
+# de_analysis:
+#   type:       boolean
+#   required:   false
+#   default:    false
+#   description: Run DESeq2 differential expression. Requires 'type' column in sample_sheet.
+
+# outdir:
+#   type:       path
+#   required:   true
+#   description: Output directory (written directly — no scratch staging).
+#   example:    /work/maw210003/pipelines/wf-transcriptomes/my_project
+
+# ── Titan fields (all optional) ───────────────────────────────────────────────
+# titan_project_id:  string  PRJ-xxxx
+# titan_sample_id:   string  SMP-xxxx
+# titan_library_id:  string  LIB-xxxx
+# titan_run_id:      string  RUN-xxxx

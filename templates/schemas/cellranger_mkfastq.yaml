@@ -1,0 +1,72 @@
+# Schema: cellranger-mkfastq config.yaml
+# Pipeline: Cell Ranger mkfastq (BCL demultiplexing)
+
+# run_id:
+#   type:       string
+#   required:   true
+#   description: Output folder name for the demultiplexed FASTQ run.
+#   example:    2024-01-15_run1
+
+# run_dir:
+#   type:       path
+#   required:   true
+#   description: Path to the Illumina BCL run folder (contains Data/, RunInfo.xml, etc.)
+#   example:    /scratch/juno/maw210003/bcl/240115_VH00234_42_AABCDE
+
+# samplesheet:
+#   type:       path
+#   required:   true
+#   description: Illumina-format SampleSheet.csv with [Data] section.
+#   example:    /scratch/juno/maw210003/bcl/SampleSheet.csv
+
+# localcores:
+#   type:       integer
+#   required:   false
+#   default:    16
+
+# localmem:
+#   type:       integer
+#   required:   false
+#   default:    120
+
+# tool_path:
+#   type:       path
+#   required:   false
+#   default:    /groups/tprice/software/cellranger (symlink to versioned install)
+
+# scratch_output_dir:
+#   type:       path
+#   required:   false
+#   default:    /scratch/juno/$USER/pipelines/cellranger-mkfastq/runs/<timestamp>
+
+# lanes:
+#   type:       string
+#   required:   false
+#   description: Comma-separated lane numbers to process (e.g., "1,2"). Default = all lanes.
+#   example:    "1,2"
+
+# rc_i2_override:
+#   type:       boolean
+#   required:   false
+#   description: Force reverse-complement of Index 2. Default = auto-detect from RunInfo.xml.
+
+# filter_single_index:
+#   type:       boolean
+#   required:   false
+#   description: Only process single-indexed samples. Useful for mixed-index flowcells.
+
+# filter_dual_index:
+#   type:       boolean
+#   required:   false
+#   description: Only process dual-indexed samples.
+
+# qc:
+#   type:       boolean
+#   required:   false
+#   description: Generate additional QC metrics report.
+
+# ── Titan fields (all optional) ───────────────────────────────────────────────
+# titan_project_id:  string  PRJ-xxxx
+# titan_sample_id:   string  SMP-xxxx
+# titan_library_id:  string  LIB-xxxx
+# titan_run_id:      string  RUN-xxxx

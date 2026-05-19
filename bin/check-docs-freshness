@@ -1,0 +1,260 @@
+#!/usr/bin/env bash
+# check-docs-freshness — verify documentation is in sync with the pipeline registry
+#
+# Checks that every pipeline in KNOWN_PIPELINES (bin/lib/common.sh) appears in
+# README.md's pipeline table, and that pipeline counts match across key docs.
+# Run before merging any PR that adds or removes a pipeline.
+#
+# Usage: bin/check-docs-freshness [--fix]
+#   --fix   Print sed commands to resolve simple count discrepancies (does not apply them)
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ERRORS=0
+WARNINGS=0
+
+red()   { echo -e "\033[31m$*\033[0m"; }
+green() { echo -e "\033[32m$*\033[0m"; }
+yellow(){ echo -e "\033[33m$*\033[0m"; }
+bold()  { echo -e "\033[1m$*\033[0m"; }
+
+fail()  { red "  FAIL: $*"; ((ERRORS++)) || true; }
+warn()  { yellow "  WARN: $*"; ((WARNINGS++)) || true; }
+pass()  { green "  OK:   $*"; }
+
+bold "=== TJP HPC — Documentation Freshness Check ==="
+echo ""
+
+# ── 1. Extract KNOWN_PIPELINES from common.sh ─────────────────────────────────
+COMMON_SH="$REPO_ROOT/bin/lib/common.sh"
+if [[ ! -f "$COMMON_SH" ]]; then
+    fail "bin/lib/common.sh not found"
+    exit 1
+fi
+
+# Parse: KNOWN_PIPELINES=(addone bulkrnaseq psoma ...)
+REGISTRY_LINE=$(grep -E '^KNOWN_PIPELINES=\(' "$COMMON_SH" | head -1)
+if [[ -z "$REGISTRY_LINE" ]]; then
+    fail "Could not find KNOWN_PIPELINES=(...) in bin/lib/common.sh"
+    exit 1
+fi
+
+# Extract pipeline names from the array declaration
+REGISTRY_PIPELINES=()
+while IFS= read -r p; do
+    [[ -n "$p" ]] && REGISTRY_PIPELINES+=("$p")
+done < <(echo "$REGISTRY_LINE" | grep -oP '(?<=\()[^)]+' | tr ' ' '\n')
+
+REGISTRY_COUNT=${#REGISTRY_PIPELINES[@]}
+bold "Registry (bin/lib/common.sh): $REGISTRY_COUNT pipelines"
+echo "  ${REGISTRY_PIPELINES[*]}"
+echo ""
+
+# ── 2. Check each pipeline appears in README.md pipeline table ─────────────────
+bold "Checking README.md pipeline table..."
+README="$REPO_ROOT/README.md"
+MISSING_IN_README=()
+
+for pipeline in "${REGISTRY_PIPELINES[@]}"; do
+    # README uses bold display names which may differ from registry names
+    # (e.g., "cellranger" → "**Cell Ranger**", "spaceranger" → "**Space Ranger**").
+    # Strategy: check if ANY table row (starting with |) contains a keyword unique to this pipeline.
+    # We also check for the literal pipeline name (handles wf-transcriptomes, sqanti3, etc.).
+
+    found=0
+
+    # 1. Literal name match in a table row
+    escaped="${pipeline//./\\.}"
+    if grep -qiE "^\|.*${escaped}.*\|" "$README" 2>/dev/null; then
+        found=1
+    fi
+
+    # 2. Name with dashes/underscores as spaces (cellranger-multi → "cellranger multi")
+    if [[ $found -eq 0 ]]; then
+        nodash="${pipeline//-/ }"
+        nodash="${nodash//_/ }"
+        if grep -qiE "^\|.*${nodash}.*\|" "$README" 2>/dev/null; then
+            found=1
+        fi
+    fi
+
+    # 3. For compound words like "cellranger", "spaceranger", "xeniumranger":
+    #    split before "ranger" and allow a space (cell ranger, space ranger, xenium ranger)
+    if [[ $found -eq 0 ]] && [[ "$pipeline" == *ranger* ]]; then
+        prefix="${pipeline%%ranger*}"
+        prefix="${prefix//-/ }"
+        if grep -qiE "^\|.*${prefix}.?ranger.*\|" "$README" 2>/dev/null; then
+            found=1
+        fi
+    fi
+
+    if [[ $found -eq 1 ]]; then
+        pass "$pipeline in README pipeline table"
+    else
+        fail "$pipeline missing from README.md pipeline table"
+        MISSING_IN_README+=("$pipeline")
+    fi
+done
+echo ""
+
+# ── 3. Check pipeline counts in documentation ──────────────────────────────────
+bold "Checking pipeline counts in documentation..."
+
+check_count() {
+    local file="$1"
+    local pattern="$2"
+    local label="$3"
+
+    if [[ ! -f "$file" ]]; then
+        warn "$file not found — skipping count check"
+        return
+    fi
+
+    # Find lines matching the pattern and extract the number
+    local matched
+    matched=$(grep -oE "$pattern" "$file" | head -1 || true)
+    if [[ -z "$matched" ]]; then
+        warn "Count pattern '$pattern' not found in $file"
+        return
+    fi
+
+    # Extract the number from the match — handle both digits and English words
+    local found_count
+    found_count=$(echo "$matched" | grep -oE '[0-9]+' | head -1 || true)
+    if [[ -z "$found_count" ]]; then
+        # Try English word-to-number conversion for common counts
+        case "${matched,,}" in
+            *eight*)  found_count=8 ;;
+            *nine*)   found_count=9 ;;
+            *ten*)    found_count=10 ;;
+            *eleven*) found_count=11 ;;
+            *twelve*) found_count=12 ;;
+            *)        warn "Could not extract count from '$matched' in $file"; return ;;
+        esac
+    fi
+
+    if [[ "$found_count" -eq "$REGISTRY_COUNT" ]]; then
+        pass "$label: $found_count (matches registry)"
+    else
+        fail "$label: found $found_count, expected $REGISTRY_COUNT"
+    fi
+}
+
+check_count "$REPO_ROOT/README.md" \
+    "(Eleven|Ten|Nine|Eight|[0-9]+) pipeline" \
+    "README.md pipeline count"
+
+check_count "$REPO_ROOT/DEVELOPER_ONBOARDING.md" \
+    "(eleven|ten|nine|eight|[0-9]+) pipeline" \
+    "DEVELOPER_ONBOARDING.md pipeline count"
+
+check_count "$REPO_ROOT/TJP_HPC_COMPLETE_GUIDE.md" \
+    "[0-9]+ pipeline" \
+    "TJP_HPC_COMPLETE_GUIDE.md pipeline count"
+
+echo ""
+
+# ── 4. Check SLURM templates exist for all pipelines ──────────────────────────
+bold "Checking SLURM templates..."
+SLURM_DIR="$REPO_ROOT/slurm_templates"
+
+# Normalize: cellranger-multi → cellranger_multi, wf-transcriptomes → wf_transcriptomes
+normalize_name() {
+    echo "$1" | tr '-' '_'
+}
+
+for pipeline in "${REGISTRY_PIPELINES[@]}"; do
+    [[ "$pipeline" == "addone" ]] && continue  # addone uses a different naming
+    norm=$(normalize_name "$pipeline")
+    template="$SLURM_DIR/${norm}_slurm_template.sh"
+    if [[ -f "$template" ]]; then
+        pass "SLURM template exists: $(basename "$template")"
+    else
+        fail "SLURM template missing: ${norm}_slurm_template.sh"
+    fi
+done
+echo ""
+
+# ── 5. Check config templates exist for all pipelines ─────────────────────────
+bold "Checking config templates..."
+TEMPLATES_DIR="$REPO_ROOT/templates"
+
+for pipeline in "${REGISTRY_PIPELINES[@]}"; do
+    norm=$(normalize_name "$pipeline")
+    # Check both dash and underscore variants
+    if [[ -f "$TEMPLATES_DIR/$pipeline/config.yaml" ]]; then
+        pass "Config template exists: templates/$pipeline/config.yaml"
+    elif [[ -f "$TEMPLATES_DIR/$norm/config.yaml" ]]; then
+        pass "Config template exists: templates/$norm/config.yaml"
+    else
+        fail "Config template missing: templates/$pipeline/config.yaml"
+    fi
+done
+echo ""
+
+# ── 6. Check samplesheet templates exist for all pipelines ────────────────────
+bold "Checking samplesheet templates..."
+
+for pipeline in "${REGISTRY_PIPELINES[@]}"; do
+    norm=$(normalize_name "$pipeline")
+    if [[ -f "$TEMPLATES_DIR/$pipeline/samplesheet.csv" ]]; then
+        pass "Samplesheet template exists: templates/$pipeline/samplesheet.csv"
+    elif [[ -f "$TEMPLATES_DIR/$norm/samplesheet.csv" ]]; then
+        pass "Samplesheet template exists: templates/$norm/samplesheet.csv"
+    else
+        warn "Samplesheet template missing: templates/$pipeline/samplesheet.csv (may be intentional for some pipelines)"
+    fi
+done
+echo ""
+
+# ── 7. Check validators exist for all pipelines ────────────────────────────────
+bold "Checking validators..."
+VALIDATE_SH="$REPO_ROOT/bin/lib/validate.sh"
+
+for pipeline in "${REGISTRY_PIPELINES[@]}"; do
+    norm=$(normalize_name "$pipeline")
+    if grep -qE "_validate_${norm}[[:space:](]" "$VALIDATE_SH" 2>/dev/null; then
+        pass "Validator found: _validate_${norm}()"
+    else
+        fail "Validator missing: _validate_${norm}() in bin/lib/validate.sh"
+    fi
+done
+echo ""
+
+# ── 8. Check samplesheet required-columns defined for all pipelines ────────────
+bold "Checking samplesheet required-column definitions..."
+SAMPLESHEET_SH="$REPO_ROOT/bin/lib/samplesheet.sh"
+
+# Pipelines that legitimately don't support batch mode (no samplesheet needed)
+declare -a NO_BATCH_PIPELINES=(addone)
+
+for pipeline in "${REGISTRY_PIPELINES[@]}"; do
+    # Skip pipelines that intentionally don't support batch mode
+    skip=0
+    for nb in "${NO_BATCH_PIPELINES[@]}"; do
+        [[ "$pipeline" == "$nb" ]] && skip=1 && break
+    done
+    if [[ $skip -eq 1 ]]; then
+        pass "Samplesheet columns: [$pipeline] (batch not supported — OK)"
+        continue
+    fi
+
+    if grep -qE "\[${pipeline}\]" "$SAMPLESHEET_SH" 2>/dev/null; then
+        pass "Samplesheet columns defined: [$pipeline]"
+    else
+        fail "Samplesheet columns missing: [$pipeline] in bin/lib/samplesheet.sh"
+    fi
+done
+echo ""
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+bold "=== Summary ==="
+if [[ $ERRORS -eq 0 && $WARNINGS -eq 0 ]]; then
+    green "All checks passed. Documentation is in sync with pipeline registry."
+elif [[ $ERRORS -eq 0 ]]; then
+    yellow "$WARNINGS warning(s). No hard failures."
+else
+    red "$ERRORS error(s), $WARNINGS warning(s). Fix the issues above before merging."
+    exit 1
+fi
