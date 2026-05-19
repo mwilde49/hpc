@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# tjp-test-validate — validate outputs from a tjp-test smoke test run
-# Checks that expected output directories and key files exist.
+# tjp-test-validate — DEPRECATED: replaced by tjp-test-suite
+# This script is kept for backwards compatibility only.
+# Use 'tjp-test-suite --layer 3 --pipeline <name>' instead.
 #
 # Usage: tjp-test-validate <pipeline> [--run <timestamp>]
 #

@@ -88,23 +88,53 @@ For tools that manage their own execution without a container.
 ### After adding any pipeline
 
 - [ ] Run `bin/check-docs-freshness` and fix any reported gaps
-- [ ] Test with `tjp-launch <name> --dev` on the dev partition
+- [ ] Create `bin/lib/tests/test_<name>.sh` (see §4 below)
+- [ ] Run `tjp-test-suite --layer 1 --pipeline <name>` and confirm it passes
 
 ---
 
-## 4. Modifying Existing Pipelines
+## 4. Test Module Requirements
+
+Every pipeline in `KNOWN_PIPELINES` must have a corresponding test module at
+`bin/lib/tests/test_<name>.sh` (dashes converted to underscores, e.g.
+`cellranger-multi` → `test_cellranger_multi.sh`). The module is sourced by
+`tjp-test-suite` and must define these six functions:
+
+| Function | Layer | Purpose |
+|---|---|---|
+| `l1_<name>()` | 1 | Offline: assert template/schema/validator correctness |
+| `l2_<name>()` | 2 | Dry-run: assert registry/SLURM wiring (no job submission) |
+| `l3_fixture_<name>()` | 3 | Return 0 if test data ready, 1 if not (print reason to stderr) |
+| `l3_submit_<name>()` | 3 | Submit SLURM job; echo job ID to stdout |
+| `l3_validate_<name>()` | 3 | Call `ts_assert_*` on job outputs |
+| `l3_teardown_<name>()` | 3 | Post-run cleanup (may be a no-op) |
+
+Plus two module-level variables:
+
+```bash
+PIPELINE_NAME="<name>"    # matches KNOWN_PIPELINES entry
+L3_SKIP=false             # set true if no minimal test data can ever exist
+L3_SKIP_REASON=""         # human-readable reason shown in suite output
+```
+
+Copy `bin/lib/tests/test_addone.sh` as a starting template. The suite runner
+auto-discovers modules by name, so no registration step is needed.
+
+---
+
+## 5. Modifying Existing Pipelines
 
 **Config key changes:** If you add or remove required keys, update the validator in `validate.sh`, the config template in `templates/<name>/config.yaml`, and all documentation tables.
 
 **SLURM resource changes:** Update `slurm_templates/<name>_slurm_template.sh`, `PIPELINE_DESIGN_REVIEW.md` (resources table), and `DEVELOPER_ONBOARDING.md` (Layer 2 table).
 
-**Submodule updates:** See §5.
+**Submodule updates:** See §7.
 
-**Version bumps:** See §7.
+**Version bumps:** See §8.
 
 ---
 
-## 5. Submodule Releases
+## 6. Submodule Releases
 
 ### Updating a submodule to a new release
 
@@ -149,7 +179,7 @@ To restore: `git checkout v6.x.0 && git submodule update --init --recursive`
 
 ---
 
-## 6. PR Checklist
+## 7. PR Checklist
 
 Before merging any PR to `master`:
 
@@ -159,8 +189,10 @@ Before merging any PR to `master`:
 - [ ] Template config has comments for all fields
 
 **Testing**
-- [ ] `tjp-validate <pipeline> --config templates/<name>/config.yaml` passes
-- [ ] If smoke test supported: `tjp-test <pipeline>` submits and completes on dev partition
+- [ ] Create `bin/lib/tests/test_<name>.sh` with all six functions (see §4 below)
+- [ ] `tjp-test-suite --layer 1 --pipeline <name>` passes (offline validation)
+- [ ] `tjp-test-suite --layer 2 --pipeline <name>` passes (registry/SLURM wiring)
+- [ ] `tjp-test-suite --layer 3 --pipeline <name>` submits and completes on dev partition
 
 **Documentation**
 - [ ] Pipeline appears in all pipeline tables across all docs
@@ -177,7 +209,7 @@ Before merging any PR to `master`:
 
 ---
 
-## 7. Release Process
+## 8. Release Process
 
 Releases are tagged on `master`. Version scheme: `v<MAJOR>.<MINOR>.<PATCH>`
 
@@ -210,7 +242,7 @@ git push origin master vX.Y.Z
 
 ---
 
-## 8. Documentation Standards
+## 9. Documentation Standards
 
 - **No bare commit messages in changelogs** — summarize the user-facing effect
 - **All new config keys get comments** in the template config: `# Required`, `# Optional`, `# Default: X`, or a brief description inline

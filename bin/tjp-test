@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# tjp-test — smoke-test a TJP RNA-Seq pipeline with subsampled data
-# Copies test FASTQs to scratch, generates a test config, and delegates
-# to tjp-launch --dev for submission to the dev partition.
+# tjp-test — DEPRECATED: replaced by tjp-test-suite
+# This script is kept for backwards compatibility only.
+# Use 'tjp-test-suite --layer 3 --pipeline <name>' instead.
 #
 # Usage: tjp-test <pipeline> [--clean]
 #

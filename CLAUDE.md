@@ -43,7 +43,7 @@ Four-layer stack where each layer has a single responsibility:
 
 Supporting layers:
 
-- **`bin/`** — user-facing CLI tools (`tjp-setup`, `tjp-launch`, `tjp-test`, `tjp-test-validate`, `tjp-batch`, `labdata`) with `hyperion-*` and `biocruiser-*` symlink aliases, plus shared libraries in `bin/lib/`:
+- **`bin/`** — user-facing CLI tools (`tjp-setup`, `tjp-launch`, `tjp-test-suite`, `tjp-batch`, `labdata`) with `hyperion-*` and `biocruiser-*` symlink aliases; `tjp-test` and `tjp-test-validate` are deprecated in favour of `tjp-test-suite`. Shared libraries in `bin/lib/`:
   - `branding.sh` — Hyperion Compute themed output (banners, colored log tags, sign-off)
   - `common.sh` — pipeline registry, path resolution, `is_native_pipeline()`, `is_nextflow_managed_pipeline()`, `is_multicontainer_pipeline()`
   - `validate.sh` — per-pipeline config validation
@@ -81,17 +81,38 @@ labdata show PLR-xxxx
 
 Each launch creates a timestamped run directory under `/work/$USER/pipelines/<pipeline>/runs/` containing a config snapshot, reproducibility manifest (`manifest.json`), SLURM logs, and a PLR-xxxx Titan metadata record. After a successful pipeline run, inputs (FASTQs) and outputs are automatically archived from scratch to `inputs/` and `outputs/` subdirectories in the run directory via rsync with checksum verification. See `ONBOARDING.md` for full details.
 
-### Smoke Testing
+### Smoke Testing (Legacy)
 
-Verify a pipeline works end-to-end with 2 pre-configured test samples on the dev partition:
+> **Replaced by `tjp-test-suite`** — `tjp-test` and `tjp-test-validate` are kept for backwards compatibility but no longer the primary testing path.
 
 ```bash
+# Legacy single-pipeline smoke test (deprecated interface)
 tjp-test psoma              # copies test FASTQs to scratch, generates config, submits to dev
 squeue -u $USER             # monitor
 tjp-test-validate psoma     # check outputs after completion
 ```
 
-Supports `psoma`, `bulkrnaseq`, `cellranger`, and `spaceranger`. Test FASTQs live at `$REPO_ROOT/test_data/rnaseq/fastq/` (RNA-seq, gitignored, generated on HPC) and `$REPO_ROOT/test_data/10x/` (10x pipelines). Spaceranger uses bundled tiny inputs from the Space Ranger install directory. Use `--clean` to wipe previous test data.
+### Comprehensive Test Suite (`tjp-test-suite`)
+
+`tjp-test-suite` runs a three-layer test harness for every registered pipeline:
+
+| Layer | What it tests | Runtime |
+|---|---|---|
+| 1 | Config templates, schema files, validator logic (offline) | ~30s |
+| 2 | SLURM template existence, registry wiring, native flags (no job submission) | ~2min |
+| 3 | Full SLURM execution on dev partition using minimal test fixtures | ~20–40min |
+
+```bash
+tjp-test-suite                        # run all layers for all pipelines
+tjp-test-suite --layer 1              # offline validation only (fast, no HPC needed)
+tjp-test-suite --layer 3 --pipeline cellranger   # single pipeline, full run
+tjp-test-suite --clean                # wipe test scratch before running
+```
+
+Test modules live in `bin/lib/tests/test_<pipeline>.sh`. Each module defines
+`l1_*`, `l2_*`, `l3_fixture_*`, `l3_submit_*`, `l3_validate_*`, `l3_teardown_*` functions.
+Xenium Ranger has `L3_SKIP=true` (no minimal Xenium bundle available).
+See `CONTRIBUTING.md §4` for the full module interface.
 
 ## HPC Path Conventions (Juno-Specific)
 

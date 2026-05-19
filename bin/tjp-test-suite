@@ -1,0 +1,445 @@
+#!/usr/bin/env bash
+# tjp-test-suite — Hyperion Compute comprehensive pipeline test suite
+#
+# Runs a three-layer test harness for every registered pipeline:
+#   Layer 1  Offline validation (config schema, template presence, validator logic)  ~30s
+#   Layer 2  SLURM/registry wiring checks (no job submission, no HPC needed)         ~2min
+#   Layer 3  Full SLURM execution on dev partition using minimal test fixtures        ~20-40min
+#
+# Usage:
+#   tjp-test-suite [options]
+#
+# Options:
+#   --layer 1|2|3|all    Layers to run (default: all)
+#   --pipeline <name>    Run only one pipeline (default: all known pipelines)
+#   --clean              Wipe test scratch directory before running
+#   --no-fixtures        Skip Layer 3 fixture preparation (assume fixtures already present)
+#   --timeout <minutes>  Max minutes to wait for all Layer 3 jobs (default: 60)
+#   --dev                Force dev partition for Layer 3 (default; explicit for clarity)
+#   --normal             Use normal partition instead of dev for Layer 3
+#   -v, --verbose        Show stdout/stderr from fixture generators and validators
+#   --help               Show this help
+#
+# Environment:
+#   TEST_SCRATCH    Override scratch directory used for Layer 3 (default: /scratch/juno/$USER/pipelines/test-suite)
+#
+# Exit codes:
+#   0  All tests passed (or all failures were expected skips)
+#   1  One or more tests failed
+#   2  Usage error
+
+set -euo pipefail
+
+# ── Bootstrap ────────────────────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
+source "$SCRIPT_DIR/lib/branding.sh"
+source "$SCRIPT_DIR/lib/test_framework.sh"
+
+# ── Defaults ─────────────────────────────────────────────────────────────────
+OPT_LAYERS="all"
+OPT_PIPELINE=""
+OPT_CLEAN=false
+OPT_NO_FIXTURES=false
+OPT_TIMEOUT_MINS=60
+OPT_PARTITION="dev"
+OPT_VERBOSE=false
+
+# ── Usage ─────────────────────────────────────────────────────────────────────
+usage() {
+    cat <<EOF
+Usage: tjp-test-suite [options]
+
+Hyperion Compute — comprehensive 3-layer pipeline test suite.
+
+Options:
+  --layer 1|2|3|all    Layers to run (default: all)
+  --pipeline <name>    Test only this pipeline (default: all ${#KNOWN_PIPELINES[@]} pipelines)
+  --clean              Wipe test scratch directory before running
+  --no-fixtures        Skip fixture preparation for Layer 3
+  --timeout <minutes>  Max wait time for Layer 3 SLURM jobs (default: 60)
+  --dev                Use dev partition for Layer 3 (default)
+  --normal             Use normal partition for Layer 3
+  -v, --verbose        Show output from fixture generators and validators
+  --help               Show this help
+
+Pipelines: ${KNOWN_PIPELINES[*]}
+
+Replaces: bin/tjp-test, bin/tjp-test-validate
+EOF
+    exit "${1:-0}"
+}
+
+# ── Argument parsing ──────────────────────────────────────────────────────────
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --layer)
+            [[ $# -lt 2 ]] && { error "--layer requires an argument"; usage 2; }
+            case "$2" in
+                1|2|3|all) OPT_LAYERS="$2" ;;
+                *) error "Unknown layer '$2' — must be 1, 2, 3, or all"; usage 2 ;;
+            esac
+            shift 2 ;;
+        --pipeline)
+            [[ $# -lt 2 ]] && { error "--pipeline requires an argument"; usage 2; }
+            OPT_PIPELINE="$2"
+            if ! is_known_pipeline "$OPT_PIPELINE"; then
+                error "Unknown pipeline '$OPT_PIPELINE'. Known: ${KNOWN_PIPELINES[*]}"
+                exit 2
+            fi
+            shift 2 ;;
+        --clean)       OPT_CLEAN=true;        shift ;;
+        --no-fixtures) OPT_NO_FIXTURES=true;  shift ;;
+        --timeout)
+            [[ $# -lt 2 ]] && { error "--timeout requires an argument"; usage 2; }
+            OPT_TIMEOUT_MINS="$2"; shift 2 ;;
+        --dev)    OPT_PARTITION="dev";    shift ;;
+        --normal) OPT_PARTITION="normal"; shift ;;
+        -v|--verbose) OPT_VERBOSE=true; shift ;;
+        --help|-h) usage 0 ;;
+        *) error "Unknown option: $1"; usage 2 ;;
+    esac
+done
+
+# ── Pipeline list ─────────────────────────────────────────────────────────────
+if [[ -n "$OPT_PIPELINE" ]]; then
+    TEST_PIPELINES=("$OPT_PIPELINE")
+else
+    TEST_PIPELINES=("${KNOWN_PIPELINES[@]}")
+fi
+readonly TEST_PIPELINES
+
+# ── Test scratch ─────────────────────────────────────────────────────────────
+export TEST_SCRATCH="${TEST_SCRATCH:-$SCRATCH_ROOT/pipelines/test-suite}"
+export TEST_TS
+TEST_TS=$(date '+%Y%m%d_%H%M%S')
+
+if [[ "$OPT_CLEAN" == true ]]; then
+    info "Cleaning test scratch: $TEST_SCRATCH"
+    rm -rf "$TEST_SCRATCH"
+fi
+mkdir -p "$TEST_SCRATCH"
+
+# ── Load test modules ─────────────────────────────────────────────────────────
+# Modules set PIPELINE_NAME, L3_SKIP, L3_SKIP_REASON, and define l1_/l2_/l3_* functions.
+MODULES_DIR="$SCRIPT_DIR/lib/tests"
+
+_load_module() {
+    local pipeline="$1"
+    local norm="${pipeline//-/_}"
+    local module="$MODULES_DIR/test_${norm}.sh"
+    if [[ -f "$module" ]]; then
+        # shellcheck source=/dev/null
+        source "$module"
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Pre-validate all modules exist before starting (fail early)
+_modules_ok=true
+for _p in "${TEST_PIPELINES[@]}"; do
+    _norm="${_p//-/_}"
+    if [[ ! -f "$MODULES_DIR/test_${_norm}.sh" ]]; then
+        warn "No test module found for pipeline '$_p' (expected: lib/tests/test_${_norm}.sh)"
+        _modules_ok=false
+    fi
+done
+if [[ "$_modules_ok" == false ]]; then
+    error "Some test modules are missing. Run bin/check-docs-freshness for details."
+    exit 1
+fi
+
+# ── Layer selector helpers ────────────────────────────────────────────────────
+_run_layer1() { [[ "$OPT_LAYERS" == "all" || "$OPT_LAYERS" == "1" ]]; }
+_run_layer2() { [[ "$OPT_LAYERS" == "all" || "$OPT_LAYERS" == "2" ]]; }
+_run_layer3() { [[ "$OPT_LAYERS" == "all" || "$OPT_LAYERS" == "3" ]]; }
+
+# ── Suite banner ──────────────────────────────────────────────────────────────
+num_layers=0
+_run_layer1 && num_layers=$(( num_layers + 1 ))
+_run_layer2 && num_layers=$(( num_layers + 1 ))
+_run_layer3 && num_layers=$(( num_layers + 1 ))
+
+ts_suite_banner "${#TEST_PIPELINES[@]}" "$num_layers"
+
+printf "  ${_BOLD}Layers:${_RESET}     %s\n"   "$OPT_LAYERS"
+printf "  ${_BOLD}Pipelines:${_RESET}  %s\n"   "${TEST_PIPELINES[*]}"
+if _run_layer3; then
+    printf "  ${_BOLD}Partition:${_RESET}  %s (Layer 3)\n" "$OPT_PARTITION"
+    printf "  ${_BOLD}Timeout:${_RESET}    %d min (Layer 3)\n" "$OPT_TIMEOUT_MINS"
+fi
+printf "  ${_BOLD}Scratch:${_RESET}    %s\n\n" "$TEST_SCRATCH"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LAYER 1 — Offline validation
+# ══════════════════════════════════════════════════════════════════════════════
+if _run_layer1; then
+    ts_layer_start 1 "Offline Validation"
+
+    for pipeline in "${TEST_PIPELINES[@]}"; do
+        _load_module "$pipeline"
+        ts_pipeline_start "$pipeline"
+        _TS_CURRENT_LAYER=1
+        _TS_CURRENT_PIPELINE="$pipeline"
+
+        local_fn="l1_${pipeline//-/_}"
+        if declare -f "$local_fn" >/dev/null 2>&1; then
+            if [[ "$OPT_VERBOSE" == true ]]; then
+                "$local_fn"
+            else
+                "$local_fn" 2>/dev/null
+            fi
+        else
+            ts_skip "$pipeline layer 1" "function $local_fn not defined"
+        fi
+    done
+
+    ts_layer_end
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LAYER 2 — Registry / SLURM wiring dry-run
+# ══════════════════════════════════════════════════════════════════════════════
+if _run_layer2; then
+    ts_layer_start 2 "Registry & SLURM Wiring"
+
+    for pipeline in "${TEST_PIPELINES[@]}"; do
+        _load_module "$pipeline"
+        ts_pipeline_start "$pipeline"
+        _TS_CURRENT_LAYER=2
+        _TS_CURRENT_PIPELINE="$pipeline"
+
+        local_fn="l2_${pipeline//-/_}"
+        if declare -f "$local_fn" >/dev/null 2>&1; then
+            if [[ "$OPT_VERBOSE" == true ]]; then
+                "$local_fn"
+            else
+                "$local_fn" 2>/dev/null
+            fi
+        else
+            ts_skip "$pipeline layer 2" "function $local_fn not defined"
+        fi
+    done
+
+    ts_layer_end
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LAYER 3 — Full SLURM execution
+# ══════════════════════════════════════════════════════════════════════════════
+if _run_layer3; then
+    ts_layer_start 3 "Full SLURM Execution (partition: $OPT_PARTITION)"
+
+    # ── Step 1: Fixture preparation ───────────────────────────────────────────
+    printf "\n  ${_BOLD}Phase 3a — Fixture preparation${_RESET}\n\n"
+
+    declare -A _L3_SKIP_MAP=()    # [pipeline] = reason|""
+    declare -a _L3_ACTIVE=()      # pipelines that will actually run
+
+    for pipeline in "${TEST_PIPELINES[@]}"; do
+        _load_module "$pipeline"
+        _TS_CURRENT_LAYER=3
+        _TS_CURRENT_PIPELINE="$pipeline"
+
+        # Module-level L3_SKIP flag
+        if [[ "${L3_SKIP:-false}" == true ]]; then
+            _L3_SKIP_MAP["$pipeline"]="${L3_SKIP_REASON:-L3_SKIP=true in module}"
+            ts_skip "$pipeline: fixture check" "${L3_SKIP_REASON:-L3_SKIP=true in module}"
+            continue
+        fi
+
+        if [[ "$OPT_NO_FIXTURES" == true ]]; then
+            _L3_ACTIVE+=("$pipeline")
+            printf "  ${_CYAN}↷${_RESET}  %s: fixture preparation skipped (--no-fixtures)\n" "$pipeline"
+            continue
+        fi
+
+        fixture_fn="l3_fixture_${pipeline//-/_}"
+        if ! declare -f "$fixture_fn" >/dev/null 2>&1; then
+            _L3_SKIP_MAP["$pipeline"]="function $fixture_fn not defined"
+            ts_skip "$pipeline: fixture check" "function $fixture_fn not defined"
+            continue
+        fi
+
+        printf "  ${_CYAN}⟳${_RESET}  %s: preparing fixtures...\n" "$pipeline"
+        fixture_err=""
+        if [[ "$OPT_VERBOSE" == true ]]; then
+            if "$fixture_fn"; then
+                _L3_ACTIVE+=("$pipeline")
+                printf "  ${_GREEN}✓${_RESET}  %s: fixtures ready\n" "$pipeline"
+            else
+                fixture_err=$(2>&1 "$fixture_fn" || true)
+                _L3_SKIP_MAP["$pipeline"]="fixture not ready: $fixture_err"
+                ts_warn "$pipeline: fixture check" "fixture not ready — L3 skipped for this pipeline"
+            fi
+        else
+            fixture_out=$(mktemp)
+            if "$fixture_fn" >"$fixture_out" 2>&1; then
+                _L3_ACTIVE+=("$pipeline")
+                printf "  ${_GREEN}✓${_RESET}  %s: fixtures ready\n" "$pipeline"
+            else
+                fixture_err=$(cat "$fixture_out")
+                _L3_SKIP_MAP["$pipeline"]="fixture not ready"
+                ts_warn "$pipeline: fixture check" "fixture not ready (use -v for details) — L3 skipped"
+                if [[ -s "$fixture_out" ]]; then
+                    printf "     ${_YELLOW}└─ %s${_RESET}\n" "$(head -1 "$fixture_out")"
+                fi
+            fi
+            rm -f "$fixture_out"
+        fi
+    done
+
+    if [[ ${#_L3_ACTIVE[@]} -eq 0 ]]; then
+        printf "\n  ${_YELLOW}No pipelines have fixtures ready for Layer 3.${_RESET}\n"
+        printf "  Run fixture generators in test_data/fixtures/ first.\n\n"
+    else
+        # ── Step 2: Job submission ─────────────────────────────────────────────
+        printf "\n  ${_BOLD}Phase 3b — SLURM job submission${_RESET}\n\n"
+
+        declare -A _L3_JOBS=()        # [job_id] = pipeline
+        declare -A _L3_PIPELINE_JOB=() # [pipeline] = job_id
+
+        hyperion_milestone "Launching ${#_L3_ACTIVE[@]} pipeline(s) on $OPT_PARTITION partition"
+
+        for pipeline in "${_L3_ACTIVE[@]}"; do
+            _load_module "$pipeline"
+            _TS_CURRENT_LAYER=3
+            _TS_CURRENT_PIPELINE="$pipeline"
+
+            submit_fn="l3_submit_${pipeline//-/_}"
+            if ! declare -f "$submit_fn" >/dev/null 2>&1; then
+                ts_warn "$pipeline: submission" "function $submit_fn not defined — skipping"
+                continue
+            fi
+
+            printf "  ${_CYAN}⟳${_RESET}  %s: submitting...\n" "$pipeline"
+
+            submit_out=""
+            submit_err_file=$(mktemp)
+            if [[ "$OPT_PARTITION" == "normal" ]]; then
+                # Override partition env var respected by tjp-launch
+                export TJPTEST_PARTITION="normal"
+            else
+                export TJPTEST_PARTITION="dev"
+            fi
+
+            if submit_out=$("$submit_fn" 2>"$submit_err_file"); then
+                job_id="${submit_out%%[[:space:]]*}"   # first whitespace-delimited token
+                job_id="${job_id//[^0-9]/}"            # strip any non-digit chars
+                if [[ -n "$job_id" && "$job_id" =~ ^[0-9]+$ ]]; then
+                    _L3_JOBS["$job_id"]="$pipeline"
+                    _L3_PIPELINE_JOB["$pipeline"]="$job_id"
+                    printf "  ${_GREEN}✓${_RESET}  %s: submitted (job %s)\n" "$pipeline" "$job_id"
+                else
+                    ts_warn "$pipeline: submission" "could not parse job ID from submit output: '$submit_out'"
+                    if [[ "$OPT_VERBOSE" == true ]] && [[ -s "$submit_err_file" ]]; then
+                        printf "     ${_YELLOW}└─ stderr: %s${_RESET}\n" "$(head -1 "$submit_err_file")"
+                    fi
+                fi
+            else
+                ts_warn "$pipeline: submission" "submit function exited nonzero"
+                if [[ -s "$submit_err_file" ]]; then
+                    printf "     ${_YELLOW}└─ %s${_RESET}\n" "$(head -1 "$submit_err_file")"
+                fi
+            fi
+            rm -f "$submit_err_file"
+        done
+
+        # ── Step 3: Block-and-wait with live status table ──────────────────────
+        if [[ ${#_L3_JOBS[@]} -gt 0 ]]; then
+            printf "\n  ${_BOLD}Phase 3c — Monitoring %d job(s) (timeout: %d min)${_RESET}\n\n" \
+                "${#_L3_JOBS[@]}" "$OPT_TIMEOUT_MINS"
+
+            # Enforce timeout via a background deadline killer
+            _DEADLINE_PID=""
+            (
+                sleep $(( OPT_TIMEOUT_MINS * 60 ))
+                # Signal the parent with SIGUSR1 if still alive
+                kill -USR1 $$ 2>/dev/null || true
+            ) &
+            _DEADLINE_PID=$!
+
+            _timeout_fired=false
+            trap '_timeout_fired=true' USR1
+
+            ts_slurm_live_table _L3_JOBS || true
+
+            # Disarm timeout
+            if [[ -n "$_DEADLINE_PID" ]]; then
+                kill "$_DEADLINE_PID" 2>/dev/null || true
+                wait "$_DEADLINE_PID" 2>/dev/null || true
+                _DEADLINE_PID=""
+            fi
+            trap - USR1
+
+            if [[ "$_timeout_fired" == true ]]; then
+                printf "\n  ${_RED}TIMEOUT — %d minutes elapsed. Cancelling remaining jobs.${_RESET}\n" \
+                    "$OPT_TIMEOUT_MINS"
+                for jid in "${!_L3_JOBS[@]}"; do
+                    scancel "$jid" 2>/dev/null || true
+                done
+            fi
+
+            # ── Step 4: Validate outputs ────────────────────────────────────────
+            printf "\n  ${_BOLD}Phase 3d — Output validation${_RESET}\n\n"
+
+            for pipeline in "${_L3_ACTIVE[@]}"; do
+                [[ -v "_L3_PIPELINE_JOB[$pipeline]" ]] || continue
+
+                _load_module "$pipeline"
+                _TS_CURRENT_LAYER=3
+                _TS_CURRENT_PIPELINE="$pipeline"
+
+                ts_pipeline_start "$pipeline"
+
+                jid="${_L3_PIPELINE_JOB[$pipeline]}"
+                final_state=$(ts_slurm_job_state "$jid")
+
+                if [[ "$final_state" == "FAILED" || "$final_state" == "TIMEOUT" || "$final_state" == "CANCELLED" ]]; then
+                    printf "  ${_RED}✗${_RESET}  %s: SLURM job %s ended in state %s\n" \
+                        "$pipeline" "$jid" "$final_state"
+                    _ts_record fail "SLURM job $jid ended in state $final_state" "$final_state"
+                else
+                    validate_fn="l3_validate_${pipeline//-/_}"
+                    if declare -f "$validate_fn" >/dev/null 2>&1; then
+                        if [[ "$OPT_VERBOSE" == true ]]; then
+                            "$validate_fn"
+                        else
+                            "$validate_fn" 2>/dev/null
+                        fi
+                    else
+                        ts_warn "$pipeline validation" "function $validate_fn not defined"
+                    fi
+                fi
+
+                # Teardown
+                teardown_fn="l3_teardown_${pipeline//-/_}"
+                if declare -f "$teardown_fn" >/dev/null 2>&1; then
+                    "$teardown_fn" 2>/dev/null || true
+                fi
+            done
+        fi
+    fi
+
+    # Apply skip status to any pipeline that had its L3 skipped
+    for pipeline in "${!_L3_SKIP_MAP[@]}"; do
+        _TS_CURRENT_LAYER=3
+        _TS_CURRENT_PIPELINE="$pipeline"
+        _ts_update_layer_status "$pipeline" 3 "skip"
+    done
+
+    ts_layer_end
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Final mission report
+# ══════════════════════════════════════════════════════════════════════════════
+ts_results_table TEST_PIPELINES
+
+# Exit with failure code if any test failed
+if [[ $_TS_TOTAL_FAIL -gt 0 ]]; then
+    exit 1
+fi
+exit 0
