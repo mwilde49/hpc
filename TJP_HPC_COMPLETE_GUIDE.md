@@ -1,8 +1,8 @@
 # TJP HPC Pipeline Framework — Complete Operational Guide
 
-Version: 6.0
-Status: Production — 9 pipelines running on Juno HPC
-Last updated: 2026-04-05
+Version: 6.1
+Status: Production — 11 pipelines running on Juno HPC
+Last updated: 2026-05-19
 Audience: Group members, new developers, bioinformaticians
 
 This guide walks through the entire process from developing a pipeline on your local machine to running it on the HPC via SLURM. It uses the AddOne demo pipeline as a working example but the process applies to any pipeline.
@@ -56,7 +56,9 @@ Write code locally → Build container → Push to HPC → Submit job via SLURM
 | Virome | Submoduled (native Nextflow) | Viral profiling (Kraken2/MetaPhlAn3) |
 | SQANTI3 | Submoduled (SLURM DAG) | Long-read isoform QC |
 | wf-transcriptomes | Submoduled (Nextflow executor) | ONT full-length transcriptomics |
-| Cell Ranger | Native 10x | Single-cell RNA-seq |
+| Cell Ranger | Native 10x | Single-cell gene expression |
+| Cell Ranger mkfastq | Native 10x | BCL demultiplexing |
+| Cell Ranger Multi | Native 10x | Multi-library (GEX+VDJ, CITE-seq, CellPlex, Flex) |
 | Space Ranger | Native 10x | Spatial gene expression |
 | Xenium Ranger | Native 10x | In situ transcriptomics |
 

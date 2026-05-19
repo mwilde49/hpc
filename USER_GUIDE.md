@@ -28,11 +28,13 @@ This guide covers how to configure and run bioinformatics pipelines available on
 
 ### 10x Genomics (native, no container)
 
-|    **Pipeline**    |    **Purpose**                    |    **SLURM Resources**           |
-|--------------------|-----------------------------------|----------------------------------|
-| Cell Ranger        | Single-cell gene expression       | 24h, 16 CPU, 128GB, exclusive   |
-| Space Ranger       | Spatial gene expression (Visium)  | 24h, 16 CPU, 128GB, exclusive   |
-| Xenium Ranger      | In situ transcriptomics (Xenium)  | 12h, 16 CPU, 128GB, exclusive   |
+|    **Pipeline**         |    **Purpose**                                                |    **SLURM Resources**           |
+|-------------------------|---------------------------------------------------------------|----------------------------------|
+| Cell Ranger             | Single-cell gene expression (count)                           | 24h, 16 CPU, 128GB, exclusive   |
+| Cell Ranger mkfastq     | BCL demultiplexing — instrument run folder → per-sample FASTQs | 24h, 16 CPU, 128GB, exclusive  |
+| Cell Ranger Multi       | Multi-library: GEX + VDJ, CITE-seq, CellPlex, Flex, CRISPR   | 24h, 16 CPU, 128GB, exclusive   |
+| Space Ranger            | Spatial gene expression (Visium)                              | 24h, 16 CPU, 128GB, exclusive   |
+| Xenium Ranger           | In situ transcriptomics (Xenium)                              | 12h, 16 CPU, 128GB, exclusive   |
 
 ---
 
@@ -100,7 +102,11 @@ This creates:
 ├── wf-transcriptomes/   ← ONT full-length RNA
 │   ├── config.yaml
 │   └── samplesheet.csv
-├── cellranger/          ← 10x single-cell
+├── cellranger/          ← 10x single-cell (count)
+│   └── config.yaml
+├── cellranger-mkfastq/  ← 10x BCL demultiplexing
+│   └── config.yaml
+├── cellranger-multi/    ← 10x multi-library (GEX+VDJ, CITE-seq, CellPlex, Flex)
 │   └── config.yaml
 ├── spaceranger/         ← 10x spatial
 │   └── config.yaml
@@ -471,6 +477,58 @@ Launch:
 tjp-launch spaceranger
 ```
 
+### Cell Ranger mkfastq (BCL demultiplexing)
+
+```bash
+vi /work/$USER/pipelines/cellranger-mkfastq/config.yaml
+```
+
+The fields you **must** edit:
+
+```yaml
+run_id: my_run                              # output folder name
+run_dir: /scratch/juno/YOUR_NETID/myproject/bcl_run        # BCL run folder from sequencer
+samplesheet: /scratch/juno/YOUR_NETID/myproject/SampleSheet.csv
+```
+
+Launch:
+
+```bash
+tjp-launch cellranger-mkfastq
+```
+
+### Cell Ranger Multi (multi-library)
+
+Use this for GEX + VDJ (immune profiling), CITE-seq, CellPlex (multiplexing), Flex (fixed RNA), or CRISPR screens. For a plain single-library GEX run, use Cell Ranger (count) above.
+
+```bash
+vi /work/$USER/pipelines/cellranger-multi/config.yaml
+```
+
+The fields you **must** edit:
+
+```yaml
+sample_id: my_sample
+transcriptome: /groups/tprice/pipelines/references/refdata-gex-GRCh38-2024-A
+localcores: 16
+localmem: 64
+create_bam: true
+
+libraries:
+  - fastq_id: MySample_GEX
+    fastqs: /scratch/juno/YOUR_NETID/myproject/fastq
+    feature_types: Gene Expression
+  - fastq_id: MySample_VDJ
+    fastqs: /scratch/juno/YOUR_NETID/myproject/fastq
+    feature_types: VDJ-T
+```
+
+Launch:
+
+```bash
+tjp-launch cellranger-multi
+```
+
 ### Xenium Ranger (in situ transcriptomics)
 
 ```bash
@@ -513,7 +571,7 @@ tjp-batch psoma samplesheet.csv --dry-run
 
 | Mode | Pipelines | Behavior |
 |------|-----------|----------|
-| Per-row | cellranger, spaceranger, xeniumranger, sqanti3, wf-transcriptomes | One SLURM job per CSV row |
+| Per-row | cellranger, cellranger-mkfastq, cellranger-multi, spaceranger, xeniumranger, sqanti3, wf-transcriptomes | One SLURM job per CSV row |
 | Per-sheet | bulkrnaseq, psoma, virome | One SLURM job for all rows |
 
 ---
@@ -528,7 +586,9 @@ tjp-launch psoma              # Psomagen/HISAT2 pipeline
 tjp-launch virome             # viral profiling
 tjp-launch wf-transcriptomes  # ONT full-length RNA
 tjp-launch sqanti3            # long-read isoform QC
-tjp-launch cellranger         # 10x single-cell
+tjp-launch cellranger         # 10x single-cell (count)
+tjp-launch cellranger-mkfastq # 10x BCL demultiplexing
+tjp-launch cellranger-multi   # 10x multi-library
 tjp-launch spaceranger        # 10x spatial
 tjp-launch xeniumranger       # 10x in situ
 ```

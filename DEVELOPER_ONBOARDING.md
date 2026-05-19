@@ -1,6 +1,6 @@
 # BioCruiser / Hyperion Compute — Developer Onboarding Guide
 
-This document is a comprehensive technical reference for developers joining the TJP HPC pipeline framework. It covers every layer of the system, traces execution flows step-by-step for all nine pipelines, and explains the design decisions behind each component.
+This document is a comprehensive technical reference for developers joining the TJP HPC pipeline framework. It covers every layer of the system, traces execution flows step-by-step for all eleven pipelines, and explains the design decisions behind each component.
 
 ---
 
@@ -30,14 +30,16 @@ This document is a comprehensive technical reference for developers joining the 
 
 ## 1. System Overview
 
-This framework runs bioinformatics pipelines on the Juno HPC cluster for the TJP research group. It is deployed to `/groups/tprice/pipelines` and provides nine pipelines:
+This framework runs bioinformatics pipelines on the Juno HPC cluster for the TJP research group. It is deployed to `/groups/tprice/pipelines` and provides eleven pipelines:
 
 | Pipeline | Type | Purpose |
 |----------|------|---------|
 | **AddOne** | Inline container | Demo/template pipeline (adds 1 to numbers) |
 | **BulkRNASeq** | Submoduled container | Bulk RNA-seq analysis (STAR aligner) |
 | **Psoma** | Submoduled container | Psomagen RNA-seq analysis (HISAT2 + Trimmomatic) |
-| **Cell Ranger** | Native 10x | Single-cell RNA-seq (10x Genomics) |
+| **Cell Ranger** | Native 10x | Single-cell gene expression (10x Genomics) |
+| **Cell Ranger mkfastq** | Native 10x | BCL demultiplexing (10x Genomics) |
+| **Cell Ranger Multi** | Native 10x | Multi-library: GEX+VDJ, CITE-seq, CellPlex, Flex |
 | **Space Ranger** | Native 10x | Spatial transcriptomics (10x Visium) |
 | **Xenium Ranger** | Native 10x | In situ transcriptomics (10x Xenium) |
 | **Virome** | Submoduled (native Nextflow) | Viral profiling (Kraken2/MetaPhlAn3) |
@@ -230,7 +232,7 @@ One-time script that:
 
 ### 3.6 Samplesheet Library (`bin/lib/samplesheet.sh`)
 
-Provides CSV samplesheet validation and parsing for all nine pipelines. All batch-mode operations go through this library.
+Provides CSV samplesheet validation and parsing for all eleven pipelines. All batch-mode operations go through this library.
 
 **Key public functions:**
 
@@ -690,7 +692,7 @@ No `module load apptainer`. Instead:
 
 #### Wrapper Execution (`containers/10x/bin/cellranger-run.sh`)
 
-The 10x submodule (`containers/10x/`, pinned to v1.1.0) provides wrapper scripts that standardize config parsing across all three 10x tools.
+The 10x submodule (`containers/10x/`, pinned to v1.2.0) provides wrapper scripts that standardize config parsing across all five 10x tools (cellranger, cellranger-mkfastq, cellranger-multi, spaceranger, xeniumranger).
 
 Step by step:
 
@@ -850,7 +852,7 @@ Note: uses `INPUT_DIR` instead of `FASTQ_DIR` for archiving (Xenium input is a b
 
 ### 4.8 Virome (Native Nextflow + Per-Process Containers)
 
-**Type:** Submoduled — `mwilde49/virome` at `containers/virome/` (pinned to v1.4.0). Nextflow runs natively on the compute node; each Nextflow process uses its own `.sif` container from `containers/virome/containers/`.
+**Type:** Submoduled — `mwilde49/virome` at `containers/virome/` (pinned to v1.5.0). Nextflow runs natively on the compute node; each Nextflow process uses its own `.sif` container from `containers/virome/containers/`.
 
 **Purpose:** Viral metagenomic profiling using Kraken2 for taxonomic classification and MetaPhlAn3 for abundance estimation.
 
@@ -1395,8 +1397,8 @@ This is also why Psoma's SLURM template sets `--env HOME=/tmp` — Nextflow trie
 |------|------|---------|----------|
 | `containers/bulkrnaseq/` | `mwilde49/bulkseq` | v1.0.0 | Container def + build scripts |
 | `containers/psoma/` | `mwilde49/psoma` | v1.0.0 | Container def + pipeline code + adapters |
-| `containers/10x/` | `mwilde49/10x` | v1.1.0 | Wrapper scripts, validators, tests |
-| `containers/virome/` | `mwilde49/virome` | v1.4.0 | Nextflow workflow + per-process container defs |
+| `containers/10x/` | `mwilde49/10x` | v1.2.0 | Wrapper scripts, validators, tests |
+| `containers/virome/` | `mwilde49/virome` | v1.5.0 | Nextflow workflow + per-process container defs |
 | `containers/sqanti3/` | `mwilde49/longreads` | current | SQANTI3 + wf-transcriptomes configs + stage scripts |
 
 ### Pipeline Code

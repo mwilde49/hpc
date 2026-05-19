@@ -24,7 +24,9 @@ Your workspace will look like this:
 ├── virome/          ← viral profiling
 ├── sqanti3/         ← long-read isoform QC
 ├── wf-transcriptomes/ ← ONT full-length RNA
-├── cellranger/      ← 10x single-cell
+├── cellranger/      ← 10x single-cell (count)
+├── cellranger-mkfastq/ ← 10x BCL demultiplexing
+├── cellranger-multi/   ← 10x multi-library (GEX+VDJ, CITE-seq, CellPlex, Flex)
 ├── spaceranger/     ← 10x spatial
 ├── xeniumranger/    ← 10x in situ
 └── metadata/        ← local run records (PLR-xxxx.json)
@@ -207,6 +209,45 @@ Fields:
 
 *Provide either `slide`+`area` or `unknown_slide`, not both.
 
+### Cell Ranger mkfastq (10x BCL demultiplexing)
+
+```bash
+vi /work/$USER/pipelines/cellranger-mkfastq/config.yaml
+```
+
+Fields:
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `run_id` | yes | Output folder name (e.g., run date or project ID) |
+| `run_dir` | yes | Path to the Illumina BCL run folder |
+| `samplesheet` | yes | Path to Illumina-format SampleSheet.csv |
+| `localcores` | yes | Number of CPU cores |
+| `localmem` | yes | Memory in GB |
+| `tool_path` | no | Override default tool location |
+
+### Cell Ranger Multi (10x multi-library)
+
+Use this for any run with more than one library type (GEX + VDJ, CITE-seq, CellPlex, Flex, CRISPR). For a simple single-library GEX run, use Cell Ranger (count) instead.
+
+```bash
+vi /work/$USER/pipelines/cellranger-multi/config.yaml
+```
+
+Fields:
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `sample_id` | yes | Output directory name |
+| `transcriptome` | yes | Path to Cell Ranger reference transcriptome |
+| `localcores` | yes | Number of CPU cores |
+| `localmem` | yes | Memory in GB |
+| `create_bam` | yes | `true`/`false` — required for Cell Ranger 10+ |
+| `libraries` | yes | List of library entries (each with `fastq_id`, `fastqs`, `feature_types`) |
+| `vdj_reference` | no | Path to VDJ reference (required for VDJ-T/VDJ-B libraries) |
+| `feature_reference` | no | Path to feature reference CSV (required for CITE-seq/CRISPR) |
+| `scratch_output_dir` | no | Override default scratch output directory |
+
 ### Xenium Ranger (10x in situ transcriptomics)
 
 ```bash
@@ -235,6 +276,8 @@ tjp-launch virome
 tjp-launch sqanti3
 tjp-launch wf-transcriptomes
 tjp-launch cellranger
+tjp-launch cellranger-mkfastq
+tjp-launch cellranger-multi
 tjp-launch spaceranger
 tjp-launch xeniumranger
 ```
@@ -309,7 +352,7 @@ Options:
 | `--dry-run` | Show what would be submitted without submitting |
 | `--dev` | Use the dev partition (2-hour limit) for all jobs |
 
-**Per-row pipelines** (one SLURM job per CSV row): `cellranger`, `spaceranger`, `xeniumranger`, `sqanti3`, `wf-transcriptomes`
+**Per-row pipelines** (one SLURM job per CSV row): `cellranger`, `cellranger-mkfastq`, `cellranger-multi`, `spaceranger`, `xeniumranger`, `sqanti3`, `wf-transcriptomes`
 
 **Per-sheet pipelines** (one SLURM job for all rows): `bulkrnaseq`, `psoma`, `virome`
 

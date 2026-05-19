@@ -74,24 +74,24 @@ Technical reference for the TJP pipeline system on Juno HPC at UT Dallas.
 │   ├── addone_latest.sif
 │   ├── bulkrnaseq/          ← submodule: mwilde49/bulkseq @ v1.0.0
 │   │   └── bulkrnaseq_v1.0.0.sif
-│   ├── psoma/               ← submodule: mwilde49/psoma @ v2.0.0
+│   ├── psoma/               ← submodule: mwilde49/psoma @ v2.0.2
 │   │   ├── psomagen_bulk_rna_seq_pipeline.nf
 │   │   ├── *.sh, *.py       ← pipeline scripts
 │   │   └── NexteraPE-PE.fa
-│   ├── virome/              ← submodule: mwilde49/virome-pipeline @ v1.4.0
+│   ├── virome/              ← submodule: mwilde49/virome-pipeline @ v1.5.0
 │   │   ├── main.nf
 │   │   └── containers/      ← 6 per-process .sif files
 │   ├── sqanti3/             ← submodule: mwilde49/longreads (SQANTI3 + wf-transcriptomes)
 │   │   ├── sqanti3_v5.5.4.sif
 │   │   ├── slurm_templates/ ← stage scripts for 4-stage DAG
 │   │   └── configs/         ← wf_transcriptomes/juno.config etc.
-│   └── 10x/                 ← submodule: mwilde49/10x @ v1.1.0
+│   └── 10x/                 ← submodule: mwilde49/10x @ v1.2.0
 │       ├── bin/             ← cellranger-run.sh, spaceranger-run.sh, xeniumranger-run.sh
 │       └── lib/             ← 10x_common.sh, validate_*.sh
 ├── Bulk-RNA-Seq-Nextflow-Pipeline/  ← cloned UTDal repo (not a submodule)
 ├── pipelines/addone/        ← inline demo pipeline
 ├── slurm_templates/         ← 9 SLURM templates (one per pipeline)
-├── templates/               ← per-pipeline config.yaml + samplesheet.csv templates (9 pipelines)
+├── templates/               ← per-pipeline config.yaml + samplesheet.csv templates (11 pipelines)
 ├── docs/                    ← architecture.md, generate_diagrams.py, img/
 ├── metadata/                ← SCHEMA.md (local Titan metadata format docs)
 ├── references/              ← shared reference files (gitignored)

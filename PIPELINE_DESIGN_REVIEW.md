@@ -31,6 +31,8 @@ well, and what to do differently next time.
 | Psoma | Submoduled | Inside container | Monolithic `.sif` | User YAML → generated `pipeline.config` |
 | Virome | Submoduled | Native on host | 6 per-process `.sif` files | User YAML as params-file (no generation) |
 | Cell Ranger | Native | No | None (proprietary binary) | Direct YAML → wrapper script |
+| Cell Ranger mkfastq | Native | No | None (proprietary binary) | Direct YAML → wrapper script |
+| Cell Ranger Multi | Native | No | None (proprietary binary) | Direct YAML → wrapper script (generates multi CSV internally) |
 | Space Ranger | Native | No | None (proprietary binary) | Direct YAML → wrapper script |
 | Xenium Ranger | Native | No | None (proprietary binary) | Direct YAML → wrapper script |
 | SQANTI3 | Submoduled | No | Monolithic `.sif` (Apptainer) | Direct YAML → SLURM stage scripts (4-stage DAG) |
@@ -45,6 +47,8 @@ well, and what to do differently next time.
 | Psoma | 12h | 40 | 128 GB | No | None |
 | Virome | 12h | 16 | 128 GB | No | Nextflow on host, Kraken2 database |
 | Cell Ranger | 24h | 16 | 128 GB | Yes | Tool tarball at `/groups/tprice/opt/` |
+| Cell Ranger mkfastq | 24h | 16 | 128 GB | Yes | Tool tarball at `/groups/tprice/opt/` |
+| Cell Ranger Multi | 24h | 16 | 128 GB | Yes | Tool tarball at `/groups/tprice/opt/` |
 | Space Ranger | 24h | 16 | 128 GB | Yes | Tool tarball at `/groups/tprice/opt/` |
 | Xenium Ranger | 12h | 16 | 128 GB | Yes | Tool tarball at `/groups/tprice/opt/` |
 | SQANTI3 | varies | varies | varies | No | Container SIF (must be pulled: `apptainer pull ... docker://anaconesalab/sqanti3:v5.5.4`) |
@@ -59,6 +63,8 @@ well, and what to do differently next time.
 | Psoma | `fastq_dir` + `samples.txt` | HISAT2 | BAMs, TPM counts, HTSeq raw counts |
 | Virome | `samplesheet.csv` (sample, fastq_r1, fastq_r2) | STAR (host removal) + Kraken2 | Viral abundance matrix, MultiQC report |
 | Cell Ranger | `fastq_dir` + `sample_name` prefix | Proprietary | Feature-barcode matrix, web summary |
+| Cell Ranger mkfastq | BCL run folder + `SampleSheet.csv` | — | Per-sample FASTQ directories |
+| Cell Ranger Multi | `libraries` block (per-type FASTQs) | Proprietary | Per-library feature-barcode matrices, web summary |
 | Space Ranger | `fastq_dir` + image + slide | Proprietary | Feature-barcode matrix + spatial coords |
 | Xenium Ranger | `xenium_bundle` directory | Proprietary | Resegmented Xenium output |
 | SQANTI3 | `isoforms` GTF + `ref_gtf` + `ref_fasta` | SQANTI3 classification | Filtered isoforms GTF, QC plots, classification TSV |
@@ -68,11 +74,11 @@ well, and what to do differently next time.
 
 | Submodule | Repo | Current pin | Pin strategy |
 |---|---|---|---|
-| BulkRNASeq | `mwilde49/bulkseq` | v1.0.0 | Tag |
-| Psoma | `mwilde49/psoma` | v2.0.0 | Tag |
-| Virome | `mwilde49/virome-pipeline` | v1.4.0 | Tag |
-| 10x | `mwilde49/10x` | v1.1.0 | Tag |
-| longreads (SQANTI3 + wf-tx) | `mwilde49/longreads` | current HEAD | Tag pending |
+| BulkRNASeq | `mwilde49/bulkseq` | v1.0.1 | Tag |
+| Psoma | `mwilde49/psoma` | v2.0.2 | Tag |
+| Virome | `mwilde49/virome-pipeline` | v1.5.0 | Tag |
+| 10x | `mwilde49/10x` | v1.2.0 | Tag |
+| longreads (SQANTI3 + wf-tx) | `mwilde49/longreads` | v1.1.0 | Tag |
 
 ---
 
@@ -239,7 +245,7 @@ any Psoma v3.
 - The pre-flight check in the SLURM template only verifies `*.sif` files
   exist — it doesn't verify that all 6 expected containers are present
   by name.
-- **Active development** (v1.4.0) means the pipeline is less battle-tested
+- **Active development** (v1.5.0) means the pipeline is less battle-tested
   than BulkRNASeq/Psoma.
 
 **What to fix:** Add named container existence checks to the SLURM
@@ -367,7 +373,7 @@ self-contained (except BulkRNASeq), and have their own `CLAUDE.md` for
 AI-assisted development. This is the right pattern and should be maintained.
 
 ### Samplesheet standardization achieved (v6.0.0)
-All 9 pipelines now support CSV samplesheets with a consistent structure:
+All 11 pipelines now support CSV samplesheets with a consistent structure:
 - Required columns per pipeline defined in `bin/lib/samplesheet.sh`
 - Optional Titan ID columns (`project_id`, `sample_id`, `library_id`,
   `run_id`) on every sheet

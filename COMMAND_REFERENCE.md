@@ -1,6 +1,6 @@
 # Hyperion Compute — Command Reference
 
-**Version:** 6.0.0 | **Cluster:** Juno HPC, UT Dallas | **Updated:** 2026-04-05
+**Version:** 6.1.0 | **Cluster:** Juno HPC, UT Dallas | **Updated:** 2026-05-19
 
 Comprehensive reference for every command available in the Hyperion Compute / TJP pipeline framework. Organized from general cluster commands inward to per-pipeline specifics. Use `Ctrl+F` / `grep` to jump to any command, flag, or config key.
 
@@ -29,6 +29,8 @@ Comprehensive reference for every command available in the Hyperion Compute / TJ
    - [Cell Ranger](#67-cell-ranger)
    - [Space Ranger](#68-space-ranger)
    - [Xenium Ranger](#69-xenium-ranger)
+   - [Cell Ranger mkfastq](#610-cell-ranger-mkfastq)
+   - [Cell Ranger Multi](#611-cell-ranger-multi)
 7. [Config Key Reference](#7-config-key-reference)
 8. [Path & Environment Reference](#8-path--environment-reference)
 9. [Troubleshooting](#9-troubleshooting)
@@ -355,7 +357,7 @@ One-time workspace initialization. Run once per user per cluster. No arguments.
 **What it does:**
 
 1. Checks for Apptainer, containers, 10x tool installs, UTDal repo
-2. Creates `$WORK_ROOT/pipelines/<pipeline>/` and `runs/` subdirs for all 9 pipelines
+2. Creates `$WORK_ROOT/pipelines/<pipeline>/` and `runs/` subdirs for all 11 pipelines
 3. Copies template configs from `templates/` to `$USER_PIPELINES/<pipeline>/config.yaml` with `__USER__`/`__SCRATCH__`/`__WORK__` substituted
 4. Copies template samplesheets to `$USER_PIPELINES/<pipeline>/samplesheet.csv`
 5. Adds `/groups/tprice/pipelines/bin` to `~/.bashrc` PATH if not already there
@@ -389,7 +391,7 @@ tjp-launch --help
 | `--dev` | off | Submit to `dev` partition (`--time=02:00:00`) |
 | `--help` / `-h` | — | Show help |
 
-**Known pipelines:** `addone bulkrnaseq psoma virome cellranger spaceranger xeniumranger sqanti3 wf-transcriptomes`
+**Known pipelines:** `addone bulkrnaseq psoma virome cellranger cellranger-mkfastq cellranger-multi spaceranger xeniumranger sqanti3 wf-transcriptomes`
 
 **Run directory created:** `/work/$USER/pipelines/<pipeline>/runs/<YYYY-MM-DD_HH-MM-SS>/`
 
@@ -414,7 +416,7 @@ tjp-launch psoma --config /work/$USER/pipelines/psoma/runs/2026-03-04_14-30-00/c
 **Edge cases:**
 - If pipeline name is not recognized, prints list of known pipelines and exits
 - If config file does not exist, exits with error
-- For native pipelines (cellranger/spaceranger/xeniumranger), `--dev` overrides `--time` but not `--exclusive`
+- For native pipelines (cellranger/cellranger-mkfastq/cellranger-multi/spaceranger/xeniumranger), `--dev` overrides `--time` but not `--exclusive`
 - `--dev` sets `--partition=dev --time=02:00:00`; all other SBATCH flags come from the template
 
 ---
@@ -442,7 +444,7 @@ tjp-batch <pipeline> <samplesheet.csv> [options]
 
 | Mode | Pipelines | Behavior |
 |------|-----------|----------|
-| **Per-row** | cellranger, spaceranger, xeniumranger, sqanti3, wf-transcriptomes | One SLURM job per CSV row |
+| **Per-row** | cellranger, cellranger-mkfastq, cellranger-multi, spaceranger, xeniumranger, sqanti3, wf-transcriptomes | One SLURM job per CSV row |
 | **Per-sheet** | bulkrnaseq, psoma, virome | One SLURM job for all rows; Nextflow handles per-sample parallelism |
 
 **Samplesheet column schemas:**
@@ -498,7 +500,7 @@ tjp-test --help
 | `--clean` | off | Wipe previous test data in scratch before copying |
 | `--help` / `-h` | — | Show help |
 
-**Supported pipelines:** `psoma bulkrnaseq virome cellranger spaceranger sqanti3 wf-transcriptomes`
+**Supported pipelines:** `psoma bulkrnaseq virome cellranger cellranger-mkfastq cellranger-multi spaceranger sqanti3 wf-transcriptomes`
 
 > xeniumranger not yet supported — needs a Xenium output bundle test dataset.
 
@@ -693,6 +695,8 @@ labdata status    # print summary counts: total runs, by pipeline, by status
 | sqanti3 | 4-stage SLURM DAG | Single `.sif` | Per-row |
 | wf-transcriptomes | Nextflow SLURM executor | Host Nextflow | Per-row |
 | cellranger | Native (no container) | Tool install | Per-row |
+| cellranger-mkfastq | Native (no container) | Tool install | Per-row |
+| cellranger-multi | Native (no container) | Tool install | Per-row |
 | spaceranger | Native (no container) | Tool install | Per-row |
 | xeniumranger | Native (no container) | Tool install | Per-row |
 
@@ -1422,6 +1426,151 @@ run02,/scratch/juno/$USER/xenium/run02_output,import-segmentation,/scratch/juno/
 - `segmentation_file` is only required when `command: import-segmentation`; leave blank for `resegment`
 - Xenium Ranger expects the full Xenium instrument output bundle directory, not individual files
 - Smoke testing not yet supported (needs a Xenium output bundle test dataset)
+
+---
+
+### 6.10 Cell Ranger mkfastq
+
+BCL demultiplexing — converts an Illumina instrument run folder into per-sample FASTQ directories. Run this first if you received a BCL folder from the sequencing core rather than pre-demultiplexed FASTQs.
+
+```bash
+# Setup
+vi /work/$USER/pipelines/cellranger-mkfastq/config.yaml
+
+# Single run
+tjp-launch cellranger-mkfastq
+tjp-launch cellranger-mkfastq --config /path/to/config.yaml
+
+# Batch run (per-row — one demux job per BCL folder)
+tjp-batch cellranger-mkfastq /work/$USER/pipelines/cellranger-mkfastq/samplesheet.csv
+```
+
+**Tool path:** `/groups/tprice/software/cellranger` (symlink to versioned install)
+
+**Config keys:**
+
+```yaml
+run_id: my_run                    # output folder name (e.g., run date or project ID)
+run_dir: /scratch/juno/$USER/bcl/run_folder   # Illumina BCL run folder from sequencer
+samplesheet: /scratch/juno/$USER/bcl/SampleSheet.csv  # Illumina SampleSheet.csv
+localcores: 16
+localmem: 120                     # GB
+
+tool_path: ""                     # override default install path (optional)
+
+# Optional demux parameters
+# lanes: 1,2                      # process specific lanes only
+# rc_i2_override: true            # reverse-complement Index 2
+# filter_single_index: true       # only process single-indexed samples
+# filter_dual_index: true         # only process dual-indexed samples
+
+# Titan integration (optional)
+titan_project_id:
+titan_sample_id:
+titan_library_id:
+titan_run_id:
+```
+
+**Output directories:**
+
+```
+<run_id>/outs/fastq_path/
+└── <project>/
+    └── <sample>/
+        ├── <sample>_S1_L001_R1_001.fastq.gz
+        └── <sample>_S1_L001_R2_001.fastq.gz
+```
+
+**Edge cases:**
+- Output FASTQs land in `<run_id>/outs/fastq_path/` — pass this path as `fastq_dir` to subsequent `cellranger` or `cellranger-multi` runs
+- `SampleSheet.csv` must use the standard Illumina format with `[Data]` section
+- `rc_i2_override: true` is sometimes needed for newer NovaSeq instruments
+
+---
+
+### 6.11 Cell Ranger Multi
+
+Multi-library Cell Ranger runs: GEX + VDJ (immune profiling), CITE-seq (protein panels), CellPlex (CMO sample multiplexing), Flex (fixed RNA), or CRISPR screens. The wrapper translates YAML into a Cell Ranger multi CSV internally — you never write the CSV by hand.
+
+Use Cell Ranger (§6.7) instead for simple single-library GEX runs.
+
+```bash
+# Setup
+vi /work/$USER/pipelines/cellranger-multi/config.yaml
+
+# Single run
+tjp-launch cellranger-multi
+tjp-launch cellranger-multi --config /path/to/config.yaml
+
+# Batch run (per-row — one job per sample)
+tjp-batch cellranger-multi /work/$USER/pipelines/cellranger-multi/samplesheet.csv
+```
+
+**Tool path:** `/groups/tprice/opt/cellranger-10.0.0` (symlink: `/groups/tprice/software/cellranger`)
+
+**Config keys:**
+
+```yaml
+sample_id: my_sample              # output directory name
+transcriptome: /groups/tprice/pipelines/references/refdata-gex-GRCh38-2024-A
+localcores: 16
+localmem: 64                      # GB
+create_bam: true                  # REQUIRED for Cell Ranger 10.0.0+
+
+# Optional override for output location (default: scratch/<pipeline>/runs/<ts>)
+scratch_output_dir: /path/to/output
+
+# Optional references for non-GEX library types
+vdj_reference: /groups/tprice/pipelines/references/refdata-cellranger-vdj-GRCh38-alts-ensembl-7.1.0
+feature_reference: /path/to/feature_reference.csv   # required for CITE-seq/CRISPR
+
+# Library block — one entry per library type
+libraries:
+  - fastq_id: MySample_GEX                  # matches FASTQ filename prefix
+    fastqs: /scratch/juno/$USER/fastq/
+    feature_types: Gene Expression
+  - fastq_id: MySample_VDJ
+    fastqs: /scratch/juno/$USER/fastq/
+    feature_types: VDJ-T               # VDJ-T | VDJ-T-GD | VDJ-B
+
+# Titan integration (optional)
+titan_project_id:
+titan_sample_id:
+titan_library_id:
+titan_run_id:
+```
+
+**Feature types for `libraries[].feature_types`:**
+
+| Value | Use case |
+|-------|----------|
+| `Gene Expression` | Standard GEX |
+| `VDJ-T` | T cell receptor |
+| `VDJ-T-GD` | Gamma-delta TCR |
+| `VDJ-B` | B cell receptor |
+| `Antibody Capture` | CITE-seq (TotalSeq / protein panels) |
+| `CRISPR Guide Capture` | CRISPR screens |
+| `Multiplexing Capture` | CellPlex (CMO-based multiplexing) |
+| `Fixed RNA Profiling` | Flex (fixed RNA profiling) |
+
+**Output directories:**
+
+```
+<sample_id>/outs/
+├── web_summary.html
+├── per_sample_outs/              ← populated when using CellPlex/Flex multiplexing
+├── count/
+│   └── filtered_feature_bc_matrix/
+└── vdj_t/                        ← or vdj_b/, depending on library types
+    └── filtered_contig_annotations.csv
+```
+
+**Edge cases:**
+- `create_bam: true` is required for Cell Ranger 10.0.0+
+- `vdj_reference` is required when any library has type `VDJ-T`, `VDJ-T-GD`, or `VDJ-B`
+- `feature_reference` is required for `Antibody Capture` and `CRISPR Guide Capture` libraries
+- FASTQs for all library types in a single sample are listed in the same `libraries` block
+- `fastq_id` must match the FASTQ filename prefix exactly (Cell Ranger reads `<fastq_id>_S*_L*_R*.fastq.gz`)
 
 ---
 
