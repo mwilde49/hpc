@@ -33,6 +33,7 @@ declare -A PIPELINE_TEMPLATES=(
     [virome]="slurm_templates/virome_slurm_template.sh"
     [cellranger]="slurm_templates/cellranger_slurm_template.sh"
     [cellranger-mkfastq]="slurm_templates/cellranger_mkfastq_slurm_template.sh"
+    [cellranger-multi]="slurm_templates/cellranger_multi_slurm_template.sh"
     [spaceranger]="slurm_templates/spaceranger_slurm_template.sh"
     [xeniumranger]="slurm_templates/xeniumranger_slurm_template.sh"
     [sqanti3]="slurm_templates/sqanti3_slurm_template.sh"
@@ -43,19 +44,20 @@ declare -A PIPELINE_TEMPLATES=(
 declare -A PIPELINE_TOOL_PATHS=(
     [cellranger]="/groups/tprice/opt/cellranger-10.0.0"
     [cellranger-mkfastq]="/groups/tprice/software/cellranger"
+    [cellranger-multi]="/groups/tprice/opt/cellranger-10.0.0"
     [spaceranger]="/groups/tprice/opt/spaceranger-4.0.1"
     [xeniumranger]="/groups/tprice/opt/xeniumranger-xenium4.0"
 )
 
 # Native pipelines: no container, tool installed from tarball
-NATIVE_PIPELINES=(cellranger cellranger-mkfastq spaceranger xeniumranger)
+NATIVE_PIPELINES=(cellranger cellranger-mkfastq cellranger-multi spaceranger xeniumranger)
 
 # Nextflow-managed pipelines: Nextflow pulls per-process containers automatically.
 # Container check verifies the Nextflow config file exists, not a SIF.
 NEXTFLOW_MANAGED_PIPELINES=(wf-transcriptomes)
 
 # Ordered list of known pipelines (bash 3 compat for iteration)
-KNOWN_PIPELINES=(addone bulkrnaseq psoma virome cellranger cellranger-mkfastq spaceranger xeniumranger sqanti3 wf-transcriptomes)
+KNOWN_PIPELINES=(addone bulkrnaseq psoma virome cellranger cellranger-mkfastq cellranger-multi spaceranger xeniumranger sqanti3 wf-transcriptomes)
 
 # ── Color output ─────────────────────────────────────────────────────────────
 if [[ -t 1 ]]; then

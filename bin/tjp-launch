@@ -310,6 +310,9 @@ FASTQ_DIR=""
 case "$PIPELINE" in
     psoma|bulkrnaseq|cellranger|spaceranger)
         FASTQ_DIR=$(yaml_get "$RUN_DIR/config.yaml" "fastq_dir") ;;
+    cellranger-multi)
+        # FASTQs are nested per-library in the libraries block; no single fastq_dir to archive
+        FASTQ_DIR="" ;;
     xeniumranger)
         FASTQ_DIR=$(yaml_get "$RUN_DIR/config.yaml" "xenium_bundle" 2>/dev/null || echo "") ;;
     cellranger-mkfastq)
@@ -371,7 +374,7 @@ case "$PIPELINE" in
         info "Output dir: $SCRATCH_OUTPUT_DIR"
         SBATCH_CONFIG_ARG="$RUN_DIR/config.yaml"
         ;;
-    cellranger|cellranger-mkfastq|spaceranger|xeniumranger)
+    cellranger|cellranger-mkfastq|cellranger-multi|spaceranger|xeniumranger)
         # 10x native pipelines: create scratch output dir, pass config directly
         _config_scratch=$(yaml_get "$RUN_DIR/config.yaml" "scratch_output_dir" 2>/dev/null || echo "")
         if [[ -n "$_config_scratch" ]]; then

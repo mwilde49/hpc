@@ -16,6 +16,7 @@ validate_config() {
         virome)         _validate_virome "$config" errors ;;
         cellranger)          _validate_cellranger "$config" errors ;;
         cellranger-mkfastq) _validate_cellranger_mkfastq "$config" errors ;;
+        cellranger-multi)   _validate_cellranger_multi "$config" errors ;;
         spaceranger)    _validate_spaceranger "$config" errors ;;
         xeniumranger)   _validate_xeniumranger "$config" errors ;;
         sqanti3)           _validate_sqanti3 "$config" errors ;;
@@ -594,4 +595,21 @@ _validate_cellranger_mkfastq() {
             _errs+=("tool_path does not exist: $tp")
         fi
     fi
+}
+
+# ── Cell Ranger Multi validator ─────────────────────────────────────────────
+# Adapts the submodule's validate_cellranger_multi() (stdout + return-count
+# interface) into the framework's nameref-array interface.
+_validate_cellranger_multi() {
+    local config="$1"
+    local -n _errs=$2
+
+    # shellcheck source=/dev/null
+    source "$REPO_ROOT/containers/10x/lib/validate_cellranger_multi.sh"
+
+    local line
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        _errs+=("${line#ERROR: }")
+    done < <(validate_cellranger_multi "$config" 2>/dev/null || true)
 }
