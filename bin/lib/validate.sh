@@ -21,6 +21,8 @@ validate_config() {
         xeniumranger)   _validate_xeniumranger "$config" errors ;;
         sqanti3)           _validate_sqanti3 "$config" errors ;;
         wf-transcriptomes) _validate_wf_transcriptomes "$config" errors ;;
+        dconvatac)     _validate_dconvatac "$config" errors ;;
+        dconvatac-gpu) _validate_dconvatac "$config" errors ;;
         *)              die "No validator for pipeline: $pipeline" ;;
     esac
 
@@ -612,4 +614,53 @@ _validate_cellranger_multi() {
         [[ -z "$line" ]] && continue
         _errs+=("${line#ERROR: }")
     done < <(validate_cellranger_multi "$config" 2>/dev/null || true)
+}
+
+# ── DeconvATAC validator ─────────────────────────────────────────────────────
+_validate_dconvatac() {
+    local config="$1"
+    local -n _errs=$2
+
+    # Required keys
+    local required_keys=(spatial_h5ad reference_h5ad labels_key output_dir)
+    for key in "${required_keys[@]}"; do
+        if ! yaml_has "$config" "$key"; then
+            _errs+=("Missing required key: $key")
+        fi
+    done
+
+    # h5ad paths must exist on disk (skip placeholder paths)
+    local h5ad_keys=(spatial_h5ad reference_h5ad)
+    for key in "${h5ad_keys[@]}"; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            if [[ -n "$val" && "$val" != __* && "$val" != /path/to/* && ! -f "$val" ]]; then
+                _errs+=("File does not exist for $key: $val")
+            fi
+        fi
+    done
+
+    # Boolean fields
+    for key in run_hvp use_gpu; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            case "$val" in
+                true|false) ;;
+                *) _errs+=("$key must be 'true' or 'false', got: $val") ;;
+            esac
+        fi
+    done
+
+    # Numeric fields
+    for key in N_cells_per_location detection_alpha max_epochs_spatial max_epochs_ref; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            if [[ -n "$val" && ! "$val" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+                _errs+=("$key must be a number, got: $val")
+            fi
+        fi
+    done
 }

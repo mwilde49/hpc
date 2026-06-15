@@ -8,7 +8,7 @@ HPC pipeline framework for the TJP group on Juno HPC (UT Dallas). Uses Apptainer
 
 ## Pipelines
 
-Eleven pipelines are currently supported across three architecture patterns:
+Thirteen pipelines are currently supported across three architecture patterns:
 
 | Pipeline | Type | Description |
 |----------|------|-------------|
@@ -23,6 +23,8 @@ Eleven pipelines are currently supported across three architecture patterns:
 | **Cell Ranger Multi** | Native 10x (v10.0.0) | Multi-library runs — GEX + VDJ, CITE-seq, CellPlex, Flex, CRISPR. |
 | **Space Ranger** | Native 10x (v4.0.1) | Spatial gene expression — Visium (10x Genomics). |
 | **Xenium Ranger** | Native 10x (v4.0) | In situ transcriptomics — Xenium (10x Genomics). |
+| **DeconvATAC** | Submoduled (mwilde49/dconvatac @ v1.0.0) | Spatial ATAC deconvolution — Cell2Location (CPU). |
+| **DeconvATAC GPU** | Submoduled (mwilde49/dconvatac @ v1.0.0) | Spatial ATAC deconvolution — Cell2Location (A30 GPU). |
 
 **Architecture patterns:**
 - **Inline** — pipeline code lives directly in this repo (`pipelines/<name>/`)

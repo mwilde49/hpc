@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HPC pipeline framework for the TJP group on Juno HPC, deployed to the shared group location `/groups/tprice/pipelines`. Uses Apptainer containers + SLURM scheduling + config-driven YAML execution. Has eleven pipelines: AddOne (inline demo), BulkRNASeq (submoduled container + external Nextflow), Psoma (submoduled combined container+pipeline), Virome (submoduled Nextflow + per-process containers), SQANTI3 (submoduled 4-stage SLURM DAG), wf-transcriptomes (submoduled Nextflow SLURM executor), and five 10x Genomics native pipelines (Cell Ranger, Cell Ranger mkfastq, Cell Ranger Multi, Space Ranger, Xenium Ranger). Designed to scale horizontally by adding new pipeline directories or container submodules. Version 6.0.0 adds samplesheet-driven batch execution (`tjp-batch`), local Titan metadata prototype (`labdata`/PLR-xxxx records), and Titan integration fields in all configs.
+HPC pipeline framework for the TJP group on Juno HPC, deployed to the shared group location `/groups/tprice/pipelines`. Uses Apptainer containers + SLURM scheduling + config-driven YAML execution. Has thirteen pipelines: AddOne (inline demo), BulkRNASeq (submoduled container + external Nextflow), Psoma (submoduled combined container+pipeline), Virome (submoduled Nextflow + per-process containers), SQANTI3 (submoduled 4-stage SLURM DAG), wf-transcriptomes (submoduled Nextflow SLURM executor), five 10x Genomics native pipelines (Cell Ranger, Cell Ranger mkfastq, Cell Ranger Multi, Space Ranger, Xenium Ranger), and DeconvATAC (submoduled Python+Apptainer, spatial ATAC deconvolution via Cell2Location, CPU and GPU variants). Designed to scale horizontally by adding new pipeline directories or container submodules. Version 6.0.0 adds samplesheet-driven batch execution (`tjp-batch`), local Titan metadata prototype (`labdata`/PLR-xxxx records), and Titan integration fields in all configs.
 
 ## Build and Run Commands
 
@@ -280,6 +280,33 @@ Nextflow head-job pipeline using the epi2me-labs/wf-transcriptomes workflow with
 - Test data: `containers/sqanti3/test_data/wf_transcriptomes/` (must be staged on HPC)
 
 Both long-read pipelines write directly to `outdir:` from config; no scratch staging (unlike bulkrnaseq/psoma).
+
+## DeconvATAC Pipeline
+
+### Submodule
+
+Container repo `mwilde49/dconvatac` is a git submodule at `containers/dconvatac/`, pinned to `v1.0.0`. Unlike bulkrnaseq/psoma, this is a Python pipeline (not Nextflow) — both the container definition and pipeline script live in the submodule. No separate clone needed.
+
+### Key details
+- Input: spatial ATAC `.h5ad` + single-cell reference `.h5ad`
+- Pipeline script: `containers/dconvatac/pipeline/dconvatac.py` — called inside Apptainer
+- Two registered pipelines: `dconvatac` (CPU, `normal` partition) and `dconvatac-gpu` (A30 GPU)
+- GPU template adds `--nv` flag and `--partition=a30 --gres=gpu:nvidia_a30:1`
+- Batch mode: **per-row** (one SLURM job per spatial sample)
+- `use_gpu: true` in config enables GPU training (only meaningful with `dconvatac-gpu`)
+
+### Build container (local, requires sudo)
+```bash
+cd containers/dconvatac/container && sudo ./build.sh
+```
+
+### Submit on HPC
+```bash
+tjp-launch dconvatac        # CPU
+tjp-launch dconvatac-gpu    # GPU (A30)
+```
+
+See `DCONVATAC_HPC_GUIDE.md` for full setup and usage details.
 
 ## 10x Genomics Pipelines (Cell Ranger, Space Ranger, Xenium Ranger)
 

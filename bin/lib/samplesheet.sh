@@ -19,6 +19,8 @@ declare -A _SAMPLESHEET_REQUIRED_COLS=(
     [sqanti3]="sample isoforms ref_gtf ref_fasta"
     # wf-transcriptomes batch: one row per experiment (each has its own barcode samplesheet)
     [wf-transcriptomes]="sample fastq_dir sample_sheet ref_genome ref_annotation"
+    [dconvatac]="sample spatial_h5ad reference_h5ad labels_key"
+    [dconvatac-gpu]="sample spatial_h5ad reference_h5ad labels_key"
 )
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
