@@ -1,0 +1,30 @@
+# DeconvATAC Cell2Location Pipeline Configuration
+# Edit the paths below, then launch with: tjp-launch dconvatac
+# For GPU-accelerated training use: tjp-launch dconvatac-gpu (set use_gpu: true)
+# See DCONVATAC_HPC_GUIDE.md for full parameter reference.
+
+# ── Input data (required) ─────────────────────────────────────────────────────
+spatial_h5ad: __SCRATCH__/myproject/spatial.h5ad
+reference_h5ad: __SCRATCH__/myproject/reference.h5ad
+labels_key: cell_type
+
+# ── Output ────────────────────────────────────────────────────────────────────
+output_dir: __SCRATCH__/myproject/dconvatac_results
+
+# ── Feature selection ─────────────────────────────────────────────────────────
+run_hvp: true               # run highly_variable_peaks before deconvolution
+
+# ── Cell2Location parameters ──────────────────────────────────────────────────
+N_cells_per_location: 8     # expected number of cells per spatial location
+detection_alpha: 20         # detection model tuning parameter
+max_epochs_spatial: 400     # training epochs for the spatial model
+max_epochs_ref: 400         # training epochs for the reference model
+use_gpu: false              # set true when using the dconvatac-gpu pipeline
+
+# ── Titan Integration (optional) ──────────────────────────────────────────────
+# Leave blank until Titan is available. When populated, enables metadata
+# generation and future database registration.
+titan_project_id:           # PRJ-xxxx  — Titan project identifier
+titan_sample_id:            # SMP-xxxx  — Titan biological sample identifier
+titan_library_id:           # LIB-xxxx  — Titan library identifier
+titan_run_id:               # RUN-xxxx  — Titan sequencing run identifier

@@ -1,0 +1,13 @@
+# Schema for dconvatac config validation
+# Used by bin/lib/validate.sh _validate_dconvatac()
+required:
+  - spatial_h5ad
+  - reference_h5ad
+  - labels_key
+  - output_dir
+path_exists:
+  - spatial_h5ad
+  - reference_h5ad
+boolean:
+  - run_hvp
+  - use_gpu
