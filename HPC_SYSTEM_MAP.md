@@ -90,8 +90,8 @@ Technical reference for the TJP pipeline system on Juno HPC at UT Dallas.
 │       └── lib/             ← 10x_common.sh, validate_*.sh
 ├── Bulk-RNA-Seq-Nextflow-Pipeline/  ← cloned UTDal repo (not a submodule)
 ├── pipelines/addone/        ← inline demo pipeline
-├── slurm_templates/         ← 9 SLURM templates (one per pipeline)
-├── templates/               ← per-pipeline config.yaml + samplesheet.csv templates (11 pipelines)
+├── slurm_templates/         ← 13 SLURM templates (one per pipeline)
+├── templates/               ← per-pipeline config.yaml + samplesheet.csv templates (13 pipelines)
 ├── docs/                    ← architecture.md, generate_diagrams.py, img/
 ├── metadata/                ← SCHEMA.md (local Titan metadata format docs)
 ├── references/              ← shared reference files (gitignored)

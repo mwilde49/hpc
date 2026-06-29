@@ -373,7 +373,7 @@ self-contained (except BulkRNASeq), and have their own `CLAUDE.md` for
 AI-assisted development. This is the right pattern and should be maintained.
 
 ### Samplesheet standardization achieved (v6.0.0)
-All 11 pipelines now support CSV samplesheets with a consistent structure:
+All 13 pipelines now support CSV samplesheets with a consistent structure:
 - Required columns per pipeline defined in `bin/lib/samplesheet.sh`
 - Optional Titan ID columns (`project_id`, `sample_id`, `library_id`,
   `run_id`) on every sheet

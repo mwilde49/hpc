@@ -55,6 +55,18 @@ SAMPLE_SHEET=$(yaml_get "$USER_CONFIG" "sample_sheet")
 REF_GENOME=$(yaml_get "$USER_CONFIG" "ref_genome")
 REF_ANNOTATION=$(yaml_get "$USER_CONFIG" "ref_annotation")
 OUTDIR=$(yaml_get "$USER_CONFIG" "outdir")
+# Guard: if outdir is unset, contains unexpanded shell variables (e.g. ${USER}),
+# or is not absolute, Nextflow falls back to ./output relative to the SLURM
+# working directory — which is $HOME on Juno — filling home quota.
+# KNOWN ISSUE: the longreads submodule template uses ${USER}/${sample} syntax
+# that yaml_get does not expand. Always set outdir to a literal absolute path
+# in your config (e.g. /work/maw210003/pipelines/wf-transcriptomes/my_sample).
+if [[ -z "$OUTDIR" || "$OUTDIR" == *'${'* || "$OUTDIR" != /* ]]; then
+    echo "ERROR: outdir must be an absolute path with no unexpanded variables."
+    echo "  Got: '$OUTDIR'"
+    echo "  Set outdir: /work/$USER/pipelines/wf-transcriptomes/<sample> in your config."
+    exit 1
+fi
 WF_VERSION=$(yaml_get "$USER_CONFIG" "wf_version")
 DIRECT_RNA=$(yaml_get "$USER_CONFIG" "direct_rna")
 DE_ANALYSIS=$(yaml_get "$USER_CONFIG" "de_analysis")

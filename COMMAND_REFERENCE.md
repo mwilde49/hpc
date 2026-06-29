@@ -1,6 +1,6 @@
 # Hyperion Compute — Command Reference
 
-**Version:** 6.1.0 | **Cluster:** Juno HPC, UT Dallas | **Updated:** 2026-05-19
+**Version:** 6.1.0 | **Cluster:** Juno HPC, UT Dallas | **Updated:** 2026-06-21
 
 Comprehensive reference for every command available in the Hyperion Compute / TJP pipeline framework. Organized from general cluster commands inward to per-pipeline specifics. Use `Ctrl+F` / `grep` to jump to any command, flag, or config key.
 
@@ -16,9 +16,12 @@ Comprehensive reference for every command available in the Hyperion Compute / TJ
    - [tjp-setup](#51-tjp-setup)
    - [tjp-launch](#52-tjp-launch)
    - [tjp-batch](#53-tjp-batch)
-   - [tjp-test](#54-tjp-test)
-   - [tjp-test-validate](#55-tjp-test-validate)
-   - [labdata](#56-labdata)
+   - [tjp-edit](#54-tjp-edit)
+   - [tjp-validate](#55-tjp-validate-alias-tjp-validate)
+   - [tjp-test-suite](#56-tjp-test-suite)
+   - [tjp-test (deprecated)](#57-tjp-test-deprecated)
+   - [tjp-test-validate (deprecated)](#58-tjp-test-validate-deprecated)
+   - [labdata](#59-labdata)
 6. [Pipeline Reference](#6-pipeline-reference)
    - [AddOne](#61-addone)
    - [BulkRNASeq](#62-bulkrnaseq)
@@ -31,6 +34,8 @@ Comprehensive reference for every command available in the Hyperion Compute / TJ
    - [Xenium Ranger](#69-xenium-ranger)
    - [Cell Ranger mkfastq](#610-cell-ranger-mkfastq)
    - [Cell Ranger Multi](#611-cell-ranger-multi)
+   - [DeconvATAC](#612-dconvatac)
+   - [DeconvATAC GPU](#613-dconvatac-gpu)
 7. [Config Key Reference](#7-config-key-reference)
 8. [Path & Environment Reference](#8-path--environment-reference)
 9. [Troubleshooting](#9-troubleshooting)
@@ -197,6 +202,8 @@ Each pipeline template sets these `#SBATCH` directives:
 | cellranger | 24:00:00 | 16 | 128G | ✓ |
 | spaceranger | 24:00:00 | 16 | 128G | ✓ |
 | xeniumranger | 12:00:00 | 16 | 128G | ✓ |
+| dconvatac | 24:00:00 | 16 | 128G | — |
+| dconvatac-gpu | 24:00:00 | 16 | 128G | — (a30 partition, 1× A30 GPU) |
 
 > `--exclusive` on 10x pipelines means the job gets an entire node; 10x tools expect full node access and handle their own threading via `--localcores`.
 
@@ -341,7 +348,9 @@ All `tjp-*` commands have two additional alias forms:
 tjp-setup       == hyperion-setup       == biocruiser-setup
 tjp-launch      == hyperion-launch      == biocruiser-launch
 tjp-batch       == hyperion-batch       == biocruiser-batch
+tjp-edit        == hyperion-edit        == biocruiser-edit
 tjp-test        == hyperion-test        == biocruiser-test
+tjp-test-suite  == hyperion-test-suite
 ```
 
 ---
@@ -357,7 +366,7 @@ One-time workspace initialization. Run once per user per cluster. No arguments.
 **What it does:**
 
 1. Checks for Apptainer, containers, 10x tool installs, UTDal repo
-2. Creates `$WORK_ROOT/pipelines/<pipeline>/` and `runs/` subdirs for all 11 pipelines
+2. Creates `$WORK_ROOT/pipelines/<pipeline>/` and `runs/` subdirs for all 13 pipelines
 3. Copies template configs from `templates/` to `$USER_PIPELINES/<pipeline>/config.yaml` with `__USER__`/`__SCRATCH__`/`__WORK__` substituted
 4. Copies template samplesheets to `$USER_PIPELINES/<pipeline>/samplesheet.csv`
 5. Adds `/groups/tprice/pipelines/bin` to `~/.bashrc` PATH if not already there
@@ -386,12 +395,12 @@ tjp-launch --help
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `<pipeline>` | required | One of the 9 known pipelines |
+| `<pipeline>` | required | One of the 13 known pipelines |
 | `--config <path>` | `$USER_PIPELINES/<pipeline>/config.yaml` | Path to YAML config file |
 | `--dev` | off | Submit to `dev` partition (`--time=02:00:00`) |
 | `--help` / `-h` | — | Show help |
 
-**Known pipelines:** `addone bulkrnaseq psoma virome cellranger cellranger-mkfastq cellranger-multi spaceranger xeniumranger sqanti3 wf-transcriptomes`
+**Known pipelines:** `addone bulkrnaseq psoma virome cellranger cellranger-mkfastq cellranger-multi spaceranger xeniumranger sqanti3 wf-transcriptomes dconvatac dconvatac-gpu`
 
 **Run directory created:** `/work/$USER/pipelines/<pipeline>/runs/<YYYY-MM-DD_HH-MM-SS>/`
 
@@ -433,7 +442,7 @@ tjp-batch <pipeline> <samplesheet.csv> [options]
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `<pipeline>` | required | One of the 9 known pipelines |
+| `<pipeline>` | required | One of the 13 known pipelines |
 | `<samplesheet.csv>` | required | Path to samplesheet CSV file |
 | `--config <path>` | `$USER_PIPELINES/<pipeline>/config.yaml` | Base config YAML merged with samplesheet row values |
 | `--dry-run` | off | Print what would be submitted; do not submit |
@@ -444,7 +453,7 @@ tjp-batch <pipeline> <samplesheet.csv> [options]
 
 | Mode | Pipelines | Behavior |
 |------|-----------|----------|
-| **Per-row** | cellranger, cellranger-mkfastq, cellranger-multi, spaceranger, xeniumranger, sqanti3, wf-transcriptomes | One SLURM job per CSV row |
+| **Per-row** | cellranger, cellranger-mkfastq, cellranger-multi, spaceranger, xeniumranger, sqanti3, wf-transcriptomes, dconvatac, dconvatac-gpu | One SLURM job per CSV row |
 | **Per-sheet** | bulkrnaseq, psoma, virome | One SLURM job for all rows; Nextflow handles per-sample parallelism |
 
 **Samplesheet column schemas:**
@@ -458,6 +467,8 @@ spaceranger:       sample, fastqs, transcriptome, image, slide, area  [, unknown
 xeniumranger:      sample, xenium_bundle, command  [, segmentation_file, project_id, ...]
 sqanti3:           sample, isoforms, ref_gtf, ref_fasta  [, coverage, fl_count, project_id, ...]
 wf-transcriptomes: sample, fastq_dir, sample_sheet, ref_genome, ref_annotation  [, direct_rna, wf_version, ...]
+dconvatac:         sample, spatial_h5ad, reference_h5ad, labels_key
+dconvatac-gpu:     sample, spatial_h5ad, reference_h5ad, labels_key
 ```
 
 > Titan metadata columns (`project_id`, `sample_id`, `library_id`, `run_id`) are optional in all samplesheets. They are written to PLR-xxxx records but **not** passed to the pipeline itself.
@@ -482,7 +493,108 @@ tjp-batch bulkrnaseq samplesheet.csv --config /work/$USER/pipelines/bulkrnaseq/c
 
 ---
 
-### 5.4 tjp-test
+### 5.4 tjp-edit
+
+Open a pipeline's config file in your editor (`$EDITOR`, defaulting to `nano`).
+
+```bash
+tjp-edit <pipeline>
+tjp-edit --help
+
+# Override editor for this invocation
+EDITOR=vim tjp-edit psoma
+```
+
+**Arguments:**
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `<pipeline>` | required | One of the 13 known pipelines |
+| `--help` / `-h` | — | Show help |
+
+**What it does:** Resolves `$USER_PIPELINES/<pipeline>/config.yaml` and opens it in `$EDITOR`. If the config does not exist, exits with an error pointing to `tjp-setup`.
+
+**Aliases:** `hyperion-edit`, `biocruiser-edit`
+
+---
+
+### 5.5 tjp-validate
+
+Validate a pipeline config without submitting a job. Runs the same validator as `tjp-launch` but exits before SLURM submission.
+
+```bash
+tjp-validate <pipeline>
+tjp-validate <pipeline> --config /path/to/config.yaml
+tjp-validate --help
+```
+
+**Arguments:**
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `<pipeline>` | required | One of the 13 known pipelines |
+| `--config <path>` | `$USER_PIPELINES/<pipeline>/config.yaml` | Path to YAML config to validate |
+| `--help` / `-h` | — | Show help |
+
+**Aliases:** `hyperion-validate`, `biocruiser-validate`
+
+---
+
+### 5.6 tjp-test-suite
+
+Comprehensive three-layer test harness that replaces `tjp-test` + `tjp-test-validate`. Runs offline validation, registry wiring checks, and optionally full SLURM execution on the dev partition.
+
+```bash
+tjp-test-suite                                           # run all layers for all pipelines
+tjp-test-suite --layer 1                                 # offline validation only (~30s)
+tjp-test-suite --layer 2                                 # registry/SLURM wiring, no submission
+tjp-test-suite --layer 3                                 # full SLURM execution on dev partition
+tjp-test-suite --pipeline cellranger --layer 3           # single pipeline, full run
+tjp-test-suite --clean                                   # wipe test scratch before running
+tjp-test-suite --timeout 120                             # wait up to 120 minutes for Layer 3
+tjp-test-suite --normal                                  # use normal partition instead of dev
+tjp-test-suite --help
+```
+
+**Arguments:**
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--layer 1\|2\|3\|all` | `all` | Layer(s) to run |
+| `--pipeline <name>` | all pipelines | Test only this pipeline |
+| `--clean` | off | Wipe `$TEST_SCRATCH` before running |
+| `--no-fixtures` | off | Skip Layer 3 fixture prep (assume already present) |
+| `--timeout <minutes>` | `60` | Max wait time for Layer 3 SLURM jobs |
+| `--dev` | on | Use dev partition for Layer 3 (default) |
+| `--normal` | off | Use normal partition for Layer 3 |
+| `-v` / `--verbose` | off | Show stdout/stderr from fixture generators and validators |
+| `--help` / `-h` | — | Show help |
+
+**Layer descriptions:**
+
+| Layer | What it tests | Runtime |
+|-------|--------------|---------|
+| 1 | Config templates, schema files, validator logic (offline) | ~30s |
+| 2 | SLURM template existence, registry wiring, native flags (no job submission) | ~2min |
+| 3 | Full SLURM execution on dev partition using minimal test fixtures | ~20–40min |
+
+**Test module interface:** test modules live in `bin/lib/tests/test_<pipeline>.sh`. Each defines `l1_*`, `l2_*`, `l3_fixture_*`, `l3_submit_*`, `l3_validate_*`, `l3_teardown_*` functions. Set `L3_SKIP=true` in a module to skip Layer 3 (e.g., xeniumranger — no minimal test bundle available).
+
+**Environment:**
+
+```bash
+TEST_SCRATCH=/scratch/juno/$USER/pipelines/test-suite   # override with $TEST_SCRATCH
+```
+
+**Aliases:** `hyperion-test-suite`
+
+**Replaces:** `tjp-test`, `tjp-test-validate` (kept for backwards compatibility)
+
+---
+
+### 5.7 tjp-test (deprecated)
+
+> **Replaced by `tjp-test-suite --layer 3 --pipeline <name>`**. Kept for backwards compatibility.
 
 Runs a smoke test for a pipeline using pre-staged test data on the `dev` partition.
 
@@ -531,7 +643,9 @@ tjp-test-validate psoma     # 3. validate outputs
 
 ---
 
-### 5.5 tjp-test-validate
+### 5.8 tjp-test-validate (deprecated)
+
+> **Replaced by `tjp-test-suite --layer 3 --pipeline <name>`**. Kept for backwards compatibility.
 
 Checks that a completed smoke test produced the expected output files.
 
@@ -605,7 +719,7 @@ files: <sample_id>/outs/web_summary.html
 
 ---
 
-### 5.6 labdata
+### 5.9 labdata
 
 Local Titan metadata store CLI. Every `tjp-launch` and `tjp-batch` run auto-registers a PLR-xxxx record; use `labdata` to query and inspect them.
 
@@ -699,6 +813,8 @@ labdata status    # print summary counts: total runs, by pipeline, by status
 | cellranger-multi | Native (no container) | Tool install | Per-row |
 | spaceranger | Native (no container) | Tool install | Per-row |
 | xeniumranger | Native (no container) | Tool install | Per-row |
+| dconvatac | Submoduled container | Single `.sif` | Per-row |
+| dconvatac-gpu | Submoduled container | Single `.sif` (+ A30 GPU) | Per-row |
 
 ---
 
@@ -1571,6 +1687,109 @@ titan_run_id:
 - `feature_reference` is required for `Antibody Capture` and `CRISPR Guide Capture` libraries
 - FASTQs for all library types in a single sample are listed in the same `libraries` block
 - `fastq_id` must match the FASTQ filename prefix exactly (Cell Ranger reads `<fastq_id>_S*_L*_R*.fastq.gz`)
+
+---
+
+### 6.12 DeconvATAC
+
+Spatial ATAC deconvolution using Cell2Location. Takes a spatial ATAC `.h5ad` and a single-cell reference `.h5ad`, estimates cell-type proportions per spatial spot. CPU variant — runs on the `normal` partition.
+
+```bash
+# Setup
+vi /work/$USER/pipelines/dconvatac/config.yaml
+
+# Single run
+tjp-launch dconvatac
+tjp-launch dconvatac --config /path/to/config.yaml
+tjp-launch dconvatac --dev
+
+# Batch run (per-row — one SLURM job per spatial sample)
+vi /work/$USER/pipelines/dconvatac/samplesheet.csv
+tjp-batch dconvatac /work/$USER/pipelines/dconvatac/samplesheet.csv
+tjp-batch dconvatac samplesheet.csv --dry-run
+```
+
+**Config keys:**
+
+```yaml
+# Required inputs
+spatial_h5ad: /scratch/juno/$USER/myproject/spatial.h5ad      # spatial ATAC AnnData file
+reference_h5ad: /scratch/juno/$USER/myproject/reference.h5ad  # single-cell reference AnnData
+labels_key: cell_type                                          # obs column with cell-type labels
+
+# Required output
+output_dir: /scratch/juno/$USER/myproject/dconvatac_results
+
+# Optional feature selection
+run_hvp: true               # run highly_variable_peaks before deconvolution
+
+# Optional Cell2Location parameters
+N_cells_per_location: 8     # expected cells per spot
+detection_alpha: 20         # detection model tuning parameter
+max_epochs_spatial: 400     # training epochs for the spatial model
+max_epochs_ref: 400         # training epochs for the reference model
+use_gpu: false              # leave false for dconvatac (CPU); set true for dconvatac-gpu
+
+# Titan integration (optional)
+titan_project_id:           # PRJ-xxxx
+titan_sample_id:            # SMP-xxxx
+titan_library_id:           # LIB-xxxx
+titan_run_id:               # RUN-xxxx
+```
+
+**Batch samplesheet format:**
+
+```csv
+sample,spatial_h5ad,reference_h5ad,labels_key
+Sample_A,/scratch/juno/$USER/myproject/spatial_a.h5ad,/scratch/juno/$USER/reference.h5ad,cell_type
+Sample_B,/scratch/juno/$USER/myproject/spatial_b.h5ad,/scratch/juno/$USER/reference.h5ad,cell_type
+```
+
+**Container:**
+
+```bash
+# Build (local, requires sudo)
+cd containers/dconvatac/container && sudo ./build.sh
+
+# Transfer to HPC
+scp containers/dconvatac/dconvatac_latest.sif \
+    YOUR_NETID@juno.hpcre.utdallas.edu:/groups/tprice/pipelines/containers/dconvatac/
+```
+
+**Edge cases:**
+- `labels_key` must be a column in `reference_h5ad.obs` containing string cell-type labels
+- `run_hvp: true` uses `scanpy.pp.highly_variable_genes` on the ATAC peaks (treats peaks as features)
+- CPU training can be slow for large spatial datasets — prefer `dconvatac-gpu` for >50k spots or >400 epochs
+- Outputs go to `output_dir` directly (no scratch staging) — point to a durable path
+
+---
+
+### 6.13 DeconvATAC GPU
+
+GPU-accelerated variant of DeconvATAC. Identical config to `dconvatac` except the SLURM template adds `--partition=a30 --gres=gpu:nvidia_a30:1` and `--nv` to the Apptainer invocation. Set `use_gpu: true` in your config to enable PyTorch GPU training.
+
+```bash
+# Setup — uses the same config directory as dconvatac
+vi /work/$USER/pipelines/dconvatac-gpu/config.yaml
+# Set use_gpu: true
+
+# Single run
+tjp-launch dconvatac-gpu
+tjp-launch dconvatac-gpu --config /path/to/config.yaml
+
+# Batch run (per-row)
+tjp-batch dconvatac-gpu /work/$USER/pipelines/dconvatac-gpu/samplesheet.csv
+```
+
+**Config:** Identical to `dconvatac` (§6.12) with `use_gpu: true`.
+
+**SLURM resources:** 24h, 16 CPU, 128 GB, partition `a30`, 1× NVIDIA A30 GPU.
+
+**Edge cases:**
+- Must set `use_gpu: true` in config — the pipeline flag enables PyTorch CUDA device selection
+- The A30 partition has 2 nodes and may queue; use `squeue -p a30` to check availability
+- `--nv` in the Apptainer call is required to expose the GPU to the container
+- For CPU-only runs use `dconvatac` instead — submitting `dconvatac-gpu` with `use_gpu: false` wastes a GPU allocation
 
 ---
 

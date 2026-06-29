@@ -38,7 +38,7 @@ Thirteen pipelines are currently supported across three architecture patterns:
 ```
 hpc/
 ├── bin/
-│   ├── tjp-setup, tjp-launch, tjp-batch, tjp-test, tjp-test-validate, tjp-validate, labdata
+│   ├── tjp-setup, tjp-launch, tjp-batch, tjp-edit, tjp-validate, tjp-test-suite, labdata
 │   ├── hyperion-*, biocruiser-* (symlinks)
 │   └── lib/                  # common.sh, validate.sh, manifest.sh, metadata.sh, samplesheet.sh, branding.sh
 ├── containers/
@@ -48,11 +48,12 @@ hpc/
 │   ├── psoma/                # submodule: mwilde49/psoma @ v2.0.0
 │   ├── virome/               # submodule: mwilde49/virome-pipeline @ v1.4.0
 │   ├── sqanti3/              # submodule: mwilde49/longreads (SQANTI3 + wf-transcriptomes)
+│   ├── dconvatac/            # submodule: mwilde49/dconvatac @ v1.0.0 (spatial ATAC deconvolution)
 │   └── 10x/                  # submodule: mwilde49/10x @ v1.2.0 (Cell Ranger / Space Ranger / Xenium Ranger wrappers)
 ├── pipelines/
 │   └── addone/               # AddOne pipeline code
-├── slurm_templates/          # 11 SLURM job scripts (one per pipeline)
-├── templates/                # per-pipeline config templates + samplesheets (11 pipelines)
+├── slurm_templates/          # 13 SLURM job scripts (one per pipeline)
+├── templates/                # per-pipeline config templates + samplesheets (13 pipelines)
 ├── docs/                     # architecture diagrams and design docs
 │   ├── architecture.md       # Mermaid diagrams (6 diagrams)
 │   └── img/                  # Pre-rendered SVGs
@@ -120,12 +121,14 @@ All tools live in `bin/` and are also available as `hyperion-*` and `biocruiser-
 | `tjp-setup` | One-time workspace creation — copies config templates to `/work/$USER/pipelines/` |
 | `tjp-launch <pipeline>` | Launch a single run from a config YAML; creates timestamped run directory |
 | `tjp-batch <pipeline> samplesheet.csv` | Batch launch — one SLURM job per row in the samplesheet |
+| `tjp-edit <pipeline>` | Open the pipeline config for a given pipeline in `$EDITOR` (default: nano) |
 | `tjp-validate <pipeline>` | Validate config without submitting a job |
-| `tjp-test <pipeline>` | Submit a smoke test (2 samples, dev partition) |
-| `tjp-test-validate <pipeline>` | Check smoke test outputs after completion |
+| `tjp-test-suite` | Three-layer test harness for all pipelines (layers 1–3, offline to full SLURM) |
+| `tjp-test <pipeline>` | (deprecated) Single-pipeline smoke test; superseded by `tjp-test-suite` |
+| `tjp-test-validate <pipeline>` | (deprecated) Check smoke test outputs; superseded by `tjp-test-suite` |
 | `labdata` | Metadata management — find runs, show PLR-xxxx records, check status |
 
-Smoke testing is supported for `psoma`, `bulkrnaseq`, `cellranger`, and `spaceranger`.
+`tjp-test-suite` is the primary testing path; `tjp-test` and `tjp-test-validate` are kept for backwards compatibility.
 
 ---
 

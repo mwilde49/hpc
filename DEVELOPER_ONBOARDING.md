@@ -1,6 +1,6 @@
 # BioCruiser / Hyperion Compute — Developer Onboarding Guide
 
-This document is a comprehensive technical reference for developers joining the TJP HPC pipeline framework. It covers every layer of the system, traces execution flows step-by-step for all eleven pipelines, and explains the design decisions behind each component.
+This document is a comprehensive technical reference for developers joining the TJP HPC pipeline framework. It covers every layer of the system, traces execution flows step-by-step for all thirteen pipelines, and explains the design decisions behind each component.
 
 ---
 
@@ -30,7 +30,7 @@ This document is a comprehensive technical reference for developers joining the 
 
 ## 1. System Overview
 
-This framework runs bioinformatics pipelines on the Juno HPC cluster for the TJP research group. It is deployed to `/groups/tprice/pipelines` and provides eleven pipelines:
+This framework runs bioinformatics pipelines on the Juno HPC cluster for the TJP research group. It is deployed to `/groups/tprice/pipelines` and provides thirteen pipelines:
 
 | Pipeline | Type | Purpose |
 |----------|------|---------|
@@ -45,16 +45,20 @@ This framework runs bioinformatics pipelines on the Juno HPC cluster for the TJP
 | **Virome** | Submoduled (native Nextflow) | Viral profiling (Kraken2/MetaPhlAn3) |
 | **SQANTI3** | Submoduled (SLURM DAG) | Long-read isoform QC (4-stage pipeline) |
 | **wf-transcriptomes** | Submoduled (Nextflow SLURM executor) | ONT full-length transcript analysis |
+| **DeconvATAC** | Submoduled (mwilde49/dconvatac) | Spatial ATAC deconvolution — Cell2Location (CPU) |
+| **DeconvATAC GPU** | Submoduled (mwilde49/dconvatac) | Spatial ATAC deconvolution — Cell2Location (A30 GPU) |
 
-Users interact through seven CLI tools:
+Users interact through nine CLI tools:
 
 ```
 tjp-setup          →  One-time workspace initialization
 tjp-launch         →  Submit a single pipeline run
 tjp-batch          →  Batch submission from CSV samplesheet
-tjp-test           →  Smoke test with bundled test data
-tjp-test-validate  →  Verify smoke test outputs
+tjp-edit           →  Open pipeline config in $EDITOR (default: nano)
 tjp-validate       →  Validate config without submitting
+tjp-test-suite     →  Comprehensive 3-layer test harness (replaces tjp-test)
+tjp-test           →  (deprecated) Smoke test with bundled test data
+tjp-test-validate  →  (deprecated) Verify smoke test outputs
 labdata            →  Metadata management (find/show PLR-xxxx records)
 ```
 
@@ -93,6 +97,8 @@ Key resource allocations:
 | Virome | 12h | 20 | 64 GB | No |
 | SQANTI3 | Orchestrator: 1h; stages: dynamic | Dynamic | Dynamic | No |
 | wf-transcriptomes | 24h head job; sub-jobs dynamic | 2 (head) | 8 GB (head) | No |
+| DeconvATAC | 24h | 16 | 128 GB | No |
+| DeconvATAC GPU | 24h | 16 | 128 GB | No (a30 partition, 1× A30 GPU) |
 
 ### Layer 3: Execution Environment (the sealed toolbox)
 
@@ -232,7 +238,7 @@ One-time script that:
 
 ### 3.6 Samplesheet Library (`bin/lib/samplesheet.sh`)
 
-Provides CSV samplesheet validation and parsing for all eleven pipelines. All batch-mode operations go through this library.
+Provides CSV samplesheet validation and parsing for all thirteen pipelines. All batch-mode operations go through this library.
 
 **Key public functions:**
 

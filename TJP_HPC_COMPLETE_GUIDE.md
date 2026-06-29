@@ -1,7 +1,7 @@
 # TJP HPC Pipeline Framework — Complete Operational Guide
 
 Version: 6.1
-Status: Production — 11 pipelines running on Juno HPC
+Status: Production — 13 pipelines running on Juno HPC
 Last updated: 2026-05-19
 Audience: Group members, new developers, bioinformaticians
 
@@ -61,6 +61,8 @@ Write code locally → Build container → Push to HPC → Submit job via SLURM
 | Cell Ranger Multi | Native 10x | Multi-library (GEX+VDJ, CITE-seq, CellPlex, Flex) |
 | Space Ranger | Native 10x | Spatial gene expression |
 | Xenium Ranger | Native 10x | In situ transcriptomics |
+| DeconvATAC | Submoduled (mwilde49/dconvatac) | Spatial ATAC deconvolution (CPU, Cell2Location) |
+| DeconvATAC GPU | Submoduled (mwilde49/dconvatac) | Spatial ATAC deconvolution (A30 GPU, Cell2Location) |
 
 ### CLI Tools
 
@@ -68,9 +70,11 @@ Write code locally → Build container → Push to HPC → Submit job via SLURM
 tjp-setup          →  One-time workspace initialization
 tjp-launch         →  Submit a single pipeline run
 tjp-batch          →  Batch submission from CSV samplesheet
-tjp-test           →  Smoke test with bundled test data
-tjp-test-validate  →  Verify smoke test outputs
+tjp-edit           →  Open pipeline config in $EDITOR (default: nano)
 tjp-validate       →  Validate config without submitting
+tjp-test-suite     →  Comprehensive 3-layer test harness (replaces tjp-test)
+tjp-test           →  (deprecated) Smoke test with bundled test data
+tjp-test-validate  →  (deprecated) Verify smoke test outputs
 labdata            →  Metadata management (PLR-xxxx records)
 ```
 

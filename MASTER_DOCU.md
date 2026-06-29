@@ -19,6 +19,7 @@ This file is the single entry point for all documentation in the TJP HPC pipelin
 | Check Juno cluster specs | [HPC_SYSTEM_MAP.md](#8-hpc_system_mapmd) |
 | Set up BulkRNASeq specifically | [BULKRNASEQ_HPC_GUIDE.md](#9-bulkrnaseq_hpc_guidemd) |
 | Set up Cell Ranger / multi specifically | [CELLRANGER_GUIDE.md](#15-cellranger_guidemd) |
+| Set up DeconvATAC specifically | [DCONVATAC_HPC_GUIDE.md](#16-dconvatac_hpc_guidemd) |
 | Understand Titan metadata | [metadata/SCHEMA.md](#11-metadataschemamd) |
 | Deploy or develop in this repo | [TJP_HPC_COMPLETE_GUIDE.md](#6-tjp_hpc_complete_guidemd) |
 | Debug a pipeline failure | [TROUBLESHOOTING.md](#16-troubleshootingmd) |
@@ -38,7 +39,7 @@ This file is the single entry point for all documentation in the TJP HPC pipelin
 
 **What it covers:**
 - Project overview and version
-- Pipeline table (all 11 pipelines, type, description, submodule pins)
+- Pipeline table (all 13 pipelines, type, description, submodule pins)
 - Directory structure overview
 - Quick start (4 steps: clone, setup, launch, batch)
 - CLI tool reference table
@@ -85,7 +86,7 @@ This file is the single entry point for all documentation in the TJP HPC pipelin
 
 **When to read:** The day-to-day reference for running analyses. More detailed than ONBOARDING.md. Use `Ctrl+F` to jump to your specific pipeline.
 
-**Pipelines covered in depth:** BulkRNASeq, Psoma, Virome, wf-transcriptomes, SQANTI3, Cell Ranger, Cell Ranger mkfastq, Cell Ranger Multi, Space Ranger, Xenium Ranger.
+**Pipelines covered in depth:** BulkRNASeq, Psoma, Virome, wf-transcriptomes, SQANTI3, Cell Ranger, Cell Ranger mkfastq, Cell Ranger Multi, Space Ranger, Xenium Ranger, DeconvATAC.
 
 ---
 
@@ -98,8 +99,8 @@ This file is the single entry point for all documentation in the TJP HPC pipelin
 - SLURM job management (sbatch, squeue, scancel, sacct)
 - Apptainer container commands (exec, build, pull, bind mounts)
 - Git and submodule commands
-- All framework CLI tools with every flag (`tjp-setup`, `tjp-launch`, `tjp-batch`, `tjp-test`, `tjp-test-validate`, `labdata`)
-- Per-pipeline reference sections (§6.1–§6.11): commands, config keys, output layout, edge cases
+- All framework CLI tools with every flag (`tjp-setup`, `tjp-launch`, `tjp-batch`, `tjp-edit`, `tjp-validate`, `tjp-test-suite`, `tjp-test`, `tjp-test-validate`, `labdata`)
+- Per-pipeline reference sections (§6.1–§6.13): commands, config keys, output layout, edge cases
 - Shared reference paths (all pre-installed references on Juno)
 - Titan integration key reference
 - Environment variables and path conventions
@@ -125,7 +126,7 @@ This file is the single entry point for all documentation in the TJP HPC pipelin
   - Workspace setup (`bin/tjp-setup`)
   - Samplesheet library (`bin/lib/samplesheet.sh`)
   - Metadata (`bin/lib/metadata.sh`)
-- Step-by-step execution flows for all 11 pipelines (how `tjp-launch` dispatches each one)
+- Step-by-step execution flows for all 13 pipelines (how `tjp-launch` dispatches each one)
 - Pipeline comparison matrix (resources, container strategy, config handling)
 - Testing infrastructure (smoke test framework, test data locations)
 - How to add a new pipeline (checklist for all three patterns)
@@ -217,7 +218,7 @@ This file is the single entry point for all documentation in the TJP HPC pipelin
 Six diagrams (Mermaid source + pre-rendered SVGs in `docs/img/`):
 1. **System Architecture** — four-layer stack with all components
 2. **Execution Flow** — `tjp-launch` → SLURM → container/native → stage-out
-3. **Pipeline Taxonomy** — all 11 pipelines organized by execution model
+3. **Pipeline Taxonomy** — all 13 pipelines organized by execution model
 4. **Filesystem Layout** — scratch, work, groups, and their relationships
 5. **Titan Roadmap** — local metadata → Titan migration path
 6. **Batch Workflow** — `tjp-batch` samplesheet dispatch (per-row vs per-sheet)
@@ -293,7 +294,25 @@ python3 docs/generate_diagrams.py
 
 ---
 
-### 16. TROUBLESHOOTING.md
+### 16. DCONVATAC_HPC_GUIDE.md
+
+**Audience:** Users running DeconvATAC; developers maintaining the dconvatac submodule.
+
+**What it covers:**
+- Submodule relationship (hpc framework + mwilde49/dconvatac @ v1.0.0)
+- Container build instructions (local, requires sudo)
+- Input requirements: spatial ATAC `.h5ad` and single-cell reference `.h5ad`
+- Full config reference with all Cell2Location parameters (`N_cells_per_location`, `detection_alpha`, epoch counts)
+- CPU vs GPU variant — when to use `dconvatac` vs `dconvatac-gpu`
+- Batch execution (per-row mode: one SLURM job per spatial sample)
+- `.sif` transfer to HPC
+- Titan integration fields
+
+**When to read:** The dedicated reference for DeconvATAC. More detailed than USER_GUIDE.md for this pipeline.
+
+---
+
+### 17. TROUBLESHOOTING.md
 
 **Audience:** Anyone debugging a pipeline failure.
 
@@ -311,7 +330,7 @@ python3 docs/generate_diagrams.py
 
 ---
 
-### 17. GLOSSARY.md
+### 18. GLOSSARY.md
 
 **Audience:** New group members and anyone encountering unfamiliar terms.
 
@@ -322,7 +341,7 @@ python3 docs/generate_diagrams.py
 
 ---
 
-### 18. test_data/README.md
+### 19. test_data/README.md
 
 **Audience:** Developers running smoke tests; anyone staging test data on Juno.
 
@@ -337,7 +356,7 @@ python3 docs/generate_diagrams.py
 
 ---
 
-### 19. bin/check-docs-freshness
+### 20. bin/check-docs-freshness
 
 **Audience:** Developers; CI/CD automation.
 
@@ -351,18 +370,18 @@ This is a shell script, not a document. It checks that:
 
 ---
 
-### 20. templates/schemas/
+### 21. templates/schemas/
 
 **Audience:** Developers and users who want field-level documentation for config YAMLs.
 
 **What it covers:**
-One annotated YAML schema file per pipeline (11 files). Each schema documents every config key with its type, required/optional status, default value, description, and example.
+One annotated YAML schema file per pipeline (13 files). Each schema documents every config key with its type, required/optional status, default value, description, and example.
 
 **When to read:** When writing a config from scratch and you want to understand all available fields beyond what the template shows. Also useful for IDE integration.
 
 ---
 
-### 21. docs/decisions/
+### 22. docs/decisions/
 
 **Audience:** Developers making architectural changes; anyone wondering "why was it built this way?"
 
@@ -456,11 +475,11 @@ All 11 documentation additions originally proposed for industry-standard quality
 | 1 | Version changelog | `CHANGELOG.md` | ✓ Done |
 | 2 | Cell Ranger suite guide | `CELLRANGER_GUIDE.md` | ✓ Done |
 | 3 | Contributing guide | `CONTRIBUTING.md` | ✓ Done |
-| 4 | Config schema annotations | `templates/schemas/` (11 files) + `# Required fields` in all templates | ✓ Done |
+| 4 | Config schema annotations | `templates/schemas/` (13 files) + `# Required fields` in all templates | ✓ Done |
 | 5 | Automated doc freshness check | `bin/check-docs-freshness` | ✓ Done |
 | 6 | Consolidated troubleshooting | `TROUBLESHOOTING.md` | ✓ Done |
 | 7 | Test data documentation | `test_data/README.md` | ✓ Done |
-| 8 | Per-pipeline YAML schemas | `templates/schemas/*.yaml` (11 files) | ✓ Done |
+| 8 | Per-pipeline YAML schemas | `templates/schemas/*.yaml` (13 files) | ✓ Done |
 | 9 | Glossary | `GLOSSARY.md` | ✓ Done |
 | 10 | Architecture Decision Records | `docs/decisions/` (5 ADRs) | ✓ Done |
 | 11 | Bug reporting / feedback pointer | Added to `ONBOARDING.md` and `USER_GUIDE.md` | ✓ Done |

@@ -36,6 +36,13 @@ This guide covers how to configure and run bioinformatics pipelines available on
 | Space Ranger            | Spatial gene expression (Visium)                              | 24h, 16 CPU, 128GB, exclusive   |
 | Xenium Ranger           | In situ transcriptomics (Xenium)                              | 12h, 16 CPU, 128GB, exclusive   |
 
+### Spatial ATAC Deconvolution
+
+|    **Pipeline**    |    **Purpose**                                                        |    **SLURM Resources**                   |
+|--------------------|-----------------------------------------------------------------------|------------------------------------------|
+| DeconvATAC         | Cell2Location deconvolution of spatial ATAC chromatin accessibility   | 24h, 16 CPU, 128GB (CPU mode)            |
+| DeconvATAC GPU     | Same as DeconvATAC with GPU-accelerated training                      | 24h, 16 CPU, 128GB + 1× A30 GPU         |
+
 ---
 
 ## Table of Contents
@@ -49,14 +56,15 @@ This guide covers how to configure and run bioinformatics pipelines available on
 7. [wf-transcriptomes (ONT Full-Length Transcript Analysis)](#7-wf-transcriptomes-ont-full-length-transcript-analysis)
 8. [SQANTI3 (Long-Read Isoform QC)](#8-sqanti3-long-read-isoform-qc)
 9. [10x Genomics Pipelines](#9-10x-genomics-pipelines)
-10. [Batch Launching (Multiple Samples)](#10-batch-launching-multiple-samples)
-11. [Launching a Pipeline](#11-launching-a-pipeline)
-12. [Monitoring Your Job](#12-monitoring-your-job)
-13. [Run Metadata (labdata)](#13-run-metadata-labdata)
-14. [Finding Your Results](#14-finding-your-results)
-15. [Smoke Testing](#15-smoke-testing)
-16. [Re-running and Reproducibility](#16-re-running-and-reproducibility)
-17. [Troubleshooting](#17-troubleshooting)
+10. [DeconvATAC (Spatial ATAC Deconvolution)](#10-dconvatac-spatial-atac-deconvolution)
+11. [Batch Launching (Multiple Samples)](#11-batch-launching-multiple-samples)
+12. [Launching a Pipeline](#12-launching-a-pipeline)
+13. [Monitoring Your Job](#13-monitoring-your-job)
+14. [Run Metadata (labdata)](#14-run-metadata-labdata)
+15. [Finding Your Results](#15-finding-your-results)
+16. [Smoke Testing](#16-smoke-testing)
+17. [Re-running and Reproducibility](#17-re-running-and-reproducibility)
+18. [Troubleshooting](#18-troubleshooting)
 
 ---
 
@@ -551,7 +559,62 @@ tjp-launch xeniumranger
 
 ---
 
-## 10. Batch Launching (Multiple Samples)
+## 10. DeconvATAC (Spatial ATAC Deconvolution)
+
+DeconvATAC uses [Cell2Location](https://cell2location.readthedocs.io/) to deconvolve spatial ATAC-seq data: given a spatial `.h5ad` and a single-cell reference `.h5ad`, it estimates cell-type proportions at each spatial spot. Two registered pipelines differ only in compute: `dconvatac` (CPU) and `dconvatac-gpu` (A30 GPU, faster training).
+
+```bash
+vi /work/$USER/pipelines/dconvatac/config.yaml
+```
+
+Fields:
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `spatial_h5ad` | yes | Path to spatial ATAC AnnData file (`.h5ad`) |
+| `reference_h5ad` | yes | Path to single-cell reference AnnData file (`.h5ad`) |
+| `labels_key` | yes | `obs` column name for cell-type labels in the reference |
+| `output_dir` | yes | Directory for Cell2Location outputs |
+| `run_hvp` | no | Run highly-variable peak selection before deconvolution (default: `true`) |
+| `N_cells_per_location` | no | Expected cells per spatial location (default: `8`) |
+| `detection_alpha` | no | Detection model tuning parameter (default: `20`) |
+| `max_epochs_spatial` | no | Training epochs for the spatial model (default: `400`) |
+| `max_epochs_ref` | no | Training epochs for the reference model (default: `400`) |
+| `use_gpu` | no | Enable GPU training — set `true` when using `dconvatac-gpu` (default: `false`) |
+
+Launch (CPU mode):
+
+```bash
+tjp-launch dconvatac
+```
+
+Launch (GPU mode — submit to A30 partition):
+
+```bash
+tjp-launch dconvatac-gpu
+# Also set use_gpu: true in your config.yaml
+```
+
+Batch launch (one SLURM job per spatial sample):
+
+```bash
+vi /work/$USER/pipelines/dconvatac/samplesheet.csv
+tjp-batch dconvatac /work/$USER/pipelines/dconvatac/samplesheet.csv
+```
+
+Samplesheet format:
+
+```csv
+sample,spatial_h5ad,reference_h5ad,labels_key
+Sample_A,/scratch/juno/$USER/myproject/spatial_a.h5ad,/scratch/juno/$USER/reference.h5ad,cell_type
+Sample_B,/scratch/juno/$USER/myproject/spatial_b.h5ad,/scratch/juno/$USER/reference.h5ad,cell_type
+```
+
+> See `DCONVATAC_HPC_GUIDE.md` for full Cell2Location parameter guidance, container build instructions, and troubleshooting.
+
+---
+
+## 11. Batch Launching (Multiple Samples)
 
 `tjp-batch` launches the same pipeline on multiple samples from a samplesheet. This is the recommended way to process a cohort all at once rather than submitting jobs one at a time.
 
@@ -571,12 +634,12 @@ tjp-batch psoma samplesheet.csv --dry-run
 
 | Mode | Pipelines | Behavior |
 |------|-----------|----------|
-| Per-row | cellranger, cellranger-mkfastq, cellranger-multi, spaceranger, xeniumranger, sqanti3, wf-transcriptomes | One SLURM job per CSV row |
+| Per-row | cellranger, cellranger-mkfastq, cellranger-multi, spaceranger, xeniumranger, sqanti3, wf-transcriptomes, dconvatac, dconvatac-gpu | One SLURM job per CSV row |
 | Per-sheet | bulkrnaseq, psoma, virome | One SLURM job for all rows |
 
 ---
 
-## 11. Launching a Pipeline
+## 12. Launching a Pipeline
 
 All pipelines are launched the same way:
 
@@ -632,7 +695,7 @@ tjp-launch psoma --config /path/to/my_custom_config.yaml
 
 ---
 
-## 12. Monitoring Your Job
+## 13. Monitoring Your Job
 
 You will want to monitor the tail of 99% of jobs to ensure they have launched properly.
 
@@ -664,7 +727,7 @@ scancel <JOBID>
 
 ---
 
-## 13. Run Metadata (labdata)
+## 14. Run Metadata (labdata)
 
 Every launch automatically creates a local metadata record with a unique run ID (PLR-xxxx). You can use `labdata` to look up any run, check its status, or find outputs without having to remember timestamps.
 
@@ -689,7 +752,7 @@ titan_run_id:       # RUN-xxxx
 
 ---
 
-## 14. Finding Your Results
+## 15. Finding Your Results
 
 Pipeline outputs are written to your **scratch** directory during execution, then automatically **archived to your work directory** after a successful run. Scratch is fast but wiped every 45 days — the work archive is durable.
 
@@ -754,7 +817,7 @@ Each run is fully self-contained in your **work** directory — metadata, logs, 
 
 ---
 
-## 15. Smoke Testing
+## 16. Smoke Testing
 
 You can quickly verify that a pipeline works end-to-end using pre-configured test data (2 samples submitted to the dev partition):
 
@@ -782,7 +845,7 @@ tjp-test-validate psoma --run 2026-03-05_14-00-55
 
 ---
 
-## 16. Re-running and Reproducibility
+## 17. Re-running and Reproducibility
 
 - Each launch creates a **new** timestamped run directory. Previous runs are never overwritten.
 - The `manifest.json` file records the exact git commit, container checksum, config, and paths used — so any run can be reproduced.
@@ -794,7 +857,7 @@ tjp-launch psoma --config /work/$USER/pipelines/psoma/runs/2026-03-04_14-30-00/c
 
 ---
 
-## 17. Troubleshooting
+## 18. Troubleshooting
 
 |         Problem                                         |                                 Solution                                                           |
 |---------------------------------------------------------|----------------------------------------------------------------------------------------------------|

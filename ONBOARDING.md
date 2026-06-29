@@ -29,6 +29,8 @@ Your workspace will look like this:
 ├── cellranger-multi/   ← 10x multi-library (GEX+VDJ, CITE-seq, CellPlex, Flex)
 ├── spaceranger/     ← 10x spatial
 ├── xeniumranger/    ← 10x in situ
+├── dconvatac/       ← spatial ATAC deconvolution (CPU)
+├── dconvatac-gpu/   ← spatial ATAC deconvolution (A30 GPU)
 └── metadata/        ← local run records (PLR-xxxx.json)
 ```
 
