@@ -1761,6 +1761,7 @@ scp containers/dconvatac/dconvatac_latest.sif \
 
 **Edge cases:**
 - `labels_key` must be a column in `reference_h5ad.obs` containing string cell-type labels
+- `spatial_h5ad` and `reference_h5ad` are automatically aligned to their shared peak set (exact `var_name` match) before deconvolution — peaks unique to either file are dropped and logged. Independently peak-called datasets rarely match exactly; cell2location requires an identical feature space.
 - `run_hvp: true` uses `scanpy.pp.highly_variable_genes` on the ATAC peaks (treats peaks as features)
 - CPU training can be slow for large spatial datasets — prefer `dconvatac-gpu` for >50k spots or >400 epochs
 - Outputs go to `output_dir` directly (no scratch staging) — point to a durable path
