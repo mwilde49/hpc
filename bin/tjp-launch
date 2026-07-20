@@ -336,6 +336,12 @@ case "$PIPELINE" in
         # AddOne: pass config.yaml directly as $1 to SLURM template
         SBATCH_CONFIG_ARG="$RUN_DIR/config.yaml"
         ;;
+    dconvatac|dconvatac-gpu)
+        # DeconvATAC: writes directly to output_dir, no scratch staging —
+        # pass config.yaml directly as $1, leave SCRATCH_OUTPUT_DIR empty so
+        # the SLURM template's archive-to-work step is skipped.
+        SBATCH_CONFIG_ARG="$RUN_DIR/config.yaml"
+        ;;
     bulkrnaseq)
         # BulkRNASeq: create scratch output dir, symlink UTDal repo files into it
         SCRATCH_OUTPUT_DIR="$SCRATCH_ROOT/pipelines/$PIPELINE/runs/$TS"
