@@ -15,6 +15,9 @@ output_dir: __SCRATCH__/myproject/dconvatac_results
 run_hvp: true               # run highly_variable_peaks before deconvolution
 
 # ── Cell2Location parameters ──────────────────────────────────────────────────
+spatial_batch_key:          # obs column in spatial_h5ad identifying distinct
+                             # sections/batches, e.g. "sample" — leave blank if
+                             # spatial_h5ad is a single section
 N_cells_per_location: 8     # expected number of cells per spatial location
 detection_alpha: 20         # detection model tuning parameter
 max_epochs_spatial: 400     # training epochs for the spatial model

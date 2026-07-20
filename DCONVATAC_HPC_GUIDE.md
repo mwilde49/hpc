@@ -81,6 +81,7 @@ One SLURM job per samplesheet row.
 | `labels_key` | **required** | `obs` column name for cell type labels |
 | `output_dir` | **required** | Directory for outputs (created if absent) |
 | `run_hvp` | `true` | Run highly variable peak selection |
+| `spatial_batch_key` | *(none)* | `obs` column in `spatial_h5ad` identifying distinct sections/batches — passed to Cell2Location as `batch_key` for joint multi-section modeling. Leave blank for single-section data. |
 | `N_cells_per_location` | `8` | Expected cells per spatial location |
 | `detection_alpha` | `20` | Cell2Location detection model parameter |
 | `max_epochs_spatial` | `400` | Training epochs — spatial model |

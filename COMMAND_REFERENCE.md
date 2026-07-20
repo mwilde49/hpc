@@ -1724,6 +1724,9 @@ output_dir: /scratch/juno/$USER/myproject/dconvatac_results
 run_hvp: true               # run highly_variable_peaks before deconvolution
 
 # Optional Cell2Location parameters
+spatial_batch_key:          # obs column in spatial_h5ad marking distinct sections/batches
+                             # (e.g. multiple tissue sections pooled in one file) — passed to
+                             # Cell2Location as batch_key; leave blank for single-section data
 N_cells_per_location: 8     # expected cells per spot
 detection_alpha: 20         # detection model tuning parameter
 max_epochs_spatial: 400     # training epochs for the spatial model

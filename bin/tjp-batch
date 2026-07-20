@@ -418,8 +418,9 @@ _gen_dconvatac_config() {
     [[ -z "$labels_key" ]] && labels_key="cell_type"
 
     # Carry cell2location parameters from base config
-    local run_hvp N_cells_per_location detection_alpha max_epochs_spatial max_epochs_ref use_gpu
+    local run_hvp spatial_batch_key N_cells_per_location detection_alpha max_epochs_spatial max_epochs_ref use_gpu
     run_hvp=$(yaml_get              "$BASE_CONFIG" "run_hvp"              2>/dev/null || echo "true")
+    spatial_batch_key=$(yaml_get    "$BASE_CONFIG" "spatial_batch_key"    2>/dev/null || echo "")
     N_cells_per_location=$(yaml_get "$BASE_CONFIG" "N_cells_per_location" 2>/dev/null || echo "8")
     detection_alpha=$(yaml_get      "$BASE_CONFIG" "detection_alpha"      2>/dev/null || echo "20")
     max_epochs_spatial=$(yaml_get   "$BASE_CONFIG" "max_epochs_spatial"   2>/dev/null || echo "400")
@@ -446,6 +447,7 @@ _gen_dconvatac_config() {
         printf 'labels_key: %s\n'           "$labels_key"
         printf 'output_dir: %s\n'           "$output_dir"
         printf 'run_hvp: %s\n'              "$run_hvp"
+        [[ -n "$spatial_batch_key" ]] && printf 'spatial_batch_key: %s\n' "$spatial_batch_key"
         printf 'N_cells_per_location: %s\n' "$N_cells_per_location"
         printf 'detection_alpha: %s\n'      "$detection_alpha"
         printf 'max_epochs_spatial: %s\n'   "$max_epochs_spatial"
