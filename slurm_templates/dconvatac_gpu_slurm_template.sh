@@ -14,12 +14,18 @@ PROJECT_ROOT=/groups/tprice/pipelines
 SCRATCH_ROOT=/scratch/juno/$USER
 WORK_ROOT=/work/$USER
 
+source "$PROJECT_ROOT/bin/lib/repro.sh"
+
 CONTAINER=$PROJECT_ROOT/containers/dconvatac/dconvatac_v1.0.0.sif
 PIPELINE_SCRIPT=$PROJECT_ROOT/containers/dconvatac/pipeline/dconvatac.py
 
 CONFIG=${1:-}
 RUN_DIR=${2:-}
 SCRATCH_OUTPUT_DIR=${3:-}
+
+# --- Reproducibility capture (node, partition, resources, invocation log) ---
+capture_juno_env "$RUN_DIR"
+trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT
 
 # --- Pre-flight checks ---
 
@@ -54,7 +60,8 @@ echo "====================================================================="
 
 mkdir -p logs
 
-apptainer exec \
+run_logged "${RUN_DIR:+$RUN_DIR/invocation.log}" \
+    apptainer exec \
     --nv \
     --cleanenv \
     --env PYTHONNOUSERSITE=1 \

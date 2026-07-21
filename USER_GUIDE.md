@@ -366,6 +366,15 @@ tjp-launch virome                    # single run
 tjp-batch virome samplesheet.csv     # all samples at once
 ```
 
+### Advanced: BLAST verification (manual, not yet wired into tjp-launch)
+
+Virome v1.5.0 added a BLAST verification offshoot (`blast_verify.nf`) for cross-checking virus calls, plus HSV-1 life-cycle-phase inference. It is not part of the `tjp-launch`/`tjp-batch` flow — run it directly from the submodule:
+
+```bash
+cd /groups/tprice/pipelines/containers/virome
+nextflow run blast_verify.nf -profile slurm -params-file assets/config_blast_pd19.yaml
+```
+
 ---
 
 ## 7. wf-transcriptomes (ONT Full-Length Transcript Analysis)
@@ -819,29 +828,25 @@ Each run is fully self-contained in your **work** directory — metadata, logs, 
 
 ## 16. Smoke Testing
 
-You can quickly verify that a pipeline works end-to-end using pre-configured test data (2 samples submitted to the dev partition):
+`tjp-test-suite` is the primary way to verify a pipeline works end-to-end. It runs a three-layer test harness for every registered pipeline:
+
+| Layer | What it tests | Runtime | Needs Juno? |
+|---|---|---|---|
+| 1 | Config templates, schema files, validator logic | ~30s | No |
+| 2 | SLURM template existence, registry wiring, native flags — no job submission | ~2min | No |
+| 3 | Full SLURM execution on the dev partition using minimal test fixtures | ~20–40min | Yes |
 
 ```bash
-tjp-test psoma              # submit smoke test
-squeue -u $USER             # monitor job
-tjp-test-validate psoma     # validate outputs after completion
+tjp-test-suite                                   # run all layers for all pipelines
+tjp-test-suite --layer 1                         # offline validation only — fast, no HPC needed
+tjp-test-suite --layer 3 --pipeline psoma         # single pipeline, full run
+tjp-test-suite --clean                            # wipe test scratch before running
+tjp-test-suite --layer 3 --pipeline cellranger -v  # verbose: show fixture/validator stdout+stderr
 ```
 
-Supported pipelines: `psoma`, `bulkrnaseq`, `cellranger`, and `spaceranger`.
+Layer 3 fixtures (synthetic FASTQs, tiny references) need to be staged once — see `test_data/fixtures/README.md`. A pipeline whose fixtures aren't available skips Layer 3 with a clear reason instead of failing (e.g., DeconvATAC and Xenium Ranger currently skip Layer 3 for this reason).
 
-`tjp-test` copies shared test FASTQs from the repo to your scratch directory, generates a test config with the correct reference paths, and delegates to `tjp-launch --dev`. After the job completes, `tjp-test-validate` checks that all expected output directories and key files (BAMs, count matrices) were produced.
-
-Use `--clean` to wipe previous test data and start fresh:
-
-```bash
-tjp-test psoma --clean
-```
-
-To validate a specific run (instead of the most recent):
-
-```bash
-tjp-test-validate psoma --run 2026-03-05_14-00-55
-```
+> **Deprecated:** `tjp-test`/`tjp-test-validate` (single-pipeline smoke test for `psoma`, `bulkrnaseq`, `cellranger`, `spaceranger` only) are kept for backwards compatibility but are no longer the primary testing path — use `tjp-test-suite` instead.
 
 ---
 
@@ -849,6 +854,11 @@ tjp-test-validate psoma --run 2026-03-05_14-00-55
 
 - Each launch creates a **new** timestamped run directory. Previous runs are never overwritten.
 - The `manifest.json` file records the exact git commit, container checksum, config, and paths used — so any run can be reproduced.
+- Every run directory also contains, alongside `config.yaml` and `manifest.json`:
+  - **`juno_environment.json`** — which node and partition the job actually ran on, allocated CPUs/mem/GPU, start/end time, duration, exit code, and (best-effort) `sacct` accounting.
+  - **`invocation.log`** — the exact, fully-resolved command line that was run (the real `apptainer exec ...`/`nextflow run ...` invocation, not just the config).
+  - **`slurm_template_used.sh`** and **`pipeline_source.tar.gz`** — a frozen copy of the SLURM template and the pipeline's own source code exactly as they existed at launch time, so a later change to the shared repo or a submodule bump doesn't retroactively change what an old run "was."
+  - **`nextflow_logs/`** (BulkRNASeq, Psoma, Virome, wf-transcriptomes only) — `trace.txt`, `report.html`, `timeline.html`, `dag.html` from Nextflow's own per-process tracing.
 - To re-run with the same config, just run `tjp-launch` again. To re-run an old config, point to its snapshot:
 
 ```bash

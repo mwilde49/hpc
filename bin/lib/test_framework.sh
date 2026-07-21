@@ -49,11 +49,21 @@ _ts_update_layer_status() {
     local pipeline="$1" layer="$2" new_status="$3"
     local varname
     varname="$(_ts_layer_varname "$layer")"
-    local current="${!varname[$pipeline]:-}"
+    # Two-step indirection: ${!varname[$pipeline]} does NOT mean "array
+    # named by $varname, indexed by $pipeline" — bash tries to treat
+    # $pipeline's *value* as a scalar variable name instead, which dies
+    # with "unbound variable" under set -u the first time a given
+    # pipeline/layer key hasn't been set yet. Build the "array[key]"
+    # reference as a string first, then indirect on that.
+    local ref="${varname}[$pipeline]"
+    local current="${!ref:-}"
 
-    # Priority: fail > warn > skip > pass
+    # Priority: fail > warn > skip > pass. Each arm must return 0
+    # regardless of whether an upgrade happened — under set -e, a case arm
+    # that ends in a false `[[ ... ]] && eval ...` (no upgrade needed)
+    # would otherwise propagate as this function's own failure.
     case "$current" in
-        fail)   return ;;   # can't get worse
+        fail)   : ;;   # can't get worse
         warn)   [[ "$new_status" == "fail" ]] && eval "${varname}[$pipeline]=$new_status" ;;
         skip)   [[ "$new_status" == "fail" || "$new_status" == "warn" || "$new_status" == "pass" ]] \
                     && eval "${varname}[$pipeline]=$new_status" ;;
@@ -61,6 +71,7 @@ _ts_update_layer_status() {
                     && eval "${varname}[$pipeline]=$new_status" ;;
         "")     eval "${varname}[$pipeline]=$new_status" ;;
     esac
+    return 0
 }
 
 # _ts_record <status> <desc> <detail>

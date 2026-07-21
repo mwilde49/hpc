@@ -13,19 +13,27 @@ PROJECT_ROOT=/groups/tprice/pipelines
 SCRATCH_ROOT=/scratch/juno/$USER
 WORK_ROOT=/work/$USER
 
+source "$PROJECT_ROOT/bin/lib/repro.sh"
+
 CONTAINER=$PROJECT_ROOT/containers/addone_latest.sif
 PIPELINE=$PROJECT_ROOT/pipelines/addone/addone.py
 
 CONFIG=$1
+RUN_DIR=${2:-}
 
 if [ -z "$CONFIG" ]; then
     echo "Usage: sbatch addone_slurm_template.sh <config.yaml>"
     exit 1
 fi
 
+# --- Reproducibility capture (node, partition, resources, invocation log) ---
+capture_juno_env "$RUN_DIR"
+trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT
+
 mkdir -p logs
 
-apptainer exec \
+run_logged "${RUN_DIR:+$RUN_DIR/invocation.log}" \
+    apptainer exec \
     --bind $PROJECT_ROOT:$PROJECT_ROOT \
     --bind $SCRATCH_ROOT:$SCRATCH_ROOT \
     --bind $WORK_ROOT:$WORK_ROOT \

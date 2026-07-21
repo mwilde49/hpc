@@ -68,6 +68,26 @@ YAML
     ts_assert_fail "config missing 'sample_id' fails validator" \
         bash -c "source '$REPO_ROOT/bin/lib/common.sh' && source '$REPO_ROOT/bin/lib/validate.sh' && validate_config cellranger-multi '$bad_cfg'"
 
+    # Reproducibility manifest: source-snapshotting must resolve the 10x
+    # submodule commit SHA. Runs fully offline, no SLURM needed.
+    local mtmp
+    mtmp=$(mktemp -d)
+    echo "sample_id: test" > "$mtmp/config.yaml"
+    (
+        source "$REPO_ROOT/bin/lib/common.sh"
+        source "$REPO_ROOT/bin/lib/manifest.sh"
+        generate_manifest "$mtmp" cellranger-multi "$mtmp/config.yaml" \
+            "native:$(get_tool_path cellranger-multi 2>/dev/null || echo /groups/tprice/opt/cellranger-10.0.0)" \
+            "$REPO_ROOT/slurm_templates/cellranger_multi_slurm_template.sh"
+    )
+    local expected_sha
+    expected_sha=$(git -C "$REPO_ROOT/containers/10x" rev-parse HEAD 2>/dev/null)
+    ts_assert_exists   "manifest: slurm_template_used.sh snapshotted" "$mtmp/slurm_template_used.sh"
+    ts_assert_nonempty "manifest: pipeline_source.tar.gz snapshotted" "$mtmp/pipeline_source.tar.gz"
+    ts_assert_contains "manifest: pipeline_submodule_commit matches submodule HEAD" \
+        "$mtmp/manifest.json" "$expected_sha"
+    rm -rf "$mtmp"
+
     rm -rf "$tmpdir"
 }
 
@@ -107,6 +127,15 @@ YAML
     # Wrapper script must exist in 10x submodule
     ts_assert_exists "l2: cellranger-multi-run.sh wrapper exists" \
         "$REPO_ROOT/containers/10x/bin/cellranger-multi-run.sh"
+
+    # Reproducibility logging: repro.sh sources cleanly and is wired into
+    # the SLURM template
+    ts_assert_pass "l2: repro.sh sources cleanly" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh'"
+    ts_assert_contains "l2: cellranger-multi template sources repro.sh" \
+        "$REPO_ROOT/slurm_templates/cellranger_multi_slurm_template.sh" "repro.sh"
+    ts_assert_contains "l2: cellranger-multi template wraps invocation with run_logged" \
+        "$REPO_ROOT/slurm_templates/cellranger_multi_slurm_template.sh" "run_logged"
 
     rm -rf "$tmpdir"
 }
@@ -186,6 +215,25 @@ l3_validate_cellranger_multi() {
     ts_assert_exists  "cellranger-multi: sample outs/ directory"    "$outs"
     ts_assert_exists  "cellranger-multi: web_summary.html"          "$outs/web_summary.html"
     ts_assert_nonempty "cellranger-multi: web_summary.html non-empty" "$outs/web_summary.html"
+
+    # Reproducibility artifacts live in the WORK run dir ($RUN_DIR), not the
+    # scratch output dir checked above
+    local work_run
+    work_run=$(ls -1td "$WORK_ROOT/pipelines/cellranger-multi/runs"/*/ 2>/dev/null | head -1)
+
+    if [[ -z "$work_run" ]]; then
+        ts_assert_exists "cellranger-multi: WORK run directory exists" "$WORK_ROOT/pipelines/cellranger-multi/runs"
+        return
+    fi
+
+    ts_assert_exists   "cellranger-multi: juno_environment.json"  "$work_run/juno_environment.json"
+    ts_assert_exists   "cellranger-multi: slurm_template_used.sh" "$work_run/slurm_template_used.sh"
+    ts_assert_nonempty "cellranger-multi: pipeline_source.tar.gz" "$work_run/pipeline_source.tar.gz"
+    ts_assert_nonempty "cellranger-multi: invocation.log"         "$work_run/invocation.log"
+    ts_assert_contains "cellranger-multi: invocation.log records cellranger-multi-run.sh" \
+                       "$work_run/invocation.log" "cellranger-multi-run.sh"
+    ts_assert_fail     "cellranger-multi: juno_environment.json end_time populated" \
+                       bash -c "grep -q '\"end_time\": null' '$work_run/juno_environment.json'"
 }
 
 l3_teardown_cellranger_multi() {

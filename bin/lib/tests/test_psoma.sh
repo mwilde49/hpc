@@ -81,6 +81,26 @@ YAML
     ts_assert_fail "config missing 'samples_file' fails validator" \
         bash -c "source '$REPO_ROOT/bin/lib/common.sh' && source '$REPO_ROOT/bin/lib/validate.sh' && validate_config psoma '$bad_cfg2'"
 
+    # Reproducibility manifest: source-snapshotting must resolve the psoma
+    # submodule commit SHA. Runs fully offline, no SLURM needed.
+    local mtmp
+    mtmp=$(mktemp -d)
+    echo "project_name: test" > "$mtmp/config.yaml"
+    (
+        source "$REPO_ROOT/bin/lib/common.sh"
+        source "$REPO_ROOT/bin/lib/manifest.sh"
+        generate_manifest "$mtmp" psoma "$mtmp/config.yaml" \
+            "$REPO_ROOT/containers/psoma/psomagen_v1.0.0.sif" \
+            "$REPO_ROOT/slurm_templates/psoma_slurm_template.sh"
+    )
+    local expected_sha
+    expected_sha=$(git -C "$REPO_ROOT/containers/psoma" rev-parse HEAD 2>/dev/null)
+    ts_assert_exists   "manifest: slurm_template_used.sh snapshotted" "$mtmp/slurm_template_used.sh"
+    ts_assert_nonempty "manifest: pipeline_source.tar.gz snapshotted" "$mtmp/pipeline_source.tar.gz"
+    ts_assert_contains "manifest: pipeline_submodule_commit matches submodule HEAD" \
+        "$mtmp/manifest.json" "$expected_sha"
+    rm -rf "$mtmp"
+
     rm -rf "$tmpdir"
 }
 
@@ -126,6 +146,17 @@ YAML
     # Psoma submodule container directory must be present (submodule checked out)
     ts_assert_exists "l2: psoma submodule directory exists" \
         "$REPO_ROOT/containers/psoma"
+
+    # Reproducibility logging: repro.sh sources cleanly and is wired into
+    # the SLURM template (node/partition capture, invocation log, Nextflow trace)
+    ts_assert_pass "l2: repro.sh sources cleanly" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh'"
+    ts_assert_contains "l2: psoma template sources repro.sh" \
+        "$REPO_ROOT/slurm_templates/psoma_slurm_template.sh" "repro.sh"
+    ts_assert_contains "l2: psoma template wraps invocation with run_logged" \
+        "$REPO_ROOT/slurm_templates/psoma_slurm_template.sh" "run_logged"
+    ts_assert_contains "l2: psoma template enables Nextflow trace/report" \
+        "$REPO_ROOT/slurm_templates/psoma_slurm_template.sh" "with-trace"
 
     rm -rf "$tmpdir"
 }
@@ -200,6 +231,20 @@ l3_validate_psoma() {
     ts_assert_exists "psoma: outputs/2_trim_output"     "$latest_run/outputs/2_trim_output"
     ts_assert_exists "psoma: outputs/3_hisat2_mapping_output" \
                      "$latest_run/outputs/3_hisat2_mapping_output"
+
+    # Reproducibility artifacts
+    ts_assert_exists   "psoma: juno_environment.json"     "$latest_run/juno_environment.json"
+    ts_assert_exists   "psoma: slurm_template_used.sh"    "$latest_run/slurm_template_used.sh"
+    ts_assert_nonempty "psoma: pipeline_source.tar.gz"    "$latest_run/pipeline_source.tar.gz"
+    ts_assert_nonempty "psoma: invocation.log"            "$latest_run/invocation.log"
+    ts_assert_contains "psoma: invocation.log records nextflow run" \
+                       "$latest_run/invocation.log" "nextflow run"
+    ts_assert_exists   "psoma: nextflow_logs/trace.txt"   "$latest_run/nextflow_logs/trace.txt"
+    ts_assert_exists   "psoma: nextflow_logs/report.html" "$latest_run/nextflow_logs/report.html"
+    ts_assert_fail     "psoma: juno_environment.json end_time populated" \
+                       bash -c "grep -q '\"end_time\": null' '$latest_run/juno_environment.json'"
+    ts_assert_fail     "psoma: manifest submodule commit resolved" \
+                       bash -c "grep -q '\"pipeline_submodule_commit\": \"unknown\"' '$latest_run/manifest.json'"
 }
 
 l3_teardown_psoma() {

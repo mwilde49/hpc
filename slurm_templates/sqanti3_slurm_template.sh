@@ -27,6 +27,8 @@ PROJECT_ROOT=/groups/tprice/pipelines
 SCRATCH_ROOT=/scratch/juno/$USER
 WORK_ROOT=/work/$USER
 
+source "$PROJECT_ROOT/bin/lib/repro.sh"
+
 PIPELINE_REPO=$PROJECT_ROOT/containers/sqanti3
 SIF=$PIPELINE_REPO/sqanti3_v5.5.4.sif
 FILTER_JSON=/opt2/sqanti3/5.5.4/SQANTI3-5.5.4/src/utilities/filter/filter_default.json
@@ -34,6 +36,14 @@ FILTER_JSON=/opt2/sqanti3/5.5.4/SQANTI3-5.5.4/src/utilities/filter/filter_defaul
 USER_CONFIG=${1:-}
 RUN_DIR=${2:-}
 SCRATCH_OUTPUT_DIR=${3:-}
+
+# --- Reproducibility capture (node, partition, resources, invocation log) ---
+# Note: this only covers the lightweight orchestrator job itself. The four
+# stage jobs it submits (qc/refqc/filter/rescue) run as separate SLURM jobs
+# from scripts in the containers/sqanti3 submodule and are not instrumented
+# here — that would require changes in that submodule, not this repo.
+capture_juno_env "$RUN_DIR"
+trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT
 
 # ── Pre-flight checks ─────────────────────────────────────────────────────────
 
@@ -380,7 +390,7 @@ echo "====================================================================="
 echo "  Submitting SQANTI3 stages"
 echo "====================================================================="
 
-JOB_1A=$(sbatch \
+JOB_1A=$(run_logged "${RUN_DIR:+$RUN_DIR/invocation.log}" sbatch \
     "${COMMON_FLAGS[@]}" \
     --job-name="sqanti3_qc_${SAMPLE}" \
     --time=48:00:00 \
@@ -391,7 +401,7 @@ JOB_1A=$(sbatch \
 
 echo "Stage 1a (QC long-read):  job $JOB_1A"
 
-JOB_1B=$(sbatch \
+JOB_1B=$(run_logged "${RUN_DIR:+$RUN_DIR/invocation.log}" sbatch \
     "${COMMON_FLAGS[@]}" \
     --job-name="sqanti3_rfqc_${SAMPLE}" \
     --time=12:00:00 \
@@ -403,7 +413,7 @@ JOB_1B=$(sbatch \
 echo "Stage 1b (QC reference):  job $JOB_1B"
 
 # Stage 2: filter — depends on 1a only
-JOB_2=$(sbatch \
+JOB_2=$(run_logged "${RUN_DIR:+$RUN_DIR/invocation.log}" sbatch \
     "${COMMON_FLAGS[@]}" \
     --job-name="sqanti3_filter_${SAMPLE}" \
     --time=04:00:00 \
@@ -416,7 +426,7 @@ JOB_2=$(sbatch \
 echo "Stage 2  (Filter):        job $JOB_2  [after $JOB_1A]"
 
 # Stage 3: rescue — depends on both 2 (filter) and 1b (ref QC)
-JOB_3=$(sbatch \
+JOB_3=$(run_logged "${RUN_DIR:+$RUN_DIR/invocation.log}" sbatch \
     "${COMMON_FLAGS[@]}" \
     --job-name="sqanti3_rescue_${SAMPLE}" \
     --time=08:00:00 \

@@ -5,6 +5,44 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); version
 
 ## [Unreleased]
 
+## [v7.0.0] — 2026-07-20
+
+### Added
+- **Reproducibility & provenance logging framework**, wired into all 13 SLURM templates via a new shared library (`bin/lib/repro.sh`):
+  - `capture_juno_env` / `finalize_juno_env` write `juno_environment.json` into every run directory — SLURM job ID, node, partition, allocated CPUs/mem, GPU/gres, requested time limit, start/end time, duration, exit code, and best-effort `sacct` accounting (state, elapsed, MaxRSS).
+  - `run_logged` records the exact, fully-quoted, resolved command line for every pipeline invocation into `invocation.log` before running it.
+  - For the four Nextflow-based pipelines (BulkRNASeq, Psoma, Virome, wf-transcriptomes), `-with-trace/-report/-timeline/-dag` are now enabled, writing per-process resource usage and an interactive HTML report directly into `$RUN_DIR/nextflow_logs/`.
+  - The SQANTI3 orchestrator logs all four `sbatch` DAG-stage submissions (exact resources/configs per stage) to `invocation.log`; per-stage node capture is out of scope (those stage scripts live in the `containers/sqanti3` submodule).
+- `bin/lib/manifest.sh`: `snapshot_slurm_template` and `snapshot_pipeline_source` freeze an exact copy of the SLURM template and pipeline source (`git archive` of the relevant submodule, or `pipelines/addone/` for the inline demo) into every run directory as `slurm_template_used.sh` and `pipeline_source.tar.gz`. `manifest.json` gained `pipeline_submodule_commit` — the actual submodule commit SHA at run time, which the hpc superproject's own `git_commit` field could not previously tell you.
+- Every pipeline's `tjp-test-suite` module gained matching Layer 1 (offline manifest-snapshot verification, no SLURM needed), Layer 2 (repro.sh wiring verification), and Layer 3 (runtime artifact assertions) coverage for the new logging.
+
+### Fixed
+- **`bin/lib/test_framework.sh`**: `_ts_update_layer_status` used `${!varname[$pipeline]}` for indirect associative-array lookup — under `set -u`/`set -e` this silently killed the *entire* `tjp-test-suite` run after the first one or two assertions for any pipeline, any layer, because bash does not resolve that syntax as "array named by `$varname`, indexed by `$pipeline`". Non-verbose mode's `2>/dev/null` hid both the crash and the error message. This bug has existed since the test suite was introduced (v6.2.0) — `tjp-test-suite` has almost certainly never completed a full run for any pipeline before this fix. Fixed with two-step indirection and explicit `return 0` so a "no status change needed" outcome no longer reads as failure.
+- `run_logged`'s own log line was written to stdout, which corrupts any caller doing `JOB_ID=$(sbatch ...)` (needed for the SQANTI3 orchestrator's 4-stage submission). Moved to stderr.
+- `bin/lib/manifest.sh`: `snapshot_pipeline_source`'s submodule detection checked for `.git` as a directory, but git submodules use a `.git` *file* (gitlink) pointing into the superproject's `.git/modules/` — the check always failed, silently skipping the source snapshot for every submoduled pipeline. Fixed with `git -C <dir> rev-parse --git-dir`.
+- `bulkrnaseq_slurm_template.sh`: stage-out archiving now dereferences symlinks (`rsync -aL`) — BulkRNASeq's numbered stage-output directories are symlinked into the shared UTDal repo rather than being real per-run directories, so plain `rsync -a` copied the symlinks (a few KB) instead of the data they point to, producing an archive that verified successfully but contained none of the actual pipeline output. After a verified archive, the shared repo's stage-output directories are now purged so the next run's symlink loop can't re-link stale samples from unrelated past runs into a new run (this happened in practice on 2026-07-13).
+- `sqanti3` submodule bumped to pick up the RColorConesa filter fixes and the wf-transcriptomes outdir guard.
+
+## [v6.4.0] — 2026-06-29
+
+### Fixed
+- wf-transcriptomes SLURM template: added an exit-on-error check when `outdir` is unset, non-absolute, or contains unexpanded `${...}` variables — this misconfiguration previously wrote large amounts of output into `~/output`, filling the home quota, before failing much later.
+
+### Changed
+- Documentation catch-up pass across `COMMAND_REFERENCE.md`, `DEVELOPER_ONBOARDING.md`, `HPC_SYSTEM_MAP.md`, `MASTER_DOCU.md`, `ONBOARDING.md`, `PIPELINE_DESIGN_REVIEW.md`, `README.md`, `TJP_HPC_COMPLETE_GUIDE.md`, and `USER_GUIDE.md` to reflect the DeconvATAC pipeline and `tjp-test-suite` (both shipped in v6.2.0/v6.3.0 without a changelog entry).
+
+## [v6.3.0] — 2026-06-15
+
+### Added
+- **DeconvATAC pipeline**: spatial ATAC deconvolution via Cell2Location, submoduled at `containers/dconvatac/` (`mwilde49/dconvatac`). Python pipeline (not Nextflow) run inside Apptainer — both the container definition and pipeline script live in the submodule. Two registered pipelines: `dconvatac` (CPU, `normal` partition) and `dconvatac-gpu` (A30 GPU, `--nv` + `--gres=gpu:nvidia_a30:1`). Wired into the pipeline registry, validator, `tjp-batch` (per-row), and config/samplesheet templates.
+- `dconvatac` gained `spatial_batch_key` support for multi-section spatial data.
+
+## [v6.2.0] — 2026-05-19
+
+### Added
+- **`tjp-test-suite`**: a three-layer test harness for every registered pipeline — Layer 1 (offline config/schema/validator checks, ~30s), Layer 2 (SLURM template + registry wiring checks, no job submission, ~2min), Layer 3 (full SLURM execution on the dev partition using minimal test fixtures, ~20–40min). Test modules live in `bin/lib/tests/test_<pipeline>.sh`, one per registered pipeline. Supersedes `tjp-test`/`tjp-test-validate`, which are kept for backwards compatibility but deprecated.
+- Synthetic test-fixture generators (`test_data/fixtures/generate_rnaseq_synthetic.sh`, `generate_virome_synthetic.sh`) and a 10x fixture downloader (`download_10x_fixtures.sh`), all seeded deterministically.
+
 ## [v6.1.0] — 2026-05-18
 
 ### Added

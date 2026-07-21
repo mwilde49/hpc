@@ -163,11 +163,24 @@ Config fields (all optional, use `titan_` prefix in YAML configs to avoid naming
 
 See `metadata/SCHEMA.md` for the full JSON schema.
 
+## Reproducibility & Provenance Logging (v7.0.0)
+
+Every SLURM template sources `bin/lib/repro.sh`, which adds four things to every run directory beyond the `config.yaml`/`manifest.json` that `tjp-launch` already snapshots:
+
+- **`juno_environment.json`** — written at job start (`capture_juno_env`) and finalized via an `EXIT` trap (`finalize_juno_env`): SLURM job ID, node, partition, allocated CPUs/mem, GPU/gres, requested time limit, start/end time, duration, exit code, and best-effort `sacct` accounting (state, elapsed, MaxRSS — `sacct` can lag a few seconds past job end, so these three fields are sometimes still `null`; that isn't a sign anything is broken).
+- **`invocation.log`** — the exact, fully-quoted, resolved command line for every pipeline invocation, written by `run_logged` immediately before running it. For SQANTI3's orchestrator (which submits 4 separate stage jobs rather than running the pipeline itself), this captures all 4 `sbatch` calls instead.
+- **`slurm_template_used.sh`** / **`pipeline_source.tar.gz`** — frozen by `snapshot_slurm_template`/`snapshot_pipeline_source` in `bin/lib/manifest.sh` at manifest-generation time (before the job is even submitted): an exact copy of the SLURM template and the pipeline submodule's source tree (`git archive HEAD`) as they existed at launch time, plus `manifest.json` gains `pipeline_submodule_commit` — the submodule's own commit SHA, which the hpc superproject's `git_commit` field alone can't tell you since submodules move independently.
+- **`nextflow_logs/{trace.txt,report.html,timeline.html,dag.html}`** — for the four Nextflow-based pipelines (BulkRNASeq, Psoma, Virome, wf-transcriptomes) only, via `-with-trace/-report/-timeline/-dag`, written directly into `$RUN_DIR` (no separate archive step needed).
+
+Note: `snapshot_pipeline_source` detects a submodule with `git -C <dir> rev-parse --git-dir`, not `-d "$dir/.git"` — submodules use a `.git` *file* (gitlink), not a directory, so the directory check silently no-ops.
+
+Per-stage node/resource capture for SQANTI3's 4 sub-jobs is out of scope here — those stage scripts live in the `containers/sqanti3` submodule, a separate repo.
+
 ## BulkRNASeq Pipeline
 
 ### Submodule
 
-Container repo `mwilde49/bulkseq` is a git submodule at `containers/bulkrnaseq/`, pinned to `v1.0.0`. The actual pipeline code lives in `utdal/Bulk-RNA-Seq-Nextflow-Pipeline`, cloned separately on the HPC to `$PROJECT_ROOT/Bulk-RNA-Seq-Nextflow-Pipeline`.
+Container repo `mwilde49/bulkseq` is a git submodule at `containers/bulkrnaseq/`, pinned to `v1.0.1`. The actual pipeline code lives in `utdal/Bulk-RNA-Seq-Nextflow-Pipeline`, cloned separately on the HPC to `$PROJECT_ROOT/Bulk-RNA-Seq-Nextflow-Pipeline`.
 
 ### Build container (local, requires sudo)
 ```bash
@@ -198,7 +211,7 @@ See `BULKRNASEQ_HPC_GUIDE.md` for full setup and usage details.
 
 ### Submodule
 
-Container repo `mwilde49/psoma` is a git submodule at `containers/psoma/`, pinned to `v1.0.0`. Unlike bulkrnaseq, psoma is a combined repo — both the pipeline scripts and container definition live in the submodule (no separate clone needed).
+Container repo `mwilde49/psoma` is a git submodule at `containers/psoma/`, pinned to `v2.0.2`. Unlike bulkrnaseq, psoma is a combined repo — both the pipeline scripts and container definition live in the submodule (no separate clone needed).
 
 ### Key differences from BulkRNASeq
 - Uses **HISAT2** aligner instead of STAR
@@ -231,7 +244,7 @@ Batch mode: **per-sheet** (one SLURM job for all samples; Nextflow handles per-s
 
 ### Submodule
 
-Container repo `mwilde49/virome-pipeline` is a git submodule at `containers/virome/`, pinned to `v1.4.0`.
+Container repo `mwilde49/virome-pipeline` is a git submodule at `containers/virome/`, pinned to `v1.5.0`. v1.5.0 also adds a BLAST verification offshoot pipeline (`blast_verify.nf`, cross-checks virus calls) inside the submodule — it is not wired into `tjp-launch`/`tjp-batch`, so it must be run manually from `containers/virome/` (`nextflow run blast_verify.nf -profile slurm -params-file assets/config_blast_pd19.yaml`).
 
 ### Architecture
 

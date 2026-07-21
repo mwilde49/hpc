@@ -60,6 +60,27 @@ YAML
     ts_assert_exists "addone SLURM template exists" \
         "$REPO_ROOT/slurm_templates/addone_slurm_template.sh"
 
+    # Reproducibility manifest: source-snapshotting must archive the inline
+    # pipelines/addone/ directory and resolve the hpc superproject commit.
+    # Runs fully offline, no SLURM needed.
+    local mtmp
+    mtmp=$(mktemp -d)
+    echo "input: /tmp/x" > "$mtmp/config.yaml"
+    (
+        source "$REPO_ROOT/bin/lib/common.sh"
+        source "$REPO_ROOT/bin/lib/manifest.sh"
+        generate_manifest "$mtmp" addone "$mtmp/config.yaml" \
+            "$REPO_ROOT/containers/addone_latest.sif" \
+            "$REPO_ROOT/slurm_templates/addone_slurm_template.sh"
+    )
+    local expected_sha
+    expected_sha=$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null)
+    ts_assert_exists   "manifest: slurm_template_used.sh snapshotted" "$mtmp/slurm_template_used.sh"
+    ts_assert_nonempty "manifest: pipeline_source.tar.gz snapshotted" "$mtmp/pipeline_source.tar.gz"
+    ts_assert_contains "manifest: pipeline_submodule_commit matches repo HEAD" \
+        "$mtmp/manifest.json" "$expected_sha"
+    rm -rf "$mtmp"
+
     rm -rf "$tmpdir"
 }
 
@@ -101,6 +122,15 @@ YAML
     ts_assert_fail "l2: addone is not a native pipeline" \
         bash -c "source '$REPO_ROOT/bin/lib/common.sh' && is_native_pipeline addone"
 
+    # Reproducibility logging: repro.sh sources cleanly and is wired into
+    # the SLURM template
+    ts_assert_pass "l2: repro.sh sources cleanly" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh'"
+    ts_assert_contains "l2: addone template sources repro.sh" \
+        "$REPO_ROOT/slurm_templates/addone_slurm_template.sh" "repro.sh"
+    ts_assert_contains "l2: addone template wraps invocation with run_logged" \
+        "$REPO_ROOT/slurm_templates/addone_slurm_template.sh" "run_logged"
+
     rm -rf "$tmpdir"
 }
 
@@ -134,6 +164,22 @@ l3_validate_addone() {
     local output_file="$TEST_SCRATCH/addone/addone_out_${TEST_TS}.txt"
     ts_assert_exists "addone: output file exists" "$output_file"
     ts_assert_nonempty "addone: output file is non-empty" "$output_file"
+
+    # Reproducibility artifacts live in the WORK run dir ($RUN_DIR)
+    local work_run
+    work_run=$(ls -1td "$WORK_ROOT/pipelines/addone/runs"/*/ 2>/dev/null | head -1)
+
+    if [[ -z "$work_run" ]]; then
+        ts_assert_exists "addone: WORK run directory exists" "$WORK_ROOT/pipelines/addone/runs"
+        return
+    fi
+
+    ts_assert_exists   "addone: juno_environment.json"     "$work_run/juno_environment.json"
+    ts_assert_exists   "addone: slurm_template_used.sh"    "$work_run/slurm_template_used.sh"
+    ts_assert_nonempty "addone: pipeline_source.tar.gz"    "$work_run/pipeline_source.tar.gz"
+    ts_assert_nonempty "addone: invocation.log"            "$work_run/invocation.log"
+    ts_assert_fail     "addone: juno_environment.json end_time populated" \
+                       bash -c "grep -q '\"end_time\": null' '$work_run/juno_environment.json'"
 }
 
 l3_teardown_addone() {

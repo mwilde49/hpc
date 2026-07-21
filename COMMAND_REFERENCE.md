@@ -1,6 +1,6 @@
 # Hyperion Compute — Command Reference
 
-**Version:** 6.1.0 | **Cluster:** Juno HPC, UT Dallas | **Updated:** 2026-06-21
+**Version:** 7.0.0 | **Cluster:** Juno HPC, UT Dallas | **Updated:** 2026-07-20
 
 Comprehensive reference for every command available in the Hyperion Compute / TJP pipeline framework. Organized from general cluster commands inward to per-pipeline specifics. Use `Ctrl+F` / `grep` to jump to any command, flag, or config key.
 
@@ -1879,6 +1879,22 @@ WORK_ROOT="/work/$USER"
 SCRATCH_ROOT="/scratch/juno/$USER"
 USER_PIPELINES="$WORK_ROOT/pipelines"
 ```
+
+### Run Directory Contents (v7.0.0+)
+
+Every `tjp-launch`/`tjp-batch` run directory (`/work/$USER/pipelines/<pipeline>/runs/<ts>/`) contains, via `bin/lib/manifest.sh` and `bin/lib/repro.sh`:
+
+| File | Written by | When | Contents |
+|------|-----------|------|----------|
+| `config.yaml` | `tjp-launch` | pre-submission | snapshot of the config used |
+| `manifest.json` | `bin/lib/manifest.sh` | pre-submission, updated post-submission | git commit, `pipeline_submodule_commit`, container checksum, SLURM job ID, Titan PLR ID, paths |
+| `slurm_template_used.sh` | `snapshot_slurm_template` | pre-submission | exact copy of the SLURM template as it existed at launch |
+| `pipeline_source.tar.gz` | `snapshot_pipeline_source` | pre-submission | `git archive HEAD` of the pipeline's submodule (or `pipelines/addone/`) |
+| `juno_environment.json` | `bin/lib/repro.sh` | job start → finalized on exit | node, partition, allocated CPUs/mem/GPU, time limit, start/end time, duration, exit code, best-effort `sacct` accounting |
+| `invocation.log` | `bin/lib/repro.sh` (`run_logged`) | during job | the exact, fully-quoted, resolved command line that ran |
+| `nextflow_logs/{trace.txt,report.html,timeline.html,dag.html}` | Nextflow (`-with-trace` etc.) | during job | Nextflow's own per-process command/resource tracing — BulkRNASeq, Psoma, Virome, wf-transcriptomes only |
+
+For SQANTI3 (which submits 4 separate stage jobs rather than running the pipeline itself), `invocation.log` in the orchestrator's run dir captures all 4 `sbatch` calls; per-stage node capture is not available (those stage scripts live in the `containers/sqanti3` submodule).
 
 ### 10x Tool Versions & Paths
 

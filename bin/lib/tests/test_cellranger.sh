@@ -93,6 +93,27 @@ YAML
     ts_assert_fail "config with non-integer localcores fails validator" \
         bash -c "source '$REPO_ROOT/bin/lib/common.sh' && source '$REPO_ROOT/bin/lib/validate.sh' && validate_config cellranger '$bad_cfg3'"
 
+    # Reproducibility manifest: source-snapshotting must resolve the 10x
+    # submodule commit SHA even for a native (non-container) pipeline.
+    # Runs fully offline, no SLURM needed.
+    local mtmp
+    mtmp=$(mktemp -d)
+    echo "sample_id: test" > "$mtmp/config.yaml"
+    (
+        source "$REPO_ROOT/bin/lib/common.sh"
+        source "$REPO_ROOT/bin/lib/manifest.sh"
+        generate_manifest "$mtmp" cellranger "$mtmp/config.yaml" \
+            "native:$(get_tool_path cellranger 2>/dev/null || echo /groups/tprice/opt/cellranger-10.0.0)" \
+            "$REPO_ROOT/slurm_templates/cellranger_slurm_template.sh"
+    )
+    local expected_sha
+    expected_sha=$(git -C "$REPO_ROOT/containers/10x" rev-parse HEAD 2>/dev/null)
+    ts_assert_exists   "manifest: slurm_template_used.sh snapshotted" "$mtmp/slurm_template_used.sh"
+    ts_assert_nonempty "manifest: pipeline_source.tar.gz snapshotted" "$mtmp/pipeline_source.tar.gz"
+    ts_assert_contains "manifest: pipeline_submodule_commit matches submodule HEAD" \
+        "$mtmp/manifest.json" "$expected_sha"
+    rm -rf "$mtmp"
+
     rm -rf "$tmpdir"
 }
 
@@ -134,6 +155,17 @@ YAML
     # 10x submodule wrapper script must exist
     ts_assert_exists "l2: cellranger-run.sh wrapper exists" \
         "$REPO_ROOT/containers/10x/bin/cellranger-run.sh"
+
+    # Reproducibility logging: repro.sh sources cleanly and is wired into
+    # the SLURM template (node/partition capture, invocation log)
+    ts_assert_pass "l2: repro.sh sources cleanly" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh'"
+    ts_assert_pass "l2: repro.sh defines capture_juno_env/finalize_juno_env/run_logged" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh' && declare -f capture_juno_env finalize_juno_env run_logged >/dev/null"
+    ts_assert_contains "l2: cellranger template sources repro.sh" \
+        "$REPO_ROOT/slurm_templates/cellranger_slurm_template.sh" "repro.sh"
+    ts_assert_contains "l2: cellranger template wraps invocation with run_logged" \
+        "$REPO_ROOT/slurm_templates/cellranger_slurm_template.sh" "run_logged"
 
     rm -rf "$tmpdir"
 }
@@ -214,6 +246,30 @@ l3_validate_cellranger() {
     ts_assert_exists "cellranger: web_summary.html"               "$outs/web_summary.html"
     ts_assert_exists "cellranger: filtered_feature_bc_matrix/"    "$outs/filtered_feature_bc_matrix"
     ts_assert_nonempty "cellranger: web_summary.html non-empty"   "$outs/web_summary.html"
+
+    # Reproducibility artifacts live in the WORK run dir ($RUN_DIR), not the
+    # scratch output dir checked above — look those up separately.
+    local work_runs_dir="$WORK_ROOT/pipelines/cellranger/runs"
+    local work_run
+    work_run=$(ls -1td "$work_runs_dir"/*/ 2>/dev/null | head -1)
+
+    if [[ -z "$work_run" ]]; then
+        ts_assert_exists "cellranger: WORK run directory exists" "$work_runs_dir"
+        return
+    fi
+
+    ts_assert_exists   "cellranger: juno_environment.json"     "$work_run/juno_environment.json"
+    ts_assert_exists   "cellranger: slurm_template_used.sh"    "$work_run/slurm_template_used.sh"
+    ts_assert_nonempty "cellranger: pipeline_source.tar.gz"    "$work_run/pipeline_source.tar.gz"
+    ts_assert_nonempty "cellranger: invocation.log"            "$work_run/invocation.log"
+    ts_assert_contains "cellranger: invocation.log records cellranger-run.sh" \
+                       "$work_run/invocation.log" "cellranger-run.sh"
+    ts_assert_fail     "cellranger: juno_environment.json end_time populated" \
+                       bash -c "grep -q '\"end_time\": null' '$work_run/juno_environment.json'"
+    ts_assert_fail     "cellranger: juno_environment.json exit_code populated" \
+                       bash -c "grep -q '\"exit_code\": null' '$work_run/juno_environment.json'"
+    ts_assert_fail     "cellranger: manifest submodule commit resolved" \
+                       bash -c "grep -q '\"pipeline_submodule_commit\": \"unknown\"' '$work_run/manifest.json'"
 }
 
 l3_teardown_cellranger() {

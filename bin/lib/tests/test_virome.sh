@@ -100,6 +100,26 @@ YAML
     ts_assert_fail "config with samplesheet missing 'sample' column fails validator" \
         bash -c "source '$REPO_ROOT/bin/lib/common.sh' && source '$REPO_ROOT/bin/lib/validate.sh' && validate_config virome '$bad_ss_cfg'"
 
+    # Reproducibility manifest: source-snapshotting must resolve the virome
+    # submodule commit SHA. Runs fully offline, no SLURM needed.
+    local mtmp
+    mtmp=$(mktemp -d)
+    echo "project_name: test" > "$mtmp/config.yaml"
+    (
+        source "$REPO_ROOT/bin/lib/common.sh"
+        source "$REPO_ROOT/bin/lib/manifest.sh"
+        generate_manifest "$mtmp" virome "$mtmp/config.yaml" \
+            "$REPO_ROOT/containers/virome" \
+            "$REPO_ROOT/slurm_templates/virome_slurm_template.sh"
+    )
+    local expected_sha
+    expected_sha=$(git -C "$REPO_ROOT/containers/virome" rev-parse HEAD 2>/dev/null)
+    ts_assert_exists   "manifest: slurm_template_used.sh snapshotted" "$mtmp/slurm_template_used.sh"
+    ts_assert_nonempty "manifest: pipeline_source.tar.gz snapshotted" "$mtmp/pipeline_source.tar.gz"
+    ts_assert_contains "manifest: pipeline_submodule_commit matches submodule HEAD" \
+        "$mtmp/manifest.json" "$expected_sha"
+    rm -rf "$mtmp"
+
     rm -rf "$tmpdir"
 }
 
@@ -144,6 +164,17 @@ YAML
     # Container directory (submodule) must exist
     ts_assert_exists "l2: virome container submodule directory exists" \
         "$REPO_ROOT/containers/virome"
+
+    # Reproducibility logging: repro.sh sources cleanly and is wired into
+    # the SLURM template (node/partition capture, invocation log, Nextflow trace)
+    ts_assert_pass "l2: repro.sh sources cleanly" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh'"
+    ts_assert_contains "l2: virome template sources repro.sh" \
+        "$REPO_ROOT/slurm_templates/virome_slurm_template.sh" "repro.sh"
+    ts_assert_contains "l2: virome template wraps invocation with run_logged" \
+        "$REPO_ROOT/slurm_templates/virome_slurm_template.sh" "run_logged"
+    ts_assert_contains "l2: virome template enables Nextflow trace/report" \
+        "$REPO_ROOT/slurm_templates/virome_slurm_template.sh" "with-trace"
 
     rm -rf "$tmpdir"
 }
@@ -228,6 +259,27 @@ l3_validate_virome() {
     ts_assert_exists "virome: output directory exists" "$outdir"
     ts_assert_exists "virome: results/ directory"      "$outdir/results"
     ts_assert_exists "virome: multiqc/ directory"      "$outdir/multiqc"
+
+    # Reproducibility artifacts live in the WORK run dir ($RUN_DIR)
+    local work_run
+    work_run=$(ls -1td "$WORK_ROOT/pipelines/virome/runs"/*/ 2>/dev/null | head -1)
+
+    if [[ -z "$work_run" ]]; then
+        ts_assert_exists "virome: WORK run directory exists" "$WORK_ROOT/pipelines/virome/runs"
+        return
+    fi
+
+    ts_assert_exists   "virome: juno_environment.json"     "$work_run/juno_environment.json"
+    ts_assert_exists   "virome: slurm_template_used.sh"    "$work_run/slurm_template_used.sh"
+    ts_assert_nonempty "virome: pipeline_source.tar.gz"    "$work_run/pipeline_source.tar.gz"
+    ts_assert_nonempty "virome: invocation.log"            "$work_run/invocation.log"
+    ts_assert_contains "virome: invocation.log records nextflow run" \
+                       "$work_run/invocation.log" "nextflow run"
+    ts_assert_exists   "virome: nextflow_logs/trace.txt"   "$work_run/nextflow_logs/trace.txt"
+    ts_assert_fail     "virome: juno_environment.json end_time populated" \
+                       bash -c "grep -q '\"end_time\": null' '$work_run/juno_environment.json'"
+    ts_assert_fail     "virome: manifest submodule commit resolved" \
+                       bash -c "grep -q '\"pipeline_submodule_commit\": \"unknown\"' '$work_run/manifest.json'"
 }
 
 l3_teardown_virome() {

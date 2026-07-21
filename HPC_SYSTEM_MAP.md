@@ -58,21 +58,24 @@ Technical reference for the TJP pipeline system on Juno HPC at UT Dallas.
 ```
 /groups/tprice/pipelines/
 ├── bin/
-│   ├── tjp-setup, tjp-launch, tjp-batch
-│   ├── tjp-test, tjp-test-validate, tjp-validate
+│   ├── tjp-setup, tjp-launch, tjp-batch, tjp-edit
+│   ├── tjp-test-suite        ← primary testing tool (3-layer harness)
+│   ├── tjp-test, tjp-test-validate (deprecated), tjp-validate
 │   ├── labdata
 │   ├── hyperion-*, biocruiser-* (symlinks)
 │   └── lib/
 │       ├── common.sh        ← pipeline registry, YAML helpers, logging
 │       ├── validate.sh      ← per-pipeline config validators
-│       ├── manifest.sh      ← reproducibility manifest generation
+│       ├── manifest.sh      ← reproducibility manifest generation + source snapshotting
+│       ├── repro.sh         ← Juno env capture + invocation logging (sourced by SLURM templates)
 │       ├── metadata.sh      ← Titan metadata / PLR-xxxx generation
 │       ├── samplesheet.sh   ← CSV samplesheet parsing and validation
+│       ├── test_framework.sh ← tjp-test-suite assertion/reporting engine
 │       └── branding.sh      ← Hyperion Compute themed output
 ├── containers/
 │   ├── apptainer.def        ← AddOne container definition
 │   ├── addone_latest.sif
-│   ├── bulkrnaseq/          ← submodule: mwilde49/bulkseq @ v1.0.0
+│   ├── bulkrnaseq/          ← submodule: mwilde49/bulkseq @ v1.0.1
 │   │   └── bulkrnaseq_v1.0.0.sif
 │   ├── psoma/               ← submodule: mwilde49/psoma @ v2.0.2
 │   │   ├── psomagen_bulk_rna_seq_pipeline.nf
@@ -80,11 +83,15 @@ Technical reference for the TJP pipeline system on Juno HPC at UT Dallas.
 │   │   └── NexteraPE-PE.fa
 │   ├── virome/              ← submodule: mwilde49/virome-pipeline @ v1.5.0
 │   │   ├── main.nf
+│   │   ├── blast_verify.nf  ← BLAST verification offshoot (manual, not wired into tjp-launch)
 │   │   └── containers/      ← 6 per-process .sif files
 │   ├── sqanti3/             ← submodule: mwilde49/longreads (SQANTI3 + wf-transcriptomes)
 │   │   ├── sqanti3_v5.5.4.sif
 │   │   ├── slurm_templates/ ← stage scripts for 4-stage DAG
 │   │   └── configs/         ← wf_transcriptomes/juno.config etc.
+│   ├── dconvatac/           ← submodule: mwilde49/dconvatac @ v1.0.0
+│   │   ├── pipeline/dconvatac.py
+│   │   └── dconvatac_v1.0.0.sif
 │   └── 10x/                 ← submodule: mwilde49/10x @ v1.2.0
 │       ├── bin/             ← cellranger-run.sh, spaceranger-run.sh, xeniumranger-run.sh
 │       └── lib/             ← 10x_common.sh, validate_*.sh
@@ -222,7 +229,8 @@ The psoma pipeline was modified to accept a separate `output_directory` paramete
        ├── Creates scratch output dir:   /scratch/juno/$USER/pipelines/<pipeline>/runs/<ts>/
        ├── Snapshots config.yaml into run dir
        ├── Generates Nextflow config from template (container-based pipelines)
-       ├── Writes manifest.json (git commit, container checksum, paths)
+       ├── Snapshots slurm_template_used.sh + pipeline_source.tar.gz (bin/lib/manifest.sh)
+       ├── Writes manifest.json (git commit, submodule commit, container checksum, paths)
        ├── Registers PLR-xxxx metadata record at /work/$USER/pipelines/metadata/pipeline_runs/
        └── Submits:  sbatch slurm_template.sh <args>
                │
@@ -230,23 +238,30 @@ The psoma pipeline was modified to accept a separate `output_directory` paramete
                        │
 5.                     └── Compute node executes SLURM template:
                                │
+                               ├── source bin/lib/repro.sh; capture_juno_env → juno_environment.json
+                               │
                                ├── [Container pipelines]
                                │   ├── module load apptainer
                                │   ├── Pre-flight checks (container, pipeline, config exist)
-                               │   └── apptainer exec --cleanenv ... $CONTAINER \
-                               │           nextflow run pipeline.nf -c pipeline.config
+                               │   └── run_logged ... apptainer exec --cleanenv ... $CONTAINER \
+                               │           nextflow run pipeline.nf -c pipeline.config \
+                               │           -with-trace/-report/-timeline/-dag → nextflow_logs/
                                │
                                └── [Native pipelines: cellranger, spaceranger, xeniumranger]
                                    ├── Pre-flight checks (tool path, config exist)
-                                   └── containers/10x/bin/<tool>-run.sh config.yaml
+                                   └── run_logged ... containers/10x/bin/<tool>-run.sh config.yaml
                                            │
                                            └── <tool> --localcores N --localmem M ...
                                                    │
 6.                                                 └── Pipeline writes outputs to scratch
                                                            │
-7.                                                         └── Stage-out: rsync scratch → work
-                                                               ├── inputs/ (FASTQs archived)
-                                                               └── outputs/ (results archived)
+7.                                                         ├── Stage-out: rsync scratch → work
+                                                           │   ├── inputs/ (FASTQs archived)
+                                                           │   └── outputs/ (results archived)
+                                                           │
+8.                                                         └── EXIT trap: finalize_juno_env →
+                                                               end_time/duration/exit_code/sacct
+                                                               written into juno_environment.json
 ```
 
 ### Batch launching (v6.0.0+)

@@ -82,6 +82,27 @@ YAML
     ts_assert_fail "config missing 'samples_file' fails validator" \
         bash -c "source '$REPO_ROOT/bin/lib/common.sh' && source '$REPO_ROOT/bin/lib/validate.sh' && validate_config bulkrnaseq '$bad_cfg2'"
 
+    # Reproducibility manifest: source-snapshotting must produce a real
+    # submodule commit SHA and frozen copies of the exact scripts used
+    # (not "unknown" or missing files). Runs fully offline, no SLURM needed.
+    local mtmp
+    mtmp=$(mktemp -d)
+    echo "project_name: test" > "$mtmp/config.yaml"
+    (
+        source "$REPO_ROOT/bin/lib/common.sh"
+        source "$REPO_ROOT/bin/lib/manifest.sh"
+        generate_manifest "$mtmp" bulkrnaseq "$mtmp/config.yaml" \
+            "$REPO_ROOT/containers/bulkrnaseq/bulkrnaseq_v1.0.0.sif" \
+            "$REPO_ROOT/slurm_templates/bulkrnaseq_slurm_template.sh"
+    )
+    local expected_sha
+    expected_sha=$(git -C "$REPO_ROOT/containers/bulkrnaseq" rev-parse HEAD 2>/dev/null)
+    ts_assert_exists   "manifest: slurm_template_used.sh snapshotted" "$mtmp/slurm_template_used.sh"
+    ts_assert_nonempty "manifest: pipeline_source.tar.gz snapshotted" "$mtmp/pipeline_source.tar.gz"
+    ts_assert_contains "manifest: pipeline_submodule_commit matches submodule HEAD" \
+        "$mtmp/manifest.json" "$expected_sha"
+    rm -rf "$mtmp"
+
     rm -rf "$tmpdir"
 }
 
@@ -125,6 +146,19 @@ YAML
     # Nextflow pipeline.config template must exist (required by tjp-launch bulkrnaseq)
     ts_assert_exists "l2: Nextflow pipeline.config.tmpl exists" \
         "$REPO_ROOT/templates/bulkrnaseq/pipeline.config.tmpl"
+
+    # Reproducibility logging: repro.sh sources cleanly and is wired into
+    # the SLURM template (node/partition capture, invocation log, Nextflow trace)
+    ts_assert_pass "l2: repro.sh sources cleanly" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh'"
+    ts_assert_pass "l2: repro.sh defines capture_juno_env/finalize_juno_env/run_logged" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh' && declare -f capture_juno_env finalize_juno_env run_logged >/dev/null"
+    ts_assert_contains "l2: bulkrnaseq template sources repro.sh" \
+        "$REPO_ROOT/slurm_templates/bulkrnaseq_slurm_template.sh" "repro.sh"
+    ts_assert_contains "l2: bulkrnaseq template wraps invocation with run_logged" \
+        "$REPO_ROOT/slurm_templates/bulkrnaseq_slurm_template.sh" "run_logged"
+    ts_assert_contains "l2: bulkrnaseq template enables Nextflow trace/report" \
+        "$REPO_ROOT/slurm_templates/bulkrnaseq_slurm_template.sh" "with-trace"
 
     rm -rf "$tmpdir"
 }
@@ -201,6 +235,23 @@ l3_validate_bulkrnaseq() {
                       "$latest_run/outputs/2_star_mapping_output"
     ts_assert_exists  "bulkrnaseq: outputs/5_raw_counts_output" \
                       "$latest_run/outputs/5_raw_counts_output"
+
+    # Reproducibility artifacts: node/partition capture, invocation log,
+    # frozen scripts, Nextflow's own per-process trace/report.
+    ts_assert_exists   "bulkrnaseq: juno_environment.json"     "$latest_run/juno_environment.json"
+    ts_assert_exists   "bulkrnaseq: slurm_template_used.sh"    "$latest_run/slurm_template_used.sh"
+    ts_assert_nonempty "bulkrnaseq: pipeline_source.tar.gz"    "$latest_run/pipeline_source.tar.gz"
+    ts_assert_nonempty "bulkrnaseq: invocation.log"            "$latest_run/invocation.log"
+    ts_assert_contains "bulkrnaseq: invocation.log records nextflow run" \
+                       "$latest_run/invocation.log" "nextflow run"
+    ts_assert_exists   "bulkrnaseq: nextflow_logs/trace.txt"   "$latest_run/nextflow_logs/trace.txt"
+    ts_assert_exists   "bulkrnaseq: nextflow_logs/report.html" "$latest_run/nextflow_logs/report.html"
+    ts_assert_fail     "bulkrnaseq: juno_environment.json end_time populated" \
+                       bash -c "grep -q '\"end_time\": null' '$latest_run/juno_environment.json'"
+    ts_assert_fail     "bulkrnaseq: juno_environment.json exit_code populated" \
+                       bash -c "grep -q '\"exit_code\": null' '$latest_run/juno_environment.json'"
+    ts_assert_fail     "bulkrnaseq: manifest submodule commit resolved" \
+                       bash -c "grep -q '\"pipeline_submodule_commit\": \"unknown\"' '$latest_run/manifest.json'"
 }
 
 l3_teardown_bulkrnaseq() {

@@ -99,6 +99,27 @@ YAML
     ts_assert_fail "config with invalid de_analysis value fails validator" \
         bash -c "source '$REPO_ROOT/bin/lib/common.sh' && source '$REPO_ROOT/bin/lib/validate.sh' && validate_config wf-transcriptomes '$bad_cfg3'"
 
+    # Reproducibility manifest: source-snapshotting must resolve the
+    # longreads (sqanti3) submodule commit SHA, shared with sqanti3.
+    # Runs fully offline, no SLURM needed.
+    local mtmp
+    mtmp=$(mktemp -d)
+    echo "sample: test" > "$mtmp/config.yaml"
+    (
+        source "$REPO_ROOT/bin/lib/common.sh"
+        source "$REPO_ROOT/bin/lib/manifest.sh"
+        generate_manifest "$mtmp" wf-transcriptomes "$mtmp/config.yaml" \
+            "native:$REPO_ROOT/containers/sqanti3" \
+            "$REPO_ROOT/slurm_templates/wf_transcriptomes_slurm_template.sh"
+    )
+    local expected_sha
+    expected_sha=$(git -C "$REPO_ROOT/containers/sqanti3" rev-parse HEAD 2>/dev/null)
+    ts_assert_exists   "manifest: slurm_template_used.sh snapshotted" "$mtmp/slurm_template_used.sh"
+    ts_assert_nonempty "manifest: pipeline_source.tar.gz snapshotted" "$mtmp/pipeline_source.tar.gz"
+    ts_assert_contains "manifest: pipeline_submodule_commit matches submodule HEAD" \
+        "$mtmp/manifest.json" "$expected_sha"
+    rm -rf "$mtmp"
+
     rm -rf "$tmpdir"
 }
 
@@ -147,6 +168,17 @@ YAML
     # Nextflow config for Juno SLURM executor must exist
     ts_assert_exists "l2: juno.config Nextflow SLURM executor config exists" \
         "$REPO_ROOT/containers/sqanti3/configs/wf_transcriptomes/juno.config"
+
+    # Reproducibility logging: repro.sh sources cleanly and is wired into
+    # the SLURM template (node/partition capture, invocation log, Nextflow trace)
+    ts_assert_pass "l2: repro.sh sources cleanly" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh'"
+    ts_assert_contains "l2: wf-transcriptomes template sources repro.sh" \
+        "$REPO_ROOT/slurm_templates/wf_transcriptomes_slurm_template.sh" "repro.sh"
+    ts_assert_contains "l2: wf-transcriptomes template wraps invocation with run_logged" \
+        "$REPO_ROOT/slurm_templates/wf_transcriptomes_slurm_template.sh" "run_logged"
+    ts_assert_contains "l2: wf-transcriptomes template enables Nextflow trace/report" \
+        "$REPO_ROOT/slurm_templates/wf_transcriptomes_slurm_template.sh" "with-trace"
 
     rm -rf "$tmpdir"
 }
@@ -232,6 +264,25 @@ l3_validate_wf_transcriptomes() {
         ts_warn "wf-transcriptomes L3 output" \
             "Could not find expected output subdirectory under $outdir (jaffal_results, merged_transcriptome, stringtie_merged)"
     fi
+
+    # Reproducibility artifacts live in the WORK run dir ($RUN_DIR)
+    local work_run
+    work_run=$(ls -1td "$WORK_ROOT/pipelines/wf-transcriptomes/runs"/*/ 2>/dev/null | head -1)
+
+    if [[ -z "$work_run" ]]; then
+        ts_assert_exists "wf-transcriptomes: WORK run directory exists" "$WORK_ROOT/pipelines/wf-transcriptomes/runs"
+        return
+    fi
+
+    ts_assert_exists   "wf-transcriptomes: juno_environment.json"     "$work_run/juno_environment.json"
+    ts_assert_exists   "wf-transcriptomes: slurm_template_used.sh"    "$work_run/slurm_template_used.sh"
+    ts_assert_nonempty "wf-transcriptomes: pipeline_source.tar.gz"    "$work_run/pipeline_source.tar.gz"
+    ts_assert_nonempty "wf-transcriptomes: invocation.log"            "$work_run/invocation.log"
+    ts_assert_contains "wf-transcriptomes: invocation.log records nextflow run" \
+                       "$work_run/invocation.log" "run epi2me-labs/wf-transcriptomes"
+    ts_assert_exists   "wf-transcriptomes: nextflow_logs/trace.txt"   "$work_run/nextflow_logs/trace.txt"
+    ts_assert_fail     "wf-transcriptomes: juno_environment.json end_time populated" \
+                       bash -c "grep -q '\"end_time\": null' '$work_run/juno_environment.json'"
 }
 
 l3_teardown_wf_transcriptomes() {

@@ -11,6 +11,8 @@ PROJECT_ROOT=/groups/tprice/pipelines
 SCRATCH_ROOT=/scratch/juno/$USER
 WORK_ROOT=/work/$USER
 
+source "$PROJECT_ROOT/bin/lib/repro.sh"
+
 WRAPPER=$PROJECT_ROOT/containers/10x/bin/cellranger-run.sh
 
 # Accept config as $1 (used by tjp-launch)
@@ -18,6 +20,10 @@ CONFIG=${1:-}
 RUN_DIR=${2:-}
 SCRATCH_OUTPUT_DIR=${3:-}
 FASTQ_DIR=${4:-}
+
+# --- Reproducibility capture (node, partition, resources, invocation log) ---
+capture_juno_env "$RUN_DIR"
+trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT
 
 # --- Pre-flight checks ---
 
@@ -45,7 +51,7 @@ echo "====================================================================="
 
 mkdir -p logs
 
-bash "$WRAPPER" "$CONFIG" "$SCRATCH_OUTPUT_DIR"
+run_logged "${RUN_DIR:+$RUN_DIR/invocation.log}" bash "$WRAPPER" "$CONFIG" "$SCRATCH_OUTPUT_DIR"
 PIPELINE_EXIT=$?
 
 if [ $PIPELINE_EXIT -ne 0 ]; then

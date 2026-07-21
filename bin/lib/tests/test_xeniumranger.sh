@@ -95,6 +95,26 @@ YAML
     ts_assert_fail "config missing 'sample_id' fails validator" \
         bash -c "source '$REPO_ROOT/bin/lib/common.sh' && source '$REPO_ROOT/bin/lib/validate.sh' && validate_config xeniumranger '$bad_no_sample'"
 
+    # Reproducibility manifest: source-snapshotting must resolve the 10x
+    # submodule commit SHA. Runs fully offline, no SLURM needed.
+    local mtmp
+    mtmp=$(mktemp -d)
+    echo "sample_id: test" > "$mtmp/config.yaml"
+    (
+        source "$REPO_ROOT/bin/lib/common.sh"
+        source "$REPO_ROOT/bin/lib/manifest.sh"
+        generate_manifest "$mtmp" xeniumranger "$mtmp/config.yaml" \
+            "native:$(get_tool_path xeniumranger 2>/dev/null || echo /groups/tprice/opt/xeniumranger-xenium4.0)" \
+            "$REPO_ROOT/slurm_templates/xeniumranger_slurm_template.sh"
+    )
+    local expected_sha
+    expected_sha=$(git -C "$REPO_ROOT/containers/10x" rev-parse HEAD 2>/dev/null)
+    ts_assert_exists   "manifest: slurm_template_used.sh snapshotted" "$mtmp/slurm_template_used.sh"
+    ts_assert_nonempty "manifest: pipeline_source.tar.gz snapshotted" "$mtmp/pipeline_source.tar.gz"
+    ts_assert_contains "manifest: pipeline_submodule_commit matches submodule HEAD" \
+        "$mtmp/manifest.json" "$expected_sha"
+    rm -rf "$mtmp"
+
     rm -rf "$tmpdir"
 }
 
@@ -133,6 +153,15 @@ YAML
     # Wrapper script must exist in 10x submodule
     ts_assert_exists "l2: xeniumranger-run.sh wrapper exists" \
         "$REPO_ROOT/containers/10x/bin/xeniumranger-run.sh"
+
+    # Reproducibility logging: repro.sh sources cleanly and is wired into
+    # the SLURM template
+    ts_assert_pass "l2: repro.sh sources cleanly" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh'"
+    ts_assert_contains "l2: xeniumranger template sources repro.sh" \
+        "$REPO_ROOT/slurm_templates/xeniumranger_slurm_template.sh" "repro.sh"
+    ts_assert_contains "l2: xeniumranger template wraps invocation with run_logged" \
+        "$REPO_ROOT/slurm_templates/xeniumranger_slurm_template.sh" "run_logged"
 
     rm -rf "$tmpdir"
 }

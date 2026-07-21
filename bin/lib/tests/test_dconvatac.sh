@@ -82,6 +82,31 @@ YAML
     ts_assert_fail "config with invalid boolean 'use_gpu: yes' fails validator" \
         bash -c "source '$REPO_ROOT/bin/lib/common.sh' && source '$REPO_ROOT/bin/lib/validate.sh' && validate_config dconvatac '$bad_cfg3'"
 
+    # Reproducibility manifest: source-snapshotting must resolve the
+    # dconvatac submodule commit SHA, for both the CPU and GPU registry
+    # entries (they share one submodule). Runs fully offline, no SLURM needed.
+    local mtmp
+    mtmp=$(mktemp -d)
+    echo "labels_key: test" > "$mtmp/config.yaml"
+    local expected_sha
+    expected_sha=$(git -C "$REPO_ROOT/containers/dconvatac" rev-parse HEAD 2>/dev/null)
+    for p in dconvatac dconvatac-gpu; do
+        rm -rf "$mtmp/$p" && mkdir -p "$mtmp/$p"
+        cp "$mtmp/config.yaml" "$mtmp/$p/config.yaml"
+        (
+            source "$REPO_ROOT/bin/lib/common.sh"
+            source "$REPO_ROOT/bin/lib/manifest.sh"
+            generate_manifest "$mtmp/$p" "$p" "$mtmp/$p/config.yaml" \
+                "$REPO_ROOT/containers/dconvatac/dconvatac_v1.0.0.sif" \
+                "$REPO_ROOT/slurm_templates/${p//-/_}_slurm_template.sh"
+        )
+        ts_assert_exists   "manifest ($p): slurm_template_used.sh snapshotted" "$mtmp/$p/slurm_template_used.sh"
+        ts_assert_nonempty "manifest ($p): pipeline_source.tar.gz snapshotted" "$mtmp/$p/pipeline_source.tar.gz"
+        ts_assert_contains "manifest ($p): pipeline_submodule_commit matches submodule HEAD" \
+            "$mtmp/$p/manifest.json" "$expected_sha"
+    done
+    rm -rf "$mtmp"
+
     rm -rf "$tmpdir"
 }
 
@@ -128,6 +153,19 @@ YAML
 
     ts_assert_exists "l2: pipeline script exists in submodule" \
         "$REPO_ROOT/containers/dconvatac/pipeline/dconvatac.py"
+
+    # Reproducibility logging: repro.sh sources cleanly and is wired into
+    # both the CPU and GPU SLURM templates
+    ts_assert_pass "l2: repro.sh sources cleanly" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh'"
+    ts_assert_contains "l2: dconvatac (CPU) template sources repro.sh" \
+        "$REPO_ROOT/slurm_templates/dconvatac_slurm_template.sh" "repro.sh"
+    ts_assert_contains "l2: dconvatac (CPU) template wraps invocation with run_logged" \
+        "$REPO_ROOT/slurm_templates/dconvatac_slurm_template.sh" "run_logged"
+    ts_assert_contains "l2: dconvatac-gpu template sources repro.sh" \
+        "$REPO_ROOT/slurm_templates/dconvatac_gpu_slurm_template.sh" "repro.sh"
+    ts_assert_contains "l2: dconvatac-gpu template wraps invocation with run_logged" \
+        "$REPO_ROOT/slurm_templates/dconvatac_gpu_slurm_template.sh" "run_logged"
 
     rm -rf "$tmpdir"
 }

@@ -29,6 +29,9 @@ An Apptainer mechanism that makes a host directory visible inside a container at
 
 ## C
 
+**Cell2Location**
+The deconvolution method used by the DeconvATAC pipeline to estimate cell-type abundance at each spatial location from a paired single-cell reference. Runs on CPU or GPU (`use_gpu: true` in config, only meaningful with `dconvatac-gpu`). See *DeconvATAC*.
+
 **CellPlex**
 A 10x Genomics sample multiplexing technology using Cell Multiplexing Oligos (CMOs). Multiple samples are pooled into one GEM well and later demultiplexed computationally. Processed using `cellranger multi` with `feature_types: Multiplexing Capture`.
 
@@ -44,6 +47,9 @@ A plain YAML file that parameterizes a pipeline run — input paths, output path
 
 **DAG (Directed Acyclic Graph)**
 A workflow where stages have defined dependencies and no cycles. In this framework, SQANTI3 uses a 4-stage SLURM DAG: stages 1a and 1b run in parallel, then stage 2 depends on both, then stage 3 depends on stage 2. The orchestrator script wires this with `--dependency afterok:<job_id>`.
+
+**DeconvATAC**
+Spatial ATAC deconvolution pipeline using Cell2Location, submoduled at `containers/dconvatac/`. Two registered pipelines: `dconvatac` (CPU) and `dconvatac-gpu` (A30 GPU). Python (not Nextflow) — both the container definition and pipeline script live in the submodule. See *Cell2Location*.
 
 **Dev partition**
 A SLURM partition on Juno limited to 2 hours of wall time. Used for smoke testing and quick validation. Submit to it with `tjp-launch <pipeline> --dev` or `tjp-batch <pipeline> samplesheet.csv --dev`.
@@ -93,10 +99,20 @@ The internal branding name for this framework. Synonymous with "TJP HPC Pipeline
 
 ---
 
+## I
+
+**invocation.log**
+A file written into every run directory recording the exact, fully-quoted, resolved command line for the pipeline invocation (or, for SQANTI3, all four DAG-stage `sbatch` calls), captured by `run_logged` in `bin/lib/repro.sh` immediately before running it.
+
+---
+
 ## J
 
 **Juno**
 The HPC cluster at UT Dallas used by the TJP group. Runs SLURM for job scheduling. Access via `ssh YOUR_NETID@juno.hpcre.utdallas.edu`. The framework is deployed to `/groups/tprice/pipelines` on Juno.
+
+**juno_environment.json**
+A reproducibility file written into every run directory by `bin/lib/repro.sh`: SLURM job ID, node, partition, allocated CPUs/mem/GPU, requested time limit, start/end time, duration, exit code, and best-effort `sacct` accounting. Captured at job start (`capture_juno_env`) and finalized via an `EXIT` trap (`finalize_juno_env`). See also: *manifest.json*.
 
 ---
 
@@ -141,6 +157,9 @@ Batch mode where `tjp-batch` submits one SLURM job per CSV row. Used by 10x (cel
 **Per-sheet (batch mode)**
 Batch mode where `tjp-batch` submits a single SLURM job for all CSV rows, and the pipeline (Nextflow) handles per-sample parallelism internally. Used by BulkRNASeq, Psoma, and Virome.
 
+**pipeline_source.tar.gz**
+A frozen `git archive HEAD` of the pipeline's submodule source (or `pipelines/addone/` for the inline demo), written into every run directory by `snapshot_pipeline_source` in `bin/lib/manifest.sh` at manifest-generation time — so a later submodule bump doesn't retroactively change what an old run "was."
+
 **Pipeline run record**
 See *PLR-xxxx*.
 
@@ -153,6 +172,9 @@ A Titan project identifier. Optional metadata field in config YAMLs (`titan_proj
 ---
 
 ## R
+
+**repro.sh**
+`bin/lib/repro.sh` — the shared library sourced by every SLURM template that captures Juno runtime environment (*juno_environment.json*) and logs the exact pipeline invocation (*invocation.log*). See `CLAUDE.md` §"Reproducibility & Provenance Logging".
 
 **RUN-xxxx**
 A Titan sequencing run identifier. Optional metadata field in config YAMLs (`titan_run_id: RUN-xxxx`).
@@ -180,7 +202,7 @@ Simple Linux Utility for Resource Management. The job scheduler on Juno. Users s
 A Titan biological sample identifier. Optional metadata field in config YAMLs (`titan_sample_id: SMP-xxxx`).
 
 **Submodule**
-A git repository embedded inside another git repository at a fixed commit. The framework uses five submodules under `containers/` for pipeline container definitions and wrapper scripts. Update with `git submodule update --init --recursive`. See `CONTRIBUTING.md §5`.
+A git repository embedded inside another git repository at a fixed commit. The framework uses six submodules under `containers/` for pipeline container definitions and wrapper scripts. Update with `git submodule update --init --recursive`. See `CONTRIBUTING.md §5`.
 
 ---
 
@@ -191,6 +213,9 @@ The TJP group's planned Laboratory Information Management System (LIMS) and data
 
 **tjp-launch**
 The primary CLI tool for submitting a single pipeline run. Creates a timestamped run directory, snapshots the config, validates it, generates the reproducibility manifest, submits the SLURM job, and registers a Titan metadata record.
+
+**tjp-test-suite**
+The primary testing tool: a three-layer test harness (offline validation, registry/wiring checks, full SLURM execution) run per-pipeline or for all registered pipelines. Supersedes the deprecated `tjp-test`/`tjp-test-validate`. Test modules live in `bin/lib/tests/test_<pipeline>.sh`.
 
 **Tool path**
 The directory where a native 10x tool is installed (e.g., `/groups/tprice/opt/cellranger-10.0.0`). Overridable per-run with `tool_path:` in the config YAML — useful for testing a new tool version without changing the default.

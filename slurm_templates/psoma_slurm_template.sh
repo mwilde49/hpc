@@ -13,6 +13,8 @@ PROJECT_ROOT=/groups/tprice/pipelines
 SCRATCH_ROOT=/scratch/juno/$USER
 WORK_ROOT=/work/$USER
 
+source "$PROJECT_ROOT/bin/lib/repro.sh"
+
 CONTAINER=$PROJECT_ROOT/containers/psoma/psomagen_v1.0.0.sif
 PIPELINE_REPO=$PROJECT_ROOT/containers/psoma
 
@@ -23,6 +25,10 @@ PIPELINE_CONFIG=${1:-$PIPELINE_REPO/pipeline.config}
 RUN_DIR=${2:-}
 SCRATCH_OUTPUT_DIR=${3:-}
 FASTQ_DIR=${4:-}
+
+# --- Reproducibility capture (node, partition, resources, invocation log) ---
+capture_juno_env "$RUN_DIR"
+trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT
 
 # --- Pre-flight checks ---
 
@@ -56,7 +62,12 @@ echo "====================================================================="
 
 mkdir -p logs
 
-apptainer exec \
+NF_LOG_DIR="${RUN_DIR:+$RUN_DIR/nextflow_logs}"
+NF_LOG_DIR="${NF_LOG_DIR:-$SCRATCH_ROOT/pipelines/psoma/nextflow_logs_$SLURM_JOB_ID}"
+mkdir -p "$NF_LOG_DIR"
+
+run_logged "${RUN_DIR:+$RUN_DIR/invocation.log}" \
+    apptainer exec \
     --cleanenv \
     --env PYTHONNOUSERSITE=1 \
     --env HOME=/tmp \
@@ -67,7 +78,11 @@ apptainer exec \
     $CONTAINER \
     nextflow run $PIPELINE_REPO/psomagen_bulk_rna_seq_pipeline.nf \
     -c $PIPELINE_CONFIG \
-    -w $SCRATCH_ROOT/nextflow_work
+    -w $SCRATCH_ROOT/nextflow_work \
+    -with-trace "$NF_LOG_DIR/trace.txt" \
+    -with-report "$NF_LOG_DIR/report.html" \
+    -with-timeline "$NF_LOG_DIR/timeline.html" \
+    -with-dag "$NF_LOG_DIR/dag.html"
 PIPELINE_EXIT=$?
 
 if [ $PIPELINE_EXIT -ne 0 ]; then

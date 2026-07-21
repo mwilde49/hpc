@@ -21,11 +21,17 @@
 set -euo pipefail
 
 PROJECT_ROOT=/groups/tprice/pipelines
+source "$PROJECT_ROOT/bin/lib/repro.sh"
+
 PIPELINE_REPO=$PROJECT_ROOT/containers/sqanti3   # longreads repo deployment path
 NEXTFLOW=$PROJECT_ROOT/bin/nextflow
 
 USER_CONFIG="${1:?ERROR: Config not provided}"
 RUN_DIR="${2:?ERROR: Run dir not provided}"
+
+# --- Reproducibility capture (node, partition, resources, invocation log) ---
+capture_juno_env "$RUN_DIR"
+trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT
 
 NF_CONFIG="$PIPELINE_REPO/configs/wf_transcriptomes/juno.config"
 PREFLIGHT="$PIPELINE_REPO/scripts/wf_transcriptomes_preflight.sh"
@@ -96,7 +102,11 @@ echo "====================================================================="
 # Nextflow submits per-process SLURM jobs via juno.config (slurm executor).
 # -resume allows restart from last successful task if this job is resubmitted.
 
-"$NEXTFLOW" run epi2me-labs/wf-transcriptomes \
+NF_LOG_DIR="$RUN_DIR/nextflow_logs"
+mkdir -p "$NF_LOG_DIR"
+
+run_logged "$RUN_DIR/invocation.log" \
+    "$NEXTFLOW" run epi2me-labs/wf-transcriptomes \
     -r "$WF_VERSION" \
     -profile singularity \
     -c "$NF_CONFIG" \
@@ -109,7 +119,11 @@ echo "====================================================================="
     --de_analysis "$DE_ANALYSIS" \
     --direct_rna "$DIRECT_RNA" \
     --minimap2_index_opts "$MINIMAP2_OPTS" \
-    --out_dir "$OUTDIR"
+    --out_dir "$OUTDIR" \
+    -with-trace "$NF_LOG_DIR/trace.txt" \
+    -with-report "$NF_LOG_DIR/report.html" \
+    -with-timeline "$NF_LOG_DIR/timeline.html" \
+    -with-dag "$NF_LOG_DIR/dag.html"
 
 # ── Locate merged GTF ─────────────────────────────────────────────────────────
 # wf-transcriptomes writes the merged assembly GTF to $OUTDIR; find and report it.

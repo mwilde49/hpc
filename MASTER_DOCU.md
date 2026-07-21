@@ -1,6 +1,6 @@
 # Hyperion Compute — Documentation Master Index
 
-**Version:** v6.1.0 &nbsp;|&nbsp; **Last updated:** 2026-05-19 (v6.1.1 — full documentation suite added)
+**Version:** v7.0.0 &nbsp;|&nbsp; **Last updated:** 2026-07-20 (v7.0.0 — reproducibility & provenance logging framework, DeconvATAC, tjp-test-suite docs caught up)
 
 This file is the single entry point for all documentation in the TJP HPC pipeline framework. It describes what every document covers, who should read it, and where to look for specific information.
 

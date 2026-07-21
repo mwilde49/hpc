@@ -1,6 +1,6 @@
 # Hyperion Compute — Troubleshooting Guide
 
-**Version:** 6.1.0 | **Cluster:** Juno HPC, UT Dallas | **Updated:** 2026-05-19
+**Version:** 7.0.0 | **Cluster:** Juno HPC, UT Dallas | **Updated:** 2026-07-20
 
 ---
 
@@ -45,6 +45,11 @@
 | Script missing execute permission on HPC | [7.5 Script not executable after git pull](#75-script-not-executable-after-git-pull) |
 | `labdata find runs` returns empty | [8.1 labdata find runs returns no results](#81-labdata-find-runs-returns-no-results) |
 | `labdata show` — PLR record not found | [8.2 PLR record not found](#82-plr-record-not-found) |
+| DeconvATAC `CUDA not available` / falls back to CPU | [9.1 DeconvATAC GPU not detected](#91-deconvatac-gpu-not-detected) |
+| DeconvATAC multi-section spatial data mixed together | [9.2 spatial_batch_key not set](#92-spatial_batch_key-not-set) |
+| `juno_environment.json` fields stuck at `null` | [10.1 sacct fields not populating](#101-sacct-fields-not-populating) |
+| `invocation.log` / `juno_environment.json` missing from run dir | [10.2 Reproducibility files missing from a run directory](#102-reproducibility-files-missing-from-a-run-directory) |
+| `tjp-test-suite` dies after 1-2 checks, no error shown | [10.3 tjp-test-suite stops silently after the first check](#103-tjp-test-suite-stops-silently-after-the-first-check) |
 
 ---
 
@@ -854,6 +859,68 @@ labdata find runs --format paths           # list output paths
 labdata show PLR-xxxx                      # prints output_path field
 ls $(labdata find runs --format paths | grep PLR-xxxx)
 ```
+
+---
+
+## 9. DeconvATAC Errors
+
+### 9.1 DeconvATAC GPU not detected
+
+**Symptom:** `dconvatac-gpu` job runs but logs show it fell back to CPU, or `use_gpu: true` has no effect.
+
+**Cause:** `use_gpu: true` only takes effect on the `dconvatac-gpu` registry entry (A30 partition, `--nv` + `--gres=gpu:nvidia_a30:1`) — launching plain `dconvatac` always runs CPU-only regardless of this config key.
+
+**Fix:**
+```bash
+tjp-launch dconvatac-gpu     # not: tjp-launch dconvatac
+```
+
+---
+
+### 9.2 spatial_batch_key not set
+
+**Symptom:** Multi-section spatial data is deconvolved as if it were one section; results look averaged/blended across sections.
+
+**Cause:** `spatial_batch_key` (added in the dconvatac submodule after v1.0.0) tells Cell2Location which `.obs` column separates sections. If omitted, all spots are treated as one batch.
+
+**Fix:** Set `spatial_batch_key` in your config to the `.obs` column name that identifies each spatial section.
+
+---
+
+## 10. Reproducibility Logging Errors
+
+### 10.1 sacct fields not populating
+
+**Symptom:** `juno_environment.json`'s `sacct_state`, `sacct_elapsed`, and `sacct_maxrss` fields are `null` even though the job completed successfully.
+
+**Cause:** Not a bug — `sacct` backfill is best-effort. The job's own SLURM accounting record is usually not finalized by the scheduler until a few seconds after the job's `EXIT` trap fires, so a few retries are attempted but can still come up empty. `end_time`, `duration_seconds`, and `exit_code` are self-reported by the trap and always populate regardless.
+
+**Fix (get the numbers manually):**
+```bash
+sacct -j <jobid> --format=State,Elapsed,MaxRSS
+```
+
+---
+
+### 10.2 Reproducibility files missing from a run directory
+
+**Symptom:** A run directory is missing `juno_environment.json`, `invocation.log`, `slurm_template_used.sh`, or `pipeline_source.tar.gz`.
+
+**Cause:** Most commonly, the SLURM template was invoked manually with `sbatch <template>.sh <config>` instead of via `tjp-launch`/`tjp-batch` — with no `$RUN_DIR` argument, `capture_juno_env`/`run_logged`/the manifest snapshot functions all no-op gracefully rather than erroring. Always launch through `tjp-launch`/`tjp-batch` if you want these artifacts.
+
+**Also check:** `pipeline_source.tar.gz` requires the pipeline's submodule to actually be a git checkout (`git -C containers/<name> rev-parse --git-dir`); a submodule directory that was copied in some other way (not `git submodule update --init`) will silently skip the snapshot.
+
+---
+
+### 10.3 tjp-test-suite stops silently after the first check
+
+**Symptom:** (Fixed in v7.0.0 — noted here for anyone who hasn't pulled past that point.) `tjp-test-suite` prints one or two checkmarks per pipeline/layer and then exits with code 1, no error message, no summary report.
+
+**Cause:** A `set -u`/`set -e` bug in `_ts_update_layer_status` (`bin/lib/test_framework.sh`) — fixed in v7.0.0. If you still see this, confirm your checkout includes the fix:
+```bash
+grep -n "two-step indirection" bin/lib/test_framework.sh
+```
+If that comment isn't present, `git pull` to pick up the fix.
 
 ---
 

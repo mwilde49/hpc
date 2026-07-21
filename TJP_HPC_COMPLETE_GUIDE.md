@@ -1,8 +1,8 @@
 # TJP HPC Pipeline Framework — Complete Operational Guide
 
-Version: 6.1
+Version: 7.0.0
 Status: Production — 13 pipelines running on Juno HPC
-Last updated: 2026-05-19
+Last updated: 2026-07-20
 Audience: Group members, new developers, bioinformaticians
 
 This guide walks through the entire process from developing a pipeline on your local machine to running it on the HPC via SLURM. It uses the AddOne demo pipeline as a working example but the process applies to any pipeline.
@@ -927,7 +927,7 @@ cd /groups/tprice/pipelines && git pull
 
 ---
 
-## Current Framework State (v6.0.0)
+## Current Framework State (v7.0.0)
 
 ### What's new since v2.0
 
@@ -940,6 +940,10 @@ cd /groups/tprice/pipelines && git pull
 | v5.5.0 | SQANTI3 + wf-transcriptomes long-read pipelines |
 | v5.6.0 | All submodules pinned to releases; virome v1.4.0 |
 | v6.0.0 | Samplesheet-driven batch execution (tjp-batch), Titan metadata prototype (labdata), Titan integration fields in all 9 configs |
+| v6.2.0 | `tjp-test-suite` — three-layer test harness for every pipeline |
+| v6.3.0 | DeconvATAC pipeline (CPU + GPU), spatial ATAC deconvolution via Cell2Location |
+| v6.4.0 | wf-transcriptomes outdir guard; documentation catch-up for DeconvATAC/tjp-test-suite |
+| v7.0.0 | Reproducibility & provenance logging framework across all 13 SLURM templates (Juno env capture, invocation logging, frozen source snapshots, Nextflow trace/report); `test_framework.sh` bug fix that had been silently killing `tjp-test-suite` runs since v6.2.0 |
 
 ### Titan Integration Roadmap
 

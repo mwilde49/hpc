@@ -2,7 +2,7 @@
 
 HPC pipeline framework for the TJP group on Juno HPC (UT Dallas). Uses Apptainer containers, SLURM scheduling, and config-driven YAML execution. Deployed to the shared group location at `/groups/tprice/pipelines`.
 
-**Version:** v6.1.0 &nbsp;|&nbsp; **Platform:** Juno HPC &nbsp;|&nbsp; **Branding:** Hyperion Compute
+**Version:** v7.0.0 &nbsp;|&nbsp; **Platform:** Juno HPC &nbsp;|&nbsp; **Branding:** Hyperion Compute
 
 ---
 
@@ -129,6 +129,12 @@ All tools live in `bin/` and are also available as `hyperion-*` and `biocruiser-
 | `labdata` | Metadata management — find runs, show PLR-xxxx records, check status |
 
 `tjp-test-suite` is the primary testing path; `tjp-test` and `tjp-test-validate` are kept for backwards compatibility.
+
+---
+
+## Reproducibility (v7.0.0+)
+
+Every run directory now records, beyond the config snapshot and `manifest.json`: which Juno node/partition it ran on and for how long (`juno_environment.json`), the exact resolved command that was executed (`invocation.log`), a frozen copy of the SLURM template and pipeline source as they existed at launch time (`slurm_template_used.sh`, `pipeline_source.tar.gz`), and — for the four Nextflow-based pipelines — Nextflow's own per-process trace/report/timeline (`nextflow_logs/`). See `CLAUDE.md` §"Reproducibility & Provenance Logging" and `USER_GUIDE.md` §17.
 
 ---
 

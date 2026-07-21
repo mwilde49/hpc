@@ -21,6 +21,8 @@ PROJECT_ROOT=/groups/tprice/pipelines
 SCRATCH_ROOT=/scratch/juno/$USER
 WORK_ROOT=/work/$USER
 
+source "$PROJECT_ROOT/bin/lib/repro.sh"
+
 PIPELINE_REPO=$PROJECT_ROOT/containers/virome
 
 # Accept pipeline config as $1 (used by tjp-launch), fall back to default
@@ -30,6 +32,10 @@ PIPELINE_CONFIG=${1:-}
 RUN_DIR=${2:-}
 SCRATCH_OUTPUT_DIR=${3:-}
 # $4 (FASTQ_DIR) unused — samplesheet records input paths
+
+# --- Reproducibility capture (node, partition, resources, invocation log) ---
+capture_juno_env "$RUN_DIR"
+trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT
 
 # --- Pre-flight checks ---
 
@@ -66,12 +72,21 @@ echo "====================================================================="
 
 mkdir -p logs
 
+NF_LOG_DIR="${RUN_DIR:+$RUN_DIR/nextflow_logs}"
+NF_LOG_DIR="${NF_LOG_DIR:-$SCRATCH_ROOT/pipelines/virome/nextflow_logs_$SLURM_JOB_ID}"
+mkdir -p "$NF_LOG_DIR"
+
 # Virome uses per-process Apptainer containers managed by Nextflow.
 # Nextflow reads container paths from params.container_dir in the config.
-nextflow run "$PIPELINE_REPO/main.nf" \
+run_logged "${RUN_DIR:+$RUN_DIR/invocation.log}" \
+    nextflow run "$PIPELINE_REPO/main.nf" \
     -params-file "$PIPELINE_CONFIG" \
     -profile standard \
-    -w "$SCRATCH_ROOT/nextflow_work/virome"
+    -w "$SCRATCH_ROOT/nextflow_work/virome" \
+    -with-trace "$NF_LOG_DIR/trace.txt" \
+    -with-report "$NF_LOG_DIR/report.html" \
+    -with-timeline "$NF_LOG_DIR/timeline.html" \
+    -with-dag "$NF_LOG_DIR/dag.html"
 
 PIPELINE_EXIT=$?
 

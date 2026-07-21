@@ -36,6 +36,51 @@ compute_sif_checksum() {
     fi
 }
 
+# ── Source snapshotting ──────────────────────────────────────────────────────
+
+# snapshot_slurm_template <slurm_template> <run_dir>
+# Freezes a copy of the exact SLURM template used, since the live file in the
+# repo can change before anyone looks back at an old run.
+snapshot_slurm_template() {
+    local slurm_template="$1"
+    local run_dir="$2"
+    [[ -f "$slurm_template" ]] && cp "$slurm_template" "$run_dir/slurm_template_used.sh"
+}
+
+# snapshot_pipeline_source <pipeline> <run_dir>
+# Freezes an exact copy of the pipeline source (submodule, or inline for
+# addone) into pipeline_source.tar.gz, and echoes its commit SHA. Submodules
+# drift independently of the hpc superproject commit (psoma, virome, sqanti3,
+# dconvatac, 10x all move on their own release cadence), so the superproject
+# git_commit alone doesn't tell you which pipeline code actually ran.
+snapshot_pipeline_source() {
+    local pipeline="$1"
+    local run_dir="$2"
+
+    local submodule_dir=""
+    case "$pipeline" in
+        bulkrnaseq) submodule_dir="$REPO_ROOT/containers/bulkrnaseq" ;;
+        psoma) submodule_dir="$REPO_ROOT/containers/psoma" ;;
+        virome) submodule_dir="$REPO_ROOT/containers/virome" ;;
+        sqanti3|wf-transcriptomes) submodule_dir="$REPO_ROOT/containers/sqanti3" ;;
+        dconvatac|dconvatac-gpu) submodule_dir="$REPO_ROOT/containers/dconvatac" ;;
+        cellranger|cellranger-mkfastq|cellranger-multi|spaceranger|xeniumranger)
+            submodule_dir="$REPO_ROOT/containers/10x" ;;
+    esac
+
+    if [[ -n "$submodule_dir" ]] && git -C "$submodule_dir" rev-parse --git-dir &>/dev/null; then
+        git -C "$submodule_dir" archive HEAD --format=tar.gz -o "$run_dir/pipeline_source.tar.gz" 2>/dev/null \
+            || echo "WARNING: failed to snapshot pipeline source for $pipeline" >&2
+        git -C "$submodule_dir" rev-parse HEAD 2>/dev/null || echo "unknown"
+    elif [[ "$pipeline" == "addone" ]]; then
+        tar -czf "$run_dir/pipeline_source.tar.gz" -C "$REPO_ROOT/pipelines" addone 2>/dev/null \
+            || echo "WARNING: failed to snapshot addone pipeline source" >&2
+        git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo "unknown"
+    else
+        echo "unknown"
+    fi
+}
+
 # ── Manifest generation ─────────────────────────────────────────────────────
 # generate_manifest <run_dir> <pipeline> <config_file> <container_path> <slurm_template>
 # Writes manifest.json to the run directory.
@@ -58,6 +103,12 @@ generate_manifest() {
 
     local checksum
     checksum=$(compute_sif_checksum "$container")
+
+    # Freeze the exact scripts used for this run (SLURM template + pipeline
+    # source), and capture the pipeline submodule's own commit SHA.
+    snapshot_slurm_template "$slurm_template" "$run_dir"
+    local pipeline_source_commit
+    pipeline_source_commit=$(snapshot_pipeline_source "$pipeline" "$run_dir")
 
     # Extract input/output paths from config based on pipeline type
     # Extract timestamp from run_dir (last path component)
@@ -97,11 +148,16 @@ generate_manifest() {
     "user": "$USER",
     "pipeline": "$pipeline",
     "git_commit": "$git_commit",
+    "pipeline_submodule_commit": "$pipeline_source_commit",
     "container_file": "$container",
     "container_checksum": "$checksum",
     "config": "config.yaml",
     "slurm_job_id": "pending",
     "slurm_template": "$slurm_template",
+    "slurm_template_snapshot": "slurm_template_used.sh",
+    "pipeline_source_snapshot": "pipeline_source.tar.gz",
+    "juno_environment": "juno_environment.json",
+    "invocation_log": "invocation.log",
     "input_paths": "$input_paths",
     "output_paths": "$output_paths"
 }
