@@ -18,6 +18,10 @@ run_hvp: true               # run highly_variable_peaks before deconvolution
 spatial_batch_key:          # obs column in spatial_h5ad identifying distinct
                              # sections/batches, e.g. "sample" — leave blank if
                              # spatial_h5ad is a single section
+spatial_batch_size:         # minibatch size for spatial model training —
+                             # leave blank for full-data batches (fine under
+                             # a few thousand spots); set e.g. 2048 for larger
+                             # datasets to avoid GPU OOM
 N_cells_per_location: 8     # expected number of cells per spatial location
 detection_alpha: 20         # detection model tuning parameter
 max_epochs_spatial: 400     # training epochs for the spatial model

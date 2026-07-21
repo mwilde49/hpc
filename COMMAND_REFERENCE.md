@@ -1727,6 +1727,9 @@ run_hvp: true               # run highly_variable_peaks before deconvolution
 spatial_batch_key:          # obs column in spatial_h5ad marking distinct sections/batches
                              # (e.g. multiple tissue sections pooled in one file) — passed to
                              # Cell2Location as batch_key; leave blank for single-section data
+spatial_batch_size:         # minibatch size for spatial model training — leave blank for
+                             # full-data batches (fine under a few thousand spots); set e.g.
+                             # 2048 for larger datasets to avoid GPU OOM
 N_cells_per_location: 8     # expected cells per spot
 detection_alpha: 20         # detection model tuning parameter
 max_epochs_spatial: 400     # training epochs for the spatial model
@@ -1764,6 +1767,7 @@ scp containers/dconvatac/dconvatac_latest.sif \
 - `spatial_h5ad` and `reference_h5ad` are automatically aligned to their shared peak set (exact `var_name` match) before deconvolution — peaks unique to either file are dropped and logged. Independently peak-called datasets rarely match exactly; cell2location requires an identical feature space.
 - `run_hvp: true` uses `scanpy.pp.highly_variable_genes` on the ATAC peaks (treats peaks as features)
 - CPU training can be slow for large spatial datasets — prefer `dconvatac-gpu` for >50k spots or >400 epochs
+- Datasets above roughly 10-20k spatial spots can hit CUDA OOM on the A30's 24GB during spatial model training if `spatial_batch_size` is left unset (full-data forward pass) — set it (e.g. `2048`) once you approach that range
 - Outputs go to `output_dir` directly (no scratch staging) — point to a durable path
 
 ---

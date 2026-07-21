@@ -82,6 +82,7 @@ One SLURM job per samplesheet row.
 | `output_dir` | **required** | Directory for outputs (created if absent) |
 | `run_hvp` | `true` | Run highly variable peak selection |
 | `spatial_batch_key` | *(none)* | `obs` column in `spatial_h5ad` identifying distinct sections/batches — passed to Cell2Location as `batch_key` for joint multi-section modeling. Leave blank for single-section data. |
+| `spatial_batch_size` | *(none — full data)* | Minibatch size for spatial model training. Leave blank for datasets under a few thousand spots; set e.g. `2048` for larger datasets to avoid GPU OOM (a full-data forward pass over tens of thousands of spots can exceed A30's 24GB). |
 | `N_cells_per_location` | `8` | Expected cells per spatial location |
 | `detection_alpha` | `20` | Cell2Location detection model parameter |
 | `max_epochs_spatial` | `400` | Training epochs — spatial model |
