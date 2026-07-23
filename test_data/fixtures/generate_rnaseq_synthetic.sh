@@ -76,9 +76,13 @@ _gen_fastq() {
     {
         local i
         for (( i = 1; i <= nreads; i++ )); do
-            # Random $rlen-mer from /dev/urandom, converted to ACGT
+            # Random $rlen-mer from /dev/urandom, converted to ACGT.
+            # `|| true` on tr: under pipefail, head closing the pipe early
+            # after reading $rlen bytes sends tr SIGPIPE (exit 141), which
+            # pipefail would otherwise surface as this substitution's exit
+            # status and abort the whole script under set -e.
             local seq
-            seq=$(tr -dc 'ACGT' < /dev/urandom 2>/dev/null | head -c "$rlen")
+            seq=$({ tr -dc 'ACGT' < /dev/urandom || true; } 2>/dev/null | head -c "$rlen")
             printf '@%s_r%d/%d\n%s\n+\n%s\n' "$sample" "$i" "$readnum" "$seq" "$qual"
         done
     } | gzip -c > "$out"

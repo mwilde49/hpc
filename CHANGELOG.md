@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); version
 
 ## [Unreleased]
 
+## [v7.3.1] — 2026-07-23
+
+### Added
+- `bin/tjp-test-local`: runs a SLURM template's body directly via `bash`, bypassing `sbatch`/SLURM entirely — for smoke-testing pipeline scaffolding and the provenance framework without Juno access. Sandboxes `PROJECT_ROOT`/`SCRATCH_ROOT`/`WORK_ROOT` under `~/.tjp_local_test/` (`PROJECT_ROOT` symlinked straight to the real checkout), patches only the 3 hardcoded path lines in a disposable copy of the target template (diffed to confirm nothing else changed), and reports which provenance artifacts came out the other end.
+- `test_data/fixtures/generate_tier0_reference.sh`: generates a tiny synthetic reference FASTA/GTF, HISAT2 (psoma) and STAR (bulkrnaseq) indexes, and a placeholder exclude BED (bulkrnaseq's `filter_samples` process requires at least one of `exclude_bed_file_path`/`blacklist_bed_file_path` to be set — discovered by actually running the pipeline against this fixture). Closes a long-standing gap where `test_psoma.sh`/`test_bulkrnaseq.sh` required a tiny reference index that had no generator — only a comment saying "build one by hand."
+
+### Fixed
+- **`psoma`/`bulkrnaseq` SLURM templates called `capture_software_versions` with the pre-v7.3.0 argument order** (`<run_dir> <container> <pipeline>` instead of the current `<run_dir> <pipeline> <primary>`) — found by actually running both templates locally via the new `tjp-test-local` harness against real (stub) containers, not by unit-testing `provenance.sh`'s functions in isolation. Since `$pipeline` received a container path string instead of `"psoma"`/`"bulkrnaseq"`, it matched no case arm in the dispatcher and silently no-opped — every psoma/bulkrnaseq run since v7.3.0 was generated with **no `software_versions.txt`** and no error indicating why. The v7.3.0 changelog entry claiming "the real templates were always correct, only the CONTRIBUTING.md example was wrong" was itself wrong — only `CONTRIBUTING.md`'s example was fixed at the time; these two real call sites were missed. Strengthened `test_psoma.sh`/`test_bulkrnaseq.sh`'s L2 checks to assert the exact call (not just that the function name appears somewhere in the file) so this class of regression fails offline next time.
+- `test_data/fixtures/generate_rnaseq_synthetic.sh`: the random-sequence generator (`tr -dc 'ACGT' < /dev/urandom | head -c "$rlen"`) aborted on its very first read under `set -o pipefail` — `head` closing the pipe early after reading `$rlen` bytes sends `tr` SIGPIPE (exit 141), which pipefail surfaces as the command substitution's exit status, tripping `set -e`. This has apparently never worked; found while generating tier-0 fixtures for the first time. Fixed with `{ tr ... || true; } | head ...`; same fix applied to the equivalent line in the new `generate_tier0_reference.sh`.
+
 ## [v7.3.0] — 2026-07-23
 
 ### Added
@@ -233,7 +243,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); version
 
 ---
 
-[Unreleased]: https://github.com/mwilde49/hpc/compare/v7.3.0...HEAD
+[Unreleased]: https://github.com/mwilde49/hpc/compare/v7.3.1...HEAD
+[v7.3.1]: https://github.com/mwilde49/hpc/compare/v7.3.0...v7.3.1
 [v7.3.0]: https://github.com/mwilde49/hpc/compare/v7.2.0...v7.3.0
 [v7.2.0]: https://github.com/mwilde49/hpc/compare/v7.1.0...v7.2.0
 [v7.1.0]: https://github.com/mwilde49/hpc/compare/v7.0.0...v7.1.0

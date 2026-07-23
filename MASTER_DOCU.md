@@ -1,6 +1,6 @@
 # Hyperion Compute — Documentation Master Index
 
-**Version:** v7.3.0 &nbsp;|&nbsp; **Last updated:** 2026-07-23 (v7.3.0 — Provenance README rolled out to all 13 pipelines: PROVENANCE_README.md, CONSOLE_LOG.txt, live software-version capture)
+**Version:** v7.3.1 &nbsp;|&nbsp; **Last updated:** 2026-07-23 (v7.3.1 — bin/tjp-test-local + tier-0 fixtures; fixed psoma/bulkrnaseq silently never writing software_versions.txt)
 
 This file is the single entry point for all documentation in the TJP HPC pipeline framework. It describes what every document covers, who should read it, and where to look for specific information.
 
@@ -254,7 +254,7 @@ python3 docs/generate_diagrams.py
 
 **What it covers:**
 - Version-by-version changelog in [Keep a Changelog](https://keepachangelog.com/) format
-- Sections for every release from v2.0.0 through v7.3.0, plus an `[Unreleased]` section
+- Sections for every release from v2.0.0 through v7.3.1, plus an `[Unreleased]` section
 - Added / Changed / Fixed / Removed categories per release
 
 **When to read:** When upgrading to a new framework version to understand what changed.

@@ -1,0 +1,1 @@
+PLACEHOLDER — not a real STAR index, see generate_tier0_reference.sh

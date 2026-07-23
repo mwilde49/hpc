@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# tjp-test-local — run a SLURM template's body directly via bash, bypassing
+# sbatch/SLURM entirely.
+#
+# For local smoke-testing (e.g. in WSL2, no Juno access) of pipeline
+# scaffolding and the provenance framework specifically. NOT a substitute
+# for `tjp-test-suite --layer 3` on Juno, which validates against a real
+# SLURM scheduler and (usually) real scientific containers — this tool is
+# for fast, offline confirmation that the wiring works.
+#
+# SLURM templates are plain bash scripts with #SBATCH comment directives,
+# which bash ignores. capture_juno_env (bin/lib/repro.sh) already degrades
+# gracefully when $SLURM_JOB_ID etc. are unset, writing "unknown" instead
+# of failing — this tool relies on exactly that.
+#
+# Usage: tjp-test-local <pipeline> <config_or_pipeline_config> [run_dir_arg3] [run_dir_arg4]
+#
+#   For pipelines where tjp-launch passes the user's config.yaml straight
+#   through as $1 (addone, dconvatac(-gpu), virome, cellranger*,
+#   spaceranger, xeniumranger, sqanti3), pass that config.yaml directly.
+#
+#   For psoma/bulkrnaseq, tjp-launch first translates the user's simplified
+#   YAML into a Nextflow pipeline.config via sed templating before passing
+#   IT as $1 — this tool does not replicate that translation (it would
+#   duplicate tjp-launch's _generate_psoma_config/_generate_nextflow_config
+#   logic). Generate that pipeline.config yourself first (see
+#   test_data/fixtures/ pilot scripts for an example), then pass it here.
+#
+#   [run_dir_arg3]/[run_dir_arg4] are passed straight through as the
+#   template's $3/$4 (SCRATCH_OUTPUT_DIR override / FASTQ_DIR) — optional,
+#   most pipelines compute sensible defaults internally when empty.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+LOCAL_ROOT="${TJP_LOCAL_TEST_ROOT:-$HOME/.tjp_local_test}"
+LOCAL_PROJECT_ROOT="$LOCAL_ROOT/groups_tprice_pipelines"
+LOCAL_SCRATCH_ROOT="$LOCAL_ROOT/scratch/$USER"
+LOCAL_WORK_ROOT="$LOCAL_ROOT/work/$USER"
+
+usage() {
+    cat <<EOF
+Usage: tjp-test-local <pipeline> <config_or_pipeline_config> [arg3] [arg4]
+
+Runs a SLURM template's body directly via bash (no sbatch/SLURM needed) in
+a sandboxed local environment under: $LOCAL_ROOT
+
+  PROJECT_ROOT -> symlinked straight to this repo checkout ($REPO_ROOT)
+  SCRATCH_ROOT -> $LOCAL_SCRATCH_ROOT
+  WORK_ROOT    -> $LOCAL_WORK_ROOT
+
+See the comment header in this script for psoma/bulkrnaseq caveats
+(Nextflow pipeline.config must be pre-generated).
+EOF
+    exit "${1:-0}"
+}
+
+[[ $# -lt 2 ]] && usage 1
+
+PIPELINE="$1"
+CONFIG_ARG="$2"
+ARG3="${3:-}"
+ARG4="${4:-}"
+
+[[ -f "$CONFIG_ARG" ]] || { echo "ERROR: config not found: $CONFIG_ARG" >&2; exit 1; }
+
+TEMPLATE_NAME="${PIPELINE//-/_}_slurm_template.sh"
+REAL_TEMPLATE="$REPO_ROOT/slurm_templates/$TEMPLATE_NAME"
+[[ -f "$REAL_TEMPLATE" ]] || { echo "ERROR: no SLURM template for pipeline '$PIPELINE' (looked for $REAL_TEMPLATE)" >&2; exit 1; }
+
+# ── Sandbox setup ────────────────────────────────────────────────────────────
+mkdir -p "$LOCAL_SCRATCH_ROOT" "$LOCAL_WORK_ROOT" "$(dirname "$LOCAL_PROJECT_ROOT")"
+
+if [[ -L "$LOCAL_PROJECT_ROOT" ]]; then
+    if [[ "$(readlink -f "$LOCAL_PROJECT_ROOT")" != "$REPO_ROOT" ]]; then
+        rm "$LOCAL_PROJECT_ROOT"
+        ln -s "$REPO_ROOT" "$LOCAL_PROJECT_ROOT"
+    fi
+elif [[ ! -e "$LOCAL_PROJECT_ROOT" ]]; then
+    ln -s "$REPO_ROOT" "$LOCAL_PROJECT_ROOT"
+else
+    echo "ERROR: $LOCAL_PROJECT_ROOT exists and is not a symlink to this repo." >&2
+    echo "  Remove it, or set TJP_LOCAL_TEST_ROOT to a different sandbox dir." >&2
+    exit 1
+fi
+
+# ── Patch the template's hardcoded Juno paths ───────────────────────────────
+TS=$(date '+%Y-%m-%d_%H-%M-%S')
+RUN_DIR="$LOCAL_WORK_ROOT/pipelines/$PIPELINE/runs/$TS"
+mkdir -p "$RUN_DIR"
+
+PATCHED_TEMPLATE="$RUN_DIR/patched_template.sh"
+sed \
+    -e "s|^PROJECT_ROOT=/groups/tprice/pipelines\$|PROJECT_ROOT=$LOCAL_PROJECT_ROOT|" \
+    -e "s|^SCRATCH_ROOT=/scratch/juno/\$USER\$|SCRATCH_ROOT=$LOCAL_SCRATCH_ROOT|" \
+    -e "s|^WORK_ROOT=/work/\$USER\$|WORK_ROOT=$LOCAL_WORK_ROOT|" \
+    "$REAL_TEMPLATE" > "$PATCHED_TEMPLATE"
+chmod +x "$PATCHED_TEMPLATE"
+
+# Sanity check: confirm only the expected path lines differ (3 templates
+# assign PROJECT_ROOT/SCRATCH_ROOT/WORK_ROOT on one line each == 3 diff
+# hunks == up to 6 changed lines in unified-less `diff` output).
+DIFF_LINES=$(diff "$REAL_TEMPLATE" "$PATCHED_TEMPLATE" | grep -c '^[<>]' || true)
+if [[ "$DIFF_LINES" -gt 6 ]]; then
+    echo "ERROR: patched template differs from the original by more than the expected path lines ($DIFF_LINES changed lines)." >&2
+    echo "  This usually means the template's PROJECT_ROOT/SCRATCH_ROOT/WORK_ROOT lines changed format — update the sed patterns in this script." >&2
+    echo "  Refusing to run. Inspect: diff $REAL_TEMPLATE $PATCHED_TEMPLATE" >&2
+    exit 1
+fi
+
+cp "$CONFIG_ARG" "$RUN_DIR/config.yaml"
+
+# ── Best-effort manifest generation (mirrors what tjp-launch normally does
+#    before sbatch — not required for the template to run, but without it
+#    manifest.json/slurm_template_used.sh/pipeline_source.tar.gz won't
+#    exist and generate_provenance_readme will show "unknown" for the
+#    fields it reads from manifest.json) ───────────────────────────────────
+(
+    source "$REPO_ROOT/bin/lib/common.sh"
+    source "$REPO_ROOT/bin/lib/manifest.sh"
+    CONTAINER=""
+    if is_native_pipeline "$PIPELINE" 2>/dev/null; then
+        CONTAINER="native:$(get_tool_path "$PIPELINE")"
+    else
+        CONTAINER=$(get_container_path "$PIPELINE" 2>/dev/null || echo "")
+    fi
+    generate_manifest "$RUN_DIR" "$PIPELINE" "$RUN_DIR/config.yaml" "$CONTAINER" "$REAL_TEMPLATE"
+) || echo "WARNING: manifest generation failed (non-fatal — continuing without it)" >&2
+
+echo "============================================================"
+echo "  tjp-test-local — $PIPELINE (no SLURM, local sandbox)"
+echo "============================================================"
+echo "  Run dir:      $RUN_DIR"
+echo "  Template:     $PATCHED_TEMPLATE"
+echo "  (patched from $REAL_TEMPLATE, only path lines changed)"
+echo "============================================================"
+echo ""
+
+set +e
+bash "$PATCHED_TEMPLATE" "$RUN_DIR/config.yaml" "$RUN_DIR" "$ARG3" "$ARG4"
+PIPELINE_EXIT=$?
+set -e
+
+echo ""
+echo "============================================================"
+echo "  Result: exit code $PIPELINE_EXIT"
+echo "============================================================"
+echo "  Provenance artifacts in $RUN_DIR:"
+for f in PROVENANCE_README.md CONSOLE_LOG.txt software_versions.txt manifest.json juno_environment.json invocation.log; do
+    if [[ -f "$RUN_DIR/$f" ]]; then
+        printf '    [x] %s\n' "$f"
+    else
+        printf '    [ ] %s (missing)\n' "$f"
+    fi
+done
+echo ""
+echo "  Inspect: cat $RUN_DIR/PROVENANCE_README.md"
+echo "  Run dir: $RUN_DIR"
+
+exit "$PIPELINE_EXIT"

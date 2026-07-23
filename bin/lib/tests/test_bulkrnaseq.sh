@@ -169,8 +169,12 @@ YAML
         bash -c "source '$REPO_ROOT/bin/lib/repro.sh' && source '$REPO_ROOT/bin/lib/provenance.sh' && declare -f start_console_log capture_software_versions generate_provenance_readme >/dev/null"
     ts_assert_contains "l2: bulkrnaseq template sources provenance.sh" \
         "$REPO_ROOT/slurm_templates/bulkrnaseq_slurm_template.sh" "provenance.sh"
-    ts_assert_contains "l2: bulkrnaseq template captures software versions" \
-        "$REPO_ROOT/slurm_templates/bulkrnaseq_slurm_template.sh" "capture_software_versions"
+    # Exact call, not just substring presence — catches argument-order bugs
+    # (capture_software_versions is <run_dir> <pipeline> <primary>; a
+    # regression once swapped $CONTAINER and "bulkrnaseq", which matched no
+    # dispatcher case arm and silently never wrote software_versions.txt).
+    ts_assert_contains "l2: bulkrnaseq template calls capture_software_versions with correct argument order" \
+        "$REPO_ROOT/slurm_templates/bulkrnaseq_slurm_template.sh" 'capture_software_versions "$RUN_DIR" "bulkrnaseq" "$CONTAINER"'
     ts_assert_contains "l2: bulkrnaseq template generates provenance README on exit" \
         "$REPO_ROOT/slurm_templates/bulkrnaseq_slurm_template.sh" "generate_provenance_readme"
 

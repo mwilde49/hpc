@@ -59,7 +59,7 @@ fi
 # --- Software version capture (queried live from the container — see
 #     bin/lib/provenance.sh for why these tools aren't version-pinned at
 #     build time) ---
-capture_software_versions "$RUN_DIR" "$CONTAINER" "psoma"
+capture_software_versions "$RUN_DIR" "psoma" "$CONTAINER"
 
 # --- Run pipeline ---
 

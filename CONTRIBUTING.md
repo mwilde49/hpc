@@ -165,6 +165,12 @@ run_logged "${RUN_DIR:+$RUN_DIR/invocation.log}" \
 - [ ] Create `bin/lib/tests/test_<name>.sh` (see §4 below)
 - [ ] Run `tjp-test-suite --layer 1 --pipeline <name>` and confirm it passes
 
+### Smoke-testing without Juno (`bin/tjp-test-local`)
+
+`tjp-test-suite --layer 3` needs real SLURM and is Juno-only. `bin/tjp-test-local <pipeline> <config> [arg3] [arg4]` runs a SLURM template's body directly via `bash` instead (no `sbatch`), in a sandbox under `~/.tjp_local_test/` with `PROJECT_ROOT` symlinked straight to your actual checkout — useful for iterating on `provenance.sh`/`repro.sh` changes, or checking a template change compiles and runs at all, from a laptop or CI runner with no Juno access. It works because SLURM templates are just bash scripts with `#SBATCH` comments, and `capture_juno_env` already degrades gracefully (writes `"unknown"`) when `$SLURM_JOB_ID` etc. aren't set.
+
+Caveats: psoma/bulkrnaseq need a Nextflow `pipeline.config` pre-generated (tjp-launch normally does this via `_generate_psoma_config`/`_generate_nextflow_config`, which `tjp-test-local` deliberately doesn't duplicate — see the script's header comment); testing against a real container needs the `.sif` staged locally (not in git). `test_data/fixtures/generate_tier0_reference.sh` generates a tiny synthetic reference/index for psoma/bulkrnaseq so you don't need real biological data to exercise the scaffolding.
+
 ---
 
 ## 4. Test Module Requirements

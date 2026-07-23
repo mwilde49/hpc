@@ -1,0 +1,6 @@
+chr_tiny	tier0	gene	1	500	.	+	.	gene_id "TINY1"; gene_name "TINY1";
+chr_tiny	tier0	transcript	1	500	.	+	.	gene_id "TINY1"; transcript_id "TINY1.1";
+chr_tiny	tier0	exon	1	500	.	+	.	gene_id "TINY1"; transcript_id "TINY1.1"; exon_number "1";
+chr_tiny	tier0	gene	1000	1500	.	-	.	gene_id "TINY2"; gene_name "TINY2";
+chr_tiny	tier0	transcript	1000	1500	.	-	.	gene_id "TINY2"; transcript_id "TINY2.1";
+chr_tiny	tier0	exon	1000	1500	.	-	.	gene_id "TINY2"; transcript_id "TINY2.1"; exon_number "1";

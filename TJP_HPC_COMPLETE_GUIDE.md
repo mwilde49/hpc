@@ -1,6 +1,6 @@
 # TJP HPC Pipeline Framework — Complete Operational Guide
 
-Version: 7.3.0
+Version: 7.3.1
 Status: Production — 13 pipelines running on Juno HPC
 Last updated: 2026-07-20
 Audience: Group members, new developers, bioinformaticians
@@ -927,7 +927,7 @@ cd /groups/tprice/pipelines && git pull
 
 ---
 
-## Current Framework State (v7.3.0)
+## Current Framework State (v7.3.1)
 
 ### What's new since v2.0
 
@@ -947,6 +947,7 @@ cd /groups/tprice/pipelines && git pull
 | v7.1.0 | Cell Ranger mkfastq/Multi batch support in `tjp-batch`; DeconvATAC GPU config/samplesheet templates + dedicated validator; consistency/version-pinning audit across the repo and its submodules |
 | v7.2.0 | Provenance README (`PROVENANCE_README.md`, `CONSOLE_LOG.txt`, live per-tool `software_versions.txt`) for Psoma and BulkRNASeq, via `bin/lib/provenance.sh`; rollout to the remaining 11 pipelines pending |
 | v7.3.0 | Provenance README rolled out to all remaining 11 pipelines — multi-container (Virome), native 10x tool resolution, Nextflow-managed-external (wf-transcriptomes), and multi-job orchestrator (SQANTI3) capture strategies added to `capture_software_versions` |
+| v7.3.1 | `bin/tjp-test-local` (Juno-free smoke testing) + tier-0 synthetic reference fixtures; fixed a real regression where psoma/bulkrnaseq silently never wrote `software_versions.txt` (argument-order bug, found by actually running the pipelines locally) |
 
 ### Titan Integration Roadmap
 

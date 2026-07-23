@@ -1,6 +1,6 @@
 # Hyperion Compute — Command Reference
 
-**Version:** 7.3.0 | **Cluster:** Juno HPC, UT Dallas | **Updated:** 2026-07-23
+**Version:** 7.3.1 | **Cluster:** Juno HPC, UT Dallas | **Updated:** 2026-07-23
 
 Comprehensive reference for every command available in the Hyperion Compute / TJP pipeline framework. Organized from general cluster commands inward to per-pipeline specifics. Use `Ctrl+F` / `grep` to jump to any command, flag, or config key.
 
