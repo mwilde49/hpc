@@ -20,6 +20,8 @@ This document is a comprehensive technical reference for developers joining the 
    - [Virome (Native Nextflow + Per-Process Containers)](#48-virome-native-nextflow--per-process-containers)
    - [SQANTI3 (4-Stage SLURM DAG)](#49-sqanti3-4-stage-slurm-dag)
    - [wf-transcriptomes (Nextflow SLURM Executor)](#410-wf-transcriptomes-nextflow-slurm-executor)
+   - [DeconvATAC (Submoduled Combined Container+Pipeline — CPU)](#411-deconvatac-submoduled-combined-containerpipeline--cpu)
+   - [DeconvATAC GPU (Submoduled Combined Container+Pipeline — A30 GPU)](#412-deconvatac-gpu-submoduled-combined-containerpipeline--a30-gpu)
 5. [Pipeline Comparison Matrix](#5-pipeline-comparison-matrix)
 6. [Testing Infrastructure](#6-testing-infrastructure)
 7. [Adding a New Pipeline](#7-adding-a-new-pipeline)
@@ -518,7 +520,7 @@ AddOne demonstrates the minimal execution path: config → SLURM → Apptainer �
 
 ### 4.3 BulkRNASeq (Submoduled Container + External Nextflow)
 
-**Type:** Submoduled — container repo at `containers/bulkrnaseq/` (pinned to v1.0.0), pipeline code in a separately cloned repo (`Bulk-RNA-Seq-Nextflow-Pipeline` from UTDal).
+**Type:** Submoduled — container repo at `containers/bulkrnaseq/` (pinned to v1.0.1), pipeline code in a separately cloned repo (`Bulk-RNA-Seq-Nextflow-Pipeline` from UTDal).
 
 **Purpose:** Bulk RNA-seq analysis using STAR aligner, with FastQC, featureCounts, and StringTie.
 
@@ -605,7 +607,7 @@ Species: soft warning if not Human/Mouse/Rattus
 
 ### 4.4 Psoma (Submoduled Combined Container+Pipeline)
 
-**Type:** Submoduled combined — both container definition and pipeline code live in `containers/psoma/` (pinned to v1.0.0). No separate clone needed.
+**Type:** Submoduled combined — both container definition and pipeline code live in `containers/psoma/` (pinned to v2.0.2). No separate clone needed.
 
 **Purpose:** RNA-seq analysis for Psomagen data using HISAT2 aligner + Trimmomatic adapter trimming.
 
@@ -698,7 +700,7 @@ No `module load apptainer`. Instead:
 
 #### Wrapper Execution (`containers/10x/bin/cellranger-run.sh`)
 
-The 10x submodule (`containers/10x/`, pinned to v1.2.0) provides wrapper scripts that standardize config parsing across all five 10x tools (cellranger, cellranger-mkfastq, cellranger-multi, spaceranger, xeniumranger).
+The 10x submodule (`containers/10x/`, pinned to v1.2.0, +1 commit, untagged) provides wrapper scripts that standardize config parsing across all five 10x tools (cellranger, cellranger-mkfastq, cellranger-multi, spaceranger, xeniumranger).
 
 Step by step:
 
@@ -858,7 +860,7 @@ Note: uses `INPUT_DIR` instead of `FASTQ_DIR` for archiving (Xenium input is a b
 
 ### 4.8 Virome (Native Nextflow + Per-Process Containers)
 
-**Type:** Submoduled — `mwilde49/virome` at `containers/virome/` (pinned to v1.5.0). Nextflow runs natively on the compute node; each Nextflow process uses its own `.sif` container from `containers/virome/containers/`.
+**Type:** Submoduled — `mwilde49/virome-pipeline` at `containers/virome/` (pinned to v1.5.0). Nextflow runs natively on the compute node; each Nextflow process uses its own `.sif` container from `containers/virome/containers/`.
 
 **Purpose:** Viral metagenomic profiling using Kraken2 for taxonomic classification and MetaPhlAn3 for abundance estimation.
 
@@ -1105,6 +1107,127 @@ Format check: `wf_version` (if set) must match `v[0-9]+\.[0-9]+\.[0-9]+`
 
 ---
 
+### 4.11 DeconvATAC (Submoduled Combined Container+Pipeline — CPU)
+
+**Type:** Submoduled combined — both container definition and pipeline script live in `containers/dconvatac/` (pinned to v1.0.0, +4 untagged commits). No separate clone needed. Unlike BulkRNASeq/Psoma, there is no Nextflow layer: the pipeline is a single Python script invoked directly inside the container, architecturally closer to AddOne than to the other submoduled pipelines.
+
+**Purpose:** Spatial ATAC deconvolution — maps cell type proportions from a single-cell/single-nucleus reference (`reference_h5ad`) onto spatial ATAC spots/bins (`spatial_h5ad`) using Cell2Location.
+
+#### Dispatch (tjp-launch lines 339-344)
+
+```
+SBATCH_CONFIG_ARG = "$RUN_DIR/config.yaml"
+```
+
+Same `dconvatac|dconvatac-gpu)` case handles both variants. `SCRATCH_OUTPUT_DIR` is left empty — the pipeline writes directly to `output_dir` from config, so there is nothing to stage from scratch. The `FASTQ_DIR` extraction case (tjp-launch lines 310-328) has no entry for `dconvatac`/`dconvatac-gpu` either; it falls through to the empty-string default since the inputs are `.h5ad` files, not FASTQs.
+
+#### SLURM Execution (`slurm_templates/dconvatac_slurm_template.sh`)
+
+```
+#SBATCH --time=24:00:00
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=128G
+```
+
+1. `module load apptainer`
+2. Source `bin/lib/repro.sh`; `capture_juno_env "$RUN_DIR"` then `trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT` — same v7.0.0 provenance capture pattern every SLURM template follows
+3. Pre-flight: config path given and exists? container `dconvatac_v1.0.0.sif` exists (error hints at `containers/dconvatac/container/build.sh` + `scp` if missing)? pipeline script `containers/dconvatac/pipeline/dconvatac.py` exists (error hints at `git submodule update --init --recursive` if missing)?
+4. Execute via `run_logged` (writes `invocation.log`):
+
+```bash
+apptainer exec \
+    --cleanenv \
+    --env PYTHONNOUSERSITE=1 \
+    --env MPLBACKEND=Agg \
+    --bind $PROJECT_ROOT:$PROJECT_ROOT \
+    --bind $SCRATCH_ROOT:$SCRATCH_ROOT \
+    --bind $WORK_ROOT:$WORK_ROOT \
+    $CONTAINER \
+    python $PIPELINE_SCRIPT --config $CONFIG
+```
+
+`--env MPLBACKEND=Agg` forces headless matplotlib rendering (the pipeline script also calls `matplotlib.use('Agg')` itself, belt-and-suspenders) — Cell2Location's QC plotting would otherwise try to open a display that doesn't exist on a compute node.
+
+5. If the pipeline exits non-zero, skip the archive step and exit with that code.
+6. The archive block only runs `if [ -n "$RUN_DIR" ] && [ -n "$SCRATCH_OUTPUT_DIR" ]`. Since `tjp-launch` leaves `SCRATCH_OUTPUT_DIR` empty for this pipeline (see Dispatch, above), this rsync-to-`outputs/` step is a no-op under the standard launch path — same "writes directly to its own output location" pattern as Virome/SQANTI3/wf-transcriptomes.
+
+#### Pipeline Execution (`containers/dconvatac/pipeline/dconvatac.py`)
+
+1. Parse `--config`, load YAML
+2. Validate required keys present: `spatial_h5ad`, `reference_h5ad`, `labels_key`, `output_dir`
+3. Load spatial and reference `.h5ad` with Scanpy; log shapes
+4. Align both datasets to their shared peak set (`var_names` intersection) — independently peak-called ATAC datasets rarely match exactly
+5. Optionally select highly variable peaks (`run_hvp`, default true) via `deconvatac.pp.highly_variable_peaks`
+6. Run Cell2Location deconvolution (`deconvatac.tl.cell2location`), with optional `spatial_batch_key` (multi-section spatial data) and `spatial_batch_size` (minibatch training, to avoid OOM on large spot counts)
+7. Write results to `output_dir`
+
+Note: the script imports `rich.pretty` explicitly before any scvi-tools/deconvatac code runs — scvi-tools' `view_anndata_setup()` calls `rich.pretty.pprint()` without importing that submodule itself, which raises `AttributeError` unless something else has already imported it process-wide.
+
+#### Config Validation (`_validate_dconvatac`, validate.sh lines 620-666)
+
+Required: `spatial_h5ad`, `reference_h5ad`, `labels_key`, `output_dir`
+
+Path checks: `spatial_h5ad`, `reference_h5ad` must exist (skips `__*` and `/path/to/*` placeholders)
+
+Boolean checks: `run_hvp`, `use_gpu` must be `true`/`false`
+
+Numeric checks: `N_cells_per_location`, `detection_alpha`, `max_epochs_spatial`, `max_epochs_ref`
+
+---
+
+### 4.12 DeconvATAC GPU (Submoduled Combined Container+Pipeline — A30 GPU)
+
+**Type:** Same submodule (`containers/dconvatac/`), same `.sif`, and same pipeline script as DeconvATAC CPU — this is a separate pipeline registration (`dconvatac-gpu`) pointing at a different SLURM template, not a different container.
+
+**Purpose:** Same Cell2Location deconvolution as DeconvATAC, routed to an A30 GPU node for faster training on larger datasets.
+
+#### Key Differences from DeconvATAC (CPU)
+
+| Aspect | DeconvATAC | DeconvATAC GPU |
+|--------|-----------|-----------------|
+| SLURM template | `dconvatac_slurm_template.sh` | `dconvatac_gpu_slurm_template.sh` |
+| Partition | default (`normal`) | `a30` |
+| GRES | none | `gpu:nvidia_a30:1` |
+| `apptainer exec` flags | `--cleanenv --env PYTHONNOUSERSITE=1 --env MPLBACKEND=Agg` | same, plus `--nv` (GPU passthrough) |
+| Config requirement | `use_gpu` optional | `use_gpu: true` required (validator-enforced) |
+
+#### Dispatch (tjp-launch lines 339-344)
+
+Identical to DeconvATAC — the same `dconvatac|dconvatac-gpu)` case handles both, with the same empty `SCRATCH_OUTPUT_DIR` / direct-`output_dir` behavior.
+
+#### SLURM Execution (`slurm_templates/dconvatac_gpu_slurm_template.sh`)
+
+```
+#SBATCH --time=24:00:00
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=128G
+#SBATCH --partition=a30
+#SBATCH --gres=gpu:nvidia_a30:1
+```
+
+Same reproducibility capture, pre-flight checks, and `run_logged` invocation pattern as the CPU template, with `--nv` added to `apptainer exec` so the container can see the A30:
+
+```bash
+apptainer exec \
+    --nv \
+    --cleanenv \
+    --env PYTHONNOUSERSITE=1 \
+    --env MPLBACKEND=Agg \
+    --bind $PROJECT_ROOT:$PROJECT_ROOT \
+    --bind $SCRATCH_ROOT:$SCRATCH_ROOT \
+    --bind $WORK_ROOT:$WORK_ROOT \
+    $CONTAINER \
+    python $PIPELINE_SCRIPT --config $CONFIG
+```
+
+Same stage-out behavior as the CPU template (no-op under standard launch, since `SCRATCH_OUTPUT_DIR` is left empty).
+
+#### Config Validation (`_validate_dconvatac_gpu`, validate.sh lines 671-682)
+
+Delegates to `_validate_dconvatac` for all the base checks, then additionally requires `use_gpu: true` — the whole point of routing to the A30-gated pipeline is GPU-accelerated training, so a config that doesn't request it is rejected rather than silently running the wrong mode on the wrong hardware.
+
+---
+
 ## 5. Pipeline Comparison Matrix
 
 ### Execution Model
@@ -1115,11 +1238,15 @@ Format check: `wf_version` (if set) must match `v[0-9]+\.[0-9]+\.[0-9]+`
 | BulkRNASeq | `.sif` (submodule) | Nextflow | YAML → `pipeline.config` | No |
 | Psoma | `.sif` (submodule) | Nextflow | YAML → `pipeline.config` | No |
 | Cell Ranger | Native binary | Self-managed | None (pass YAML) | Yes |
+| Cell Ranger mkfastq | Native binary | Self-managed | None (pass YAML) | Yes |
+| Cell Ranger Multi | Native binary | Self-managed | None (pass YAML) | Yes |
 | Space Ranger | Native binary | Self-managed | None (pass YAML) | Yes |
 | Xenium Ranger | Native binary | Self-managed | None (pass YAML) | Yes |
 | Virome | Per-process `.sif` | Nextflow (native head) | None (params-file passthrough) | No |
 | SQANTI3 | `.sif` (submodule) | SLURM DAG (orchestrator) | None (pass YAML) | No |
 | wf-transcriptomes | Nextflow-managed | Nextflow (SLURM executor) | None (params-file passthrough) | No |
+| DeconvATAC | `.sif` (submodule) | Python script | None (pass YAML) | No |
+| DeconvATAC GPU | `.sif` (submodule) | Python script | None (pass YAML) | No |
 
 ### Data Flow
 
@@ -1129,11 +1256,15 @@ Format check: `wf_version` (if set) must match `v[0-9]+\.[0-9]+\.[0-9]+`
 | BulkRNASeq | FASTQs | `nextflow run` | STAR index |
 | Psoma | FASTQs | `nextflow run` | HISAT2 index + Nextera adapters |
 | Cell Ranger | FASTQs | `cellranger count` | Transcriptome reference |
+| Cell Ranger mkfastq | BCL run directory | `cellranger mkfastq` | Illumina samplesheet |
+| Cell Ranger Multi | FASTQs (per-library) | `cellranger multi` | Multi-library CSV (GEX+VDJ, CITE-seq, CellPlex, Flex — generated from config) |
 | Space Ranger | FASTQs + Image | `spaceranger count` | Slide/area + microscope image |
 | Xenium Ranger | Xenium bundle | `xeniumranger resegment` or `import-segmentation` | Segmentation file (import only) |
 | Virome | FASTQs | `nextflow run` (Kraken2/MetaPhlAn3) | Kraken2 database |
 | SQANTI3 | Isoform GTF + FASTA | `python SQANTI3_qc.py` (4 stages) | Reference GTF |
 | wf-transcriptomes | ONT FASTQ dirs | `nextflow run` (wf-transcriptomes) | EPI2ME samplesheet, genome + annotation |
+| DeconvATAC | Spatial + reference `.h5ad` | `python dconvatac.py` | Reference cell type labels (`labels_key`) |
+| DeconvATAC GPU | Spatial + reference `.h5ad` | `python dconvatac.py` (`--nv`) | Reference cell type labels (`labels_key`) |
 
 ### Container Flags
 
@@ -1369,6 +1500,8 @@ This is also why Psoma's SLURM template sets `--env HOME=/tmp` — Nextflow trie
 | `slurm_templates/virome_slurm_template.sh` | 12h, 20 CPU, 64GB |
 | `slurm_templates/sqanti3_slurm_template.sh` | 1h orchestrator; stage resources dynamic |
 | `slurm_templates/wf_transcriptomes_slurm_template.sh` | 24h head job, 2 CPU, 8GB |
+| `slurm_templates/dconvatac_slurm_template.sh` | 24h, 16 CPU, 128GB |
+| `slurm_templates/dconvatac_gpu_slurm_template.sh` | 24h, 16 CPU, 128GB, a30 partition, 1× A30 GPU |
 
 ### Config Templates
 
@@ -1383,6 +1516,8 @@ This is also why Psoma's SLURM template sets `--env HOME=/tmp` — Nextflow trie
 | `templates/virome/config.yaml` | `outdir`, `kraken2_db`, `fastq_dir` |
 | `templates/sqanti3/config.yaml` | `isoform_gtf`, `isoform_fasta`, `reference_gtf`, `outdir` |
 | `templates/wf_transcriptomes/config.yaml` | `sample_sheet`, `outdir`, `ref_genome`, `ref_annotation` |
+| `templates/dconvatac/config.yaml` | `spatial_h5ad`, `reference_h5ad`, `labels_key`, `output_dir` |
+| `templates/dconvatac-gpu/config.yaml` | `spatial_h5ad`, `reference_h5ad`, `labels_key`, `output_dir`, `use_gpu: true` (validator-enforced) |
 
 ### Samplesheet Templates
 
@@ -1396,16 +1531,19 @@ This is also why Psoma's SLURM template sets `--env HOME=/tmp` — Nextflow trie
 | `templates/virome/samplesheet.csv` | `sample_id`, `fastq_1`, `fastq_2` |
 | `templates/sqanti3/samplesheet.csv` | `sample_id`, `isoform_gtf`, `isoform_fasta` |
 | `templates/wf_transcriptomes/samplesheet.csv` | `sample_id`, `barcode_dir` (EPI2ME format) |
+| `templates/dconvatac/samplesheet.csv` | `sample`, `spatial_h5ad`, `reference_h5ad`, `labels_key` |
+| `templates/dconvatac-gpu/samplesheet.csv` | `sample`, `spatial_h5ad`, `reference_h5ad`, `labels_key` |
 
 ### Submodules
 
 | Path | Repo | Version | Contains |
 |------|------|---------|----------|
-| `containers/bulkrnaseq/` | `mwilde49/bulkseq` | v1.0.0 | Container def + build scripts |
-| `containers/psoma/` | `mwilde49/psoma` | v1.0.0 | Container def + pipeline code + adapters |
-| `containers/10x/` | `mwilde49/10x` | v1.2.0 | Wrapper scripts, validators, tests |
-| `containers/virome/` | `mwilde49/virome` | v1.5.0 | Nextflow workflow + per-process container defs |
-| `containers/sqanti3/` | `mwilde49/longreads` | current | SQANTI3 + wf-transcriptomes configs + stage scripts |
+| `containers/bulkrnaseq/` | `mwilde49/bulkseq` | v1.0.1 | Container def + build scripts |
+| `containers/psoma/` | `mwilde49/psoma` | v2.0.2 | Container def + pipeline code + adapters |
+| `containers/10x/` | `mwilde49/10x` | v1.2.0, +1 commit, untagged | Wrapper scripts, validators, tests |
+| `containers/virome/` | `mwilde49/virome-pipeline` | v1.5.0 | Nextflow workflow + per-process container defs |
+| `containers/sqanti3/` | `mwilde49/longreads` | v1.1.0, +6 commits untagged | SQANTI3 + wf-transcriptomes configs + stage scripts |
+| `containers/dconvatac/` | `mwilde49/dconvatac` | v1.0.0, +4 commits untagged | Container def + pipeline code (Cell2Location) |
 
 ### Pipeline Code
 

@@ -37,6 +37,8 @@ well, and what to do differently next time.
 | Xenium Ranger | Native | No | None (proprietary binary) | Direct YAML → wrapper script |
 | SQANTI3 | Submoduled | No | Monolithic `.sif` (Apptainer) | Direct YAML → SLURM stage scripts (4-stage DAG) |
 | wf-transcriptomes | Submoduled | Native on host (head job) | No container for head; Nextflow manages own containers | User YAML as params-file (no generation); Nextflow-managed SLURM executor |
+| DeconvATAC | Submoduled | No | Monolithic `.sif` (Apptainer) | Direct YAML → Python pipeline script |
+| DeconvATAC GPU | Submoduled | No | Monolithic `.sif` (Apptainer, `--nv`) | Direct YAML → Python pipeline script |
 
 ### Resources & Dependencies
 
@@ -53,6 +55,8 @@ well, and what to do differently next time.
 | Xenium Ranger | 12h | 16 | 128 GB | Yes | Tool tarball at `/groups/tprice/opt/` |
 | SQANTI3 | varies | varies | varies | No | Container SIF (must be pulled: `apptainer pull ... docker://anaconesalab/sqanti3:v5.5.4`) |
 | wf-transcriptomes | 24h head + sub-jobs | 8 head | 32 GB head | No | Nextflow on host; epi2me-labs/wf-transcriptomes (auto-fetched) |
+| DeconvATAC | 24h | 16 | 128 GB | No | None |
+| DeconvATAC GPU | 24h | 16 | 128 GB | No | 1× A30 GPU (`--partition=a30 --gres=gpu:nvidia_a30:1`) |
 
 ### Input & Output
 
@@ -67,8 +71,10 @@ well, and what to do differently next time.
 | Cell Ranger Multi | `libraries` block (per-type FASTQs) | Proprietary | Per-library feature-barcode matrices, web summary |
 | Space Ranger | `fastq_dir` + image + slide | Proprietary | Feature-barcode matrix + spatial coords |
 | Xenium Ranger | `xenium_bundle` directory | Proprietary | Resegmented Xenium output |
-| SQANTI3 | `isoforms` GTF + `ref_gtf` + `ref_fasta` | SQANTI3 classification | Filtered isoforms GTF, QC plots, classification TSV |
+| SQANTI3 | `isoforms` GTF + `refGTF` + `refFasta` | SQANTI3 classification | Filtered isoforms GTF, QC plots, classification TSV |
 | wf-transcriptomes | `fastq_dir` + `sample_sheet` (EPI2ME) | Minimap2 + StringTie2 | Collapsed isoforms, expression matrix, QC report |
+| DeconvATAC | `spatial_h5ad` + `reference_h5ad` (Cell2Location) | — | Deconvolved cell-type proportions per spot |
+| DeconvATAC GPU | `spatial_h5ad` + `reference_h5ad` (Cell2Location, GPU-accelerated) | — | Deconvolved cell-type proportions per spot |
 
 ### Submodule Versioning
 
@@ -77,8 +83,9 @@ well, and what to do differently next time.
 | BulkRNASeq | `mwilde49/bulkseq` | v1.0.1 | Tag |
 | Psoma | `mwilde49/psoma` | v2.0.2 | Tag |
 | Virome | `mwilde49/virome-pipeline` | v1.5.0 | Tag |
-| 10x | `mwilde49/10x` | v1.2.0 | Tag |
-| longreads (SQANTI3 + wf-tx) | `mwilde49/longreads` | v1.1.0 | Tag |
+| 10x | `mwilde49/10x` | v1.2.0 +1 commit | Untagged — needs a new tag cut (adds cellranger-multi wrapper) |
+| longreads (SQANTI3 + wf-tx) | `mwilde49/longreads` | v1.1.0 +6 commits | Untagged — needs a new tag cut (outdir-quota guard, RColorConesa/writable-tmpfs fixes, chromosome-check fixes, hDRG QC enablement) |
+| DeconvATAC | `mwilde49/dconvatac` | v1.0.0 +4 commits | Untagged — needs a new tag cut (spatial_batch_key, spatial_batch_size, peak-set alignment fix, rich.pretty fix) |
 
 ---
 
@@ -368,8 +375,11 @@ Virome uses a CSV samplesheet (explicit paths). The 10x pipelines use a
 isn't a problem today but will matter when users move between pipelines.
 
 ### Submodule discipline is good
-All submodules are tag-pinned (except longreads which is tag-pending),
-self-contained (except BulkRNASeq), and have their own `CLAUDE.md` for
+BulkRNASeq, Psoma, and Virome are cleanly tag-pinned. 10x, longreads, and
+DeconvATAC currently sit 1, 6, and 4 commits ahead of their last tag,
+respectively — each needs a new release tag cut before it can be considered
+properly pinned again (see §1 Submodule Versioning). All six are
+self-contained (except BulkRNASeq) and have their own `CLAUDE.md` for
 AI-assisted development. This is the right pattern and should be maintained.
 
 ### Samplesheet standardization achieved (v6.0.0)

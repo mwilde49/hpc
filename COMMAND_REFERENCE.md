@@ -1,6 +1,6 @@
 # Hyperion Compute — Command Reference
 
-**Version:** 7.0.0 | **Cluster:** Juno HPC, UT Dallas | **Updated:** 2026-07-20
+**Version:** 7.1.0 | **Cluster:** Juno HPC, UT Dallas | **Updated:** 2026-07-23
 
 Comprehensive reference for every command available in the Hyperion Compute / TJP pipeline framework. Organized from general cluster commands inward to per-pipeline specifics. Use `Ctrl+F` / `grep` to jump to any command, flag, or config key.
 
@@ -17,7 +17,7 @@ Comprehensive reference for every command available in the Hyperion Compute / TJ
    - [tjp-launch](#52-tjp-launch)
    - [tjp-batch](#53-tjp-batch)
    - [tjp-edit](#54-tjp-edit)
-   - [tjp-validate](#55-tjp-validate-alias-tjp-validate)
+   - [tjp-validate](#55-tjp-validate)
    - [tjp-test-suite](#56-tjp-test-suite)
    - [tjp-test (deprecated)](#57-tjp-test-deprecated)
    - [tjp-test-validate (deprecated)](#58-tjp-test-validate-deprecated)
@@ -34,8 +34,8 @@ Comprehensive reference for every command available in the Hyperion Compute / TJ
    - [Xenium Ranger](#69-xenium-ranger)
    - [Cell Ranger mkfastq](#610-cell-ranger-mkfastq)
    - [Cell Ranger Multi](#611-cell-ranger-multi)
-   - [DeconvATAC](#612-dconvatac)
-   - [DeconvATAC GPU](#613-dconvatac-gpu)
+   - [DeconvATAC](#612-deconvatac)
+   - [DeconvATAC GPU](#613-deconvatac-gpu)
 7. [Config Key Reference](#7-config-key-reference)
 8. [Path & Environment Reference](#8-path--environment-reference)
 9. [Troubleshooting](#9-troubleshooting)
@@ -1194,8 +1194,8 @@ apptainer pull /groups/tprice/pipelines/containers/sqanti3/sqanti3_v5.5.4.sif \
 # Required inputs
 sample: my_sample
 isoforms: /path/to/collapsed.gtf             # from wf-transcriptomes, FLAIR, StringTie2, etc.
-ref_gtf: /groups/tprice/pipelines/references/gencode.v48.primary_assembly.annotation.gtf
-ref_fasta: /groups/tprice/pipelines/references/GRCh38.primary_assembly.genome.fa
+refGTF: /groups/tprice/pipelines/references/gencode.v48.primary_assembly.annotation.gtf
+refFasta: /groups/tprice/pipelines/references/GRCh38.primary_assembly.genome.fa
 outdir: /scratch/juno/$USER/sqanti3/results
 
 # Optional inputs
@@ -1208,8 +1208,8 @@ polyA_motif_list: /path/to/polyA_motif.txt
 polyA_peak: ""
 
 # Filtering parameters
-filter_mode: rules                           # rules | sqanti_rules | expression
-rescue_mode: automatic                       # automatic | skip
+filter_mode: rules                           # rules | ml
+rescue_mode: automatic                       # automatic | full
 filter_mono_exonic: false
 force_id_ignore: true
 skip_report: true                            # skip HTML report generation (faster)
@@ -1277,7 +1277,7 @@ ref_annotation: /groups/tprice/pipelines/references/gencode.v47.primary_assembly
 outdir: /scratch/juno/$USER/wf-transcriptomes/results
 
 # Pipeline version
-wf_version: v1.7.2               # pinned version of epi2me-labs/wf-transcriptomes
+wf_version: v2.3.0               # pinned version of epi2me-labs/wf-transcriptomes
 
 # Read type
 direct_rna: false                # true for direct RNA; false for cDNA/PCR
@@ -1314,7 +1314,7 @@ Optional third column: `type` (experimental group for DE analysis).
 
 ```csv
 sample,fastq_dir,sample_sheet,ref_genome,ref_annotation,direct_rna,wf_version,project_id,sample_id,library_id,run_id
-experiment_01,/scratch/juno/$USER/ont/exp01/fastq_pass,/scratch/juno/$USER/ont/exp01/barcodes.csv,/groups/tprice/pipelines/references/GRCh38.primary_assembly.genome.fa,/groups/tprice/pipelines/references/gencode.v47.primary_assembly.annotation.gtf,false,v1.7.2,,,,
+experiment_01,/scratch/juno/$USER/ont/exp01/fastq_pass,/scratch/juno/$USER/ont/exp01/barcodes.csv,/groups/tprice/pipelines/references/GRCh38.primary_assembly.genome.fa,/groups/tprice/pipelines/references/gencode.v47.primary_assembly.annotation.gtf,false,v2.3.0,,,,
 ```
 
 **Nextflow config:** `containers/sqanti3/configs/wf_transcriptomes/juno.config` (part of longreads submodule)
@@ -1322,7 +1322,7 @@ experiment_01,/scratch/juno/$USER/ont/exp01/fastq_pass,/scratch/juno/$USER/ont/e
 **Edge cases:**
 - Outputs write directly to `outdir:` — no scratch staging
 - Head job is lightweight (2 CPU, 8 GB, 48h) — all heavy compute runs in Nextflow-managed sub-jobs
-- `wf_version` pins the exact release of `epi2me-labs/wf-transcriptomes` pulled at runtime; default is `v1.7.2`
+- `wf_version` pins the exact release of `epi2me-labs/wf-transcriptomes` pulled at runtime; default is `v2.3.0`
 - `direct_rna: true` changes minimap2 preset and disables PCR dedup
 - `de_analysis: true` requires a metadata column in the barcode samplesheet
 
@@ -1813,8 +1813,8 @@ All paths below are on HPC at `/groups/tprice/pipelines/references/`:
 | `hisat2_index` | `references/hisat2_index/gencode48` | psoma |
 | `reference_gtf` | `references/gencode.v48.primary_assembly.annotation.gtf` | bulkrnaseq, psoma |
 | `ref_annotation` | `references/gencode.v47.primary_assembly.annotation.gtf` | wf-transcriptomes |
-| `ref_gtf` | `references/gencode.v48.primary_assembly.annotation.gtf` | sqanti3 |
-| `ref_fasta` | `references/GRCh38.primary_assembly.genome.fa` | sqanti3 |
+| `refGTF` | `references/gencode.v48.primary_assembly.annotation.gtf` | sqanti3 |
+| `refFasta` | `references/GRCh38.primary_assembly.genome.fa` | sqanti3 |
 | `ref_genome` | `references/GRCh38.primary_assembly.genome.fa` | wf-transcriptomes |
 | `exclude_bed_file_path` | `references/filter.bed` | bulkrnaseq, psoma |
 | `blacklist_bed_file_path` | `references/blacklist.bed` | bulkrnaseq, psoma |

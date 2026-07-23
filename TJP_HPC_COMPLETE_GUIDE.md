@@ -1,6 +1,6 @@
 # TJP HPC Pipeline Framework — Complete Operational Guide
 
-Version: 7.0.0
+Version: 7.1.0
 Status: Production — 13 pipelines running on Juno HPC
 Last updated: 2026-07-20
 Audience: Group members, new developers, bioinformaticians
@@ -129,7 +129,7 @@ Juno uses symlinked home directories (`~/work` → `/work/<username>`, `~/scratc
 ├── containers/
 │   ├── apptainer.def             (addone container definition — source controlled)
 │   ├── addone_latest.sif         (built container — NOT in git)
-│   └── bulkrnaseq/               (git submodule → mwilde49/bulkseq @ v1.0.0)
+│   └── bulkrnaseq/               (git submodule → mwilde49/bulkseq @ v1.0.1)
 │       ├── bulkrnaseq.def        (container definition)
 │       ├── build.sh              (build script)
 │       └── bulkrnaseq_v1.0.0.sif (built container — NOT in git)
@@ -927,7 +927,7 @@ cd /groups/tprice/pipelines && git pull
 
 ---
 
-## Current Framework State (v7.0.0)
+## Current Framework State (v7.1.0)
 
 ### What's new since v2.0
 
@@ -944,6 +944,7 @@ cd /groups/tprice/pipelines && git pull
 | v6.3.0 | DeconvATAC pipeline (CPU + GPU), spatial ATAC deconvolution via Cell2Location |
 | v6.4.0 | wf-transcriptomes outdir guard; documentation catch-up for DeconvATAC/tjp-test-suite |
 | v7.0.0 | Reproducibility & provenance logging framework across all 13 SLURM templates (Juno env capture, invocation logging, frozen source snapshots, Nextflow trace/report); `test_framework.sh` bug fix that had been silently killing `tjp-test-suite` runs since v6.2.0 |
+| v7.1.0 | Cell Ranger mkfastq/Multi batch support in `tjp-batch`; DeconvATAC GPU config/samplesheet templates + dedicated validator; consistency/version-pinning audit across the repo and its submodules |
 
 ### Titan Integration Roadmap
 

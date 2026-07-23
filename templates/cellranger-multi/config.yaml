@@ -27,18 +27,18 @@ localmem: 120                           # GB — leave headroom below SLURM --me
 
 # ── Library definitions ────────────────────────────────────────────────────────
 # List all FASTQ libraries for this GEM well.
-# feature_types options: Gene Expression | VDJ-T | VDJ-B | Antibody Capture |
-#                        CRISPR Screen | Multiplexing Capture | Fixed RNA Profiling
+# feature_types options: Gene Expression | VDJ-T | VDJ-B | VDJ-T-GD | Antibody Capture |
+#                        CRISPR Guide Capture | Multiplexing Capture | Fixed RNA Profiling
 libraries:
-  - fastq_path: __SCRATCH__/myproject/fastq/gex
-    sample_name: GEX_sample
+  - fastq_id: GEX_sample
+    fastqs: __SCRATCH__/myproject/fastq/gex
     feature_types: Gene Expression
   # Uncomment and add more library entries as needed:
-  # - fastq_path: __SCRATCH__/myproject/fastq/vdj_t
-  #   sample_name: VDJ_sample
+  # - fastq_id: VDJ_sample
+  #   fastqs: __SCRATCH__/myproject/fastq/vdj_t
   #   feature_types: VDJ-T
-  # - fastq_path: __SCRATCH__/myproject/fastq/adt
-  #   sample_name: ADT_sample
+  # - fastq_id: ADT_sample
+  #   fastqs: __SCRATCH__/myproject/fastq/adt
   #   feature_types: Antibody Capture
 
 # Optional: override tool path (default: /groups/tprice/opt/cellranger-10.0.0)

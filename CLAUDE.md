@@ -49,7 +49,7 @@ Supporting layers:
   - `validate.sh` — per-pipeline config validation
   - `samplesheet.sh` — CSV samplesheet validation and parsing (`_SAMPLESHEET_REQUIRED_COLS`)
   - `metadata.sh` — Titan metadata prototype (PLR-xxxx JSON records)
-- **`templates/`** — per-pipeline config templates with `__USER__`/`__SCRATCH__`/`__WORK__` placeholders, plus the Nextflow config template (`pipeline.config.tmpl`) and per-pipeline `samplesheet.csv` templates (9 pipelines)
+- **`templates/`** — per-pipeline config templates with `__USER__`/`__SCRATCH__`/`__WORK__` placeholders, plus the Nextflow config template (`pipeline.config.tmpl`) and per-pipeline `samplesheet.csv` templates (12 pipelines — all except addone, which is a single-file demo with no batch mode)
 - **`metadata/`** — `SCHEMA.md` (Titan metadata format reference); runtime records stored under `/work/$USER/pipelines/metadata/`
 - **`docs/`** — architecture diagrams (Mermaid source + rendered SVG)
 

@@ -2,7 +2,9 @@
 # tjp-batch — samplesheet-driven batch submission
 # Reads a CSV samplesheet and submits pipeline runs.
 #
-#   Per-row  (one SLURM job per sample): cellranger, spaceranger, xeniumranger
+#   Per-row  (one SLURM job per sample): cellranger, cellranger-mkfastq,
+#             cellranger-multi, spaceranger, xeniumranger, sqanti3,
+#             wf-transcriptomes, dconvatac, dconvatac-gpu
 #   Per-sheet (one SLURM job for all):   bulkrnaseq, psoma, virome
 #
 # Usage: tjp-batch <pipeline> <samplesheet.csv> [options]
@@ -14,7 +16,7 @@ source "$SCRIPT_DIR/lib/common.sh"
 
 # ── Pipeline categories ───────────────────────────────────────────────────────
 # Per-row: each samplesheet row → one SLURM job (single-sample tools)
-_BATCH_PER_ROW=(cellranger spaceranger xeniumranger sqanti3 wf-transcriptomes dconvatac dconvatac-gpu)
+_BATCH_PER_ROW=(cellranger cellranger-mkfastq cellranger-multi spaceranger xeniumranger sqanti3 wf-transcriptomes dconvatac dconvatac-gpu)
 # Per-sheet: whole samplesheet → one SLURM job (multi-sample Nextflow pipelines)
 _BATCH_PER_SHEET=(bulkrnaseq psoma virome)
 
@@ -35,7 +37,9 @@ usage() {
 Usage: tjp-batch <pipeline> <samplesheet.csv> [options]
 
 Submit pipeline runs from a samplesheet CSV.
-  Per-row  (one job per sample): cellranger, spaceranger, xeniumranger
+  Per-row  (one job per sample): cellranger, cellranger-mkfastq, cellranger-multi,
+                                  spaceranger, xeniumranger, sqanti3,
+                                  wf-transcriptomes, dconvatac, dconvatac-gpu
   Per-sheet (one job for all):   bulkrnaseq, psoma, virome
 
 Options:
@@ -46,16 +50,19 @@ Options:
   --help            Show this help
 
 Samplesheet column schemas (see templates/<pipeline>/samplesheet.csv):
-  cellranger:       sample, fastqs, transcriptome [, sample_name, create_bam, titan_*]
-  spaceranger:      sample, fastqs, transcriptome, image, slide, area [, titan_*]
-  xeniumranger:     sample, xenium_bundle, command [, segmentation_file, titan_*]
-  sqanti3:          sample, isoforms, ref_gtf, ref_fasta [, coverage, fl_count, titan_*]
-  wf-transcriptomes: sample, fastq_dir, sample_sheet, ref_genome, ref_annotation [, direct_rna, wf_version, titan_*]
-  dconvatac:        sample, spatial_h5ad, reference_h5ad, labels_key [, titan_*]
-  dconvatac-gpu:    sample, spatial_h5ad, reference_h5ad, labels_key [, titan_*]
-  bulkrnaseq:       sample, fastq_1, fastq_2 [, titan_*]
-  psoma:            sample, fastq_1, fastq_2 [, titan_*]
-  virome:           sample, fastq_r1, fastq_r2 [, titan_*]
+  cellranger:         sample, fastqs, transcriptome [, sample_name, create_bam, titan_*]
+  cellranger-mkfastq: run_id, run_dir, samplesheet [, project_id, run_id_titan]
+  cellranger-multi:   sample_id, transcriptome, libraries_file [, project_id, titan_sample_id, library_id, run_id]
+                      (libraries_file is a CSV with header fastq_id,fastqs,feature_types)
+  spaceranger:        sample, fastqs, transcriptome, image, slide, area [, titan_*]
+  xeniumranger:       sample, xenium_bundle, command [, segmentation_file, titan_*]
+  sqanti3:            sample, isoforms, ref_gtf, ref_fasta [, coverage, fl_count, titan_*]
+  wf-transcriptomes:  sample, fastq_dir, sample_sheet, ref_genome, ref_annotation [, direct_rna, wf_version, titan_*]
+  dconvatac:          sample, spatial_h5ad, reference_h5ad, labels_key [, titan_*]
+  dconvatac-gpu:      sample, spatial_h5ad, reference_h5ad, labels_key [, titan_*]
+  bulkrnaseq:         sample, fastq_1, fastq_2 [, titan_*]
+  psoma:              sample, fastq_1, fastq_2 [, titan_*]
+  virome:             sample, fastq_r1, fastq_r2 [, titan_*]
 EOF
     exit "${1:-0}"
 }
@@ -92,8 +99,7 @@ done
 if ! _is_per_row "$PIPELINE" && ! _is_per_sheet "$PIPELINE"; then
     die "Batch submission not supported for: $PIPELINE
   Supported per-row:   ${_BATCH_PER_ROW[*]}
-  Supported per-sheet: ${_BATCH_PER_SHEET[*]}
-  For sqanti3 / wf-transcriptomes, use tjp-launch directly."
+  Supported per-sheet: ${_BATCH_PER_SHEET[*]}"
 fi
 
 # ── Validate samplesheet ──────────────────────────────────────────────────────
@@ -125,12 +131,20 @@ info "Base config: $BASE_CONFIG"
 [[ "$DRY_RUN" == true ]] && warn "DRY RUN — no jobs will be submitted"
 
 # ── Internal: read Titan ID columns from a samplesheet row ───────────────────
+# cellranger-mkfastq/-multi reuse "run_id"/"sample_id" as their own pipeline
+# identifier column, so their samplesheets carry Titan's run/sample ID under
+# differently-named columns to avoid clashing (see templates/*/samplesheet.csv).
 _titan_ids_from_row() {
     local row="$1"
+    local sample_col="sample_id" run_col="run_id"
+    case "$PIPELINE" in
+        cellranger-multi)   sample_col="titan_sample_id" ;;
+        cellranger-mkfastq) run_col="run_id_titan" ;;
+    esac
     TITAN_PROJECT=$(samplesheet_get_col "$SAMPLESHEET" "project_id"  "$row" 2>/dev/null || echo "")
-    TITAN_SAMPLE=$(samplesheet_get_col  "$SAMPLESHEET" "sample_id"   "$row" 2>/dev/null || echo "")
+    TITAN_SAMPLE=$(samplesheet_get_col  "$SAMPLESHEET" "$sample_col" "$row" 2>/dev/null || echo "")
     TITAN_LIBRARY=$(samplesheet_get_col "$SAMPLESHEET" "library_id"  "$row" 2>/dev/null || echo "")
-    TITAN_RUN=$(samplesheet_get_col     "$SAMPLESHEET" "run_id"      "$row" 2>/dev/null || echo "")
+    TITAN_RUN=$(samplesheet_get_col     "$SAMPLESHEET" "$run_col"    "$row" 2>/dev/null || echo "")
 }
 
 # _titan_block: emit Titan Integration YAML lines to stdout
@@ -163,8 +177,16 @@ _batch_per_row() {
 
     for (( row=1; row<=ROW_COUNT; row++ )); do
         local sample
-        sample=$(samplesheet_get_col "$SAMPLESHEET" "sample" "$row")
-        [[ -z "$sample" ]] && die "Row $row: 'sample' column is empty"
+        sample=$(samplesheet_get_col "$SAMPLESHEET" "sample" "$row" 2>/dev/null || echo "")
+        # cellranger-mkfastq/-multi have no "sample" column — they identify
+        # each row by their own pipeline-specific primary key instead.
+        if [[ -z "$sample" ]]; then
+            case "$PIPELINE" in
+                cellranger-mkfastq) sample=$(samplesheet_get_col "$SAMPLESHEET" "run_id"    "$row" 2>/dev/null || echo "") ;;
+                cellranger-multi)   sample=$(samplesheet_get_col "$SAMPLESHEET" "sample_id" "$row" 2>/dev/null || echo "") ;;
+            esac
+        fi
+        [[ -z "$sample" ]] && die "Row $row: could not determine a sample identifier (expected a 'sample' column)"
 
         header "Sample [$row/$ROW_COUNT]: $sample"
 
@@ -182,6 +204,8 @@ _batch_per_row() {
 
         case "$PIPELINE" in
             cellranger)       _gen_cellranger_config       "$row" "$sample" "$localcores" "$localmem" "$sample_config" ;;
+            cellranger-mkfastq) _gen_cellranger_mkfastq_config "$row" "$sample" "$localcores" "$localmem" "$sample_config" ;;
+            cellranger-multi) _gen_cellranger_multi_config "$row" "$sample" "$localcores" "$localmem" "$sample_config" ;;
             spaceranger)      _gen_spaceranger_config      "$row" "$sample" "$localcores" "$localmem" "$sample_config" ;;
             xeniumranger)     _gen_xeniumranger_config     "$row" "$sample" "$localcores" "$localmem" "$sample_config" ;;
             sqanti3)          _gen_sqanti3_config          "$row" "$sample" "$localcores" "$localmem" "$sample_config" ;;
@@ -225,6 +249,72 @@ _gen_cellranger_config() {
         printf 'localcores: %s\n'      "$localcores"
         printf 'localmem: %s\n'        "$localmem"
         printf 'create_bam: %s\n'      "$create_bam"
+        _titan_block
+    } > "$output"
+}
+
+_gen_cellranger_mkfastq_config() {
+    local row="$1" sample="$2" localcores="$3" localmem="$4" output="$5"
+
+    local run_dir samplesheet_path tool_path
+    run_dir=$(samplesheet_get_col          "$SAMPLESHEET" "run_dir"     "$row")
+    samplesheet_path=$(samplesheet_get_col "$SAMPLESHEET" "samplesheet" "$row")
+    tool_path=$(yaml_get "$BASE_CONFIG" "tool_path" 2>/dev/null || echo "")
+    [[ -z "$run_dir" ]]          && die "Row $row ($sample): 'run_dir' is required for cellranger-mkfastq"
+    [[ -z "$samplesheet_path" ]] && die "Row $row ($sample): 'samplesheet' is required for cellranger-mkfastq"
+
+    {
+        printf '# Generated by tjp-batch — %s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+        printf '# Samplesheet: %s (row %d)\n' "$SAMPLESHEET" "$row"
+        printf 'run_id: %s\n'      "$sample"
+        printf 'run_dir: %s\n'     "$run_dir"
+        printf 'samplesheet: %s\n' "$samplesheet_path"
+        printf 'localcores: %s\n'  "$localcores"
+        printf 'localmem: %s\n'    "$localmem"
+        [[ -n "$tool_path" ]] && printf 'tool_path: %s\n' "$tool_path"
+        _titan_block
+    } > "$output"
+}
+
+# cellranger-multi's per-row 'libraries_file' points at a small CSV (header:
+# fastq_id,fastqs,feature_types — matching containers/10x's own [libraries]
+# section format) that this function inlines into the generated config's
+# YAML 'libraries:' list. The wrapper script only reads that inline list, so
+# this translation happens entirely in tjp-batch — no submodule changes needed.
+_gen_cellranger_multi_config() {
+    local row="$1" sample="$2" localcores="$3" localmem="$4" output="$5"
+
+    local transcriptome libraries_file create_bam
+    transcriptome=$(samplesheet_get_col  "$SAMPLESHEET" "transcriptome"  "$row" 2>/dev/null || \
+                    yaml_get "$BASE_CONFIG" "transcriptome" 2>/dev/null || echo "")
+    libraries_file=$(samplesheet_get_col "$SAMPLESHEET" "libraries_file" "$row")
+    create_bam=$(yaml_get "$BASE_CONFIG" "create_bam" 2>/dev/null || echo "true")
+    [[ -z "$create_bam" ]] && create_bam="true"
+    [[ -z "$transcriptome" ]]    && die "Row $row ($sample): 'transcriptome' is required for cellranger-multi"
+    [[ -z "$libraries_file" ]]   && die "Row $row ($sample): 'libraries_file' is required for cellranger-multi"
+    [[ ! -f "$libraries_file" ]] && die "Row $row ($sample): libraries_file not found: $libraries_file"
+
+    {
+        printf '# Generated by tjp-batch — %s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+        printf '# Samplesheet: %s (row %d)\n' "$SAMPLESHEET" "$row"
+        printf '# libraries: translated from %s\n' "$libraries_file"
+        printf 'sample_id: %s\n'     "$sample"
+        printf 'transcriptome: %s\n' "$transcriptome"
+        printf 'localcores: %s\n'    "$localcores"
+        printf 'localmem: %s\n'      "$localmem"
+        printf 'create_bam: %s\n'    "$create_bam"
+        printf 'libraries:\n'
+
+        local header_skipped=false fid fqs ftype _rest
+        while IFS=',' read -r fid fqs ftype _rest; do
+            fid="${fid%$'\r'}"; fqs="${fqs%$'\r'}"; ftype="${ftype%$'\r'}"
+            if ! $header_skipped; then header_skipped=true; continue; fi
+            [[ -z "$fid" && -z "$fqs" ]] && continue
+            printf '  - fastq_id: %s\n'      "$fid"
+            printf '    fastqs: %s\n'        "$fqs"
+            printf '    feature_types: %s\n' "$ftype"
+        done < "$libraries_file"
+
         _titan_block
     } > "$output"
 }
@@ -426,13 +516,19 @@ _gen_dconvatac_config() {
     detection_alpha=$(yaml_get      "$BASE_CONFIG" "detection_alpha"      2>/dev/null || echo "20")
     max_epochs_spatial=$(yaml_get   "$BASE_CONFIG" "max_epochs_spatial"   2>/dev/null || echo "400")
     max_epochs_ref=$(yaml_get       "$BASE_CONFIG" "max_epochs_ref"       2>/dev/null || echo "400")
-    use_gpu=$(yaml_get              "$BASE_CONFIG" "use_gpu"              2>/dev/null || echo "false")
+    use_gpu=$(yaml_get              "$BASE_CONFIG" "use_gpu"              2>/dev/null || echo "")
     [[ -z "$run_hvp"              ]] && run_hvp="true"
     [[ -z "$N_cells_per_location" ]] && N_cells_per_location="8"
     [[ -z "$detection_alpha"      ]] && detection_alpha="20"
     [[ -z "$max_epochs_spatial"   ]] && max_epochs_spatial="400"
     [[ -z "$max_epochs_ref"       ]] && max_epochs_ref="400"
-    [[ -z "$use_gpu"              ]] && use_gpu="false"
+    # Default use_gpu by pipeline when the base config doesn't set it — the
+    # dconvatac-gpu validator requires use_gpu: true, so a base config that's
+    # silent on this must still resolve correctly for whichever pipeline the
+    # batch was launched under.
+    if [[ -z "$use_gpu" ]]; then
+        [[ "$PIPELINE" == "dconvatac-gpu" ]] && use_gpu="true" || use_gpu="false"
+    fi
 
     # Derive output_dir per sample
     local base_outdir output_dir

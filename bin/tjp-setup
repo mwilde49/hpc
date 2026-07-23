@@ -244,6 +244,65 @@ if [[ ! -f "$wf_transcriptomes_sheet" ]]; then
     info "Created: $wf_transcriptomes_sheet"
 fi
 
+# Cell Ranger mkfastq config + samplesheet
+# NOTE: template dir is "cellranger_mkfastq" (underscore), unlike the pipeline
+# name "cellranger-mkfastq" (dash) — do not naively substitute one for the other.
+cellranger_mkfastq_config="$USER_PIPELINES/cellranger-mkfastq/config.yaml"
+if [[ -f "$cellranger_mkfastq_config" ]]; then
+    warn "Config already exists, skipping: $cellranger_mkfastq_config"
+else
+    _substitute_placeholders "$REPO_ROOT/templates/cellranger_mkfastq/config.yaml" > "$cellranger_mkfastq_config"
+    info "Created: $cellranger_mkfastq_config"
+fi
+cellranger_mkfastq_sheet="$USER_PIPELINES/cellranger-mkfastq/samplesheet.csv"
+if [[ ! -f "$cellranger_mkfastq_sheet" ]]; then
+    _substitute_placeholders "$REPO_ROOT/templates/cellranger_mkfastq/samplesheet.csv" > "$cellranger_mkfastq_sheet"
+    info "Created: $cellranger_mkfastq_sheet"
+fi
+
+# Cell Ranger Multi config + samplesheet
+cellranger_multi_config="$USER_PIPELINES/cellranger-multi/config.yaml"
+if [[ -f "$cellranger_multi_config" ]]; then
+    warn "Config already exists, skipping: $cellranger_multi_config"
+else
+    _substitute_placeholders "$REPO_ROOT/templates/cellranger-multi/config.yaml" > "$cellranger_multi_config"
+    info "Created: $cellranger_multi_config"
+fi
+cellranger_multi_sheet="$USER_PIPELINES/cellranger-multi/samplesheet.csv"
+if [[ ! -f "$cellranger_multi_sheet" ]]; then
+    _substitute_placeholders "$REPO_ROOT/templates/cellranger-multi/samplesheet.csv" > "$cellranger_multi_sheet"
+    info "Created: $cellranger_multi_sheet"
+fi
+
+# DeconvATAC config + samplesheet
+dconvatac_config="$USER_PIPELINES/dconvatac/config.yaml"
+if [[ -f "$dconvatac_config" ]]; then
+    warn "Config already exists, skipping: $dconvatac_config"
+else
+    _substitute_placeholders "$REPO_ROOT/templates/dconvatac/config.yaml" > "$dconvatac_config"
+    info "Created: $dconvatac_config"
+fi
+dconvatac_sheet="$USER_PIPELINES/dconvatac/samplesheet.csv"
+if [[ ! -f "$dconvatac_sheet" ]]; then
+    _substitute_placeholders "$REPO_ROOT/templates/dconvatac/samplesheet.csv" > "$dconvatac_sheet"
+    info "Created: $dconvatac_sheet"
+fi
+
+# DeconvATAC GPU config + samplesheet (independent config from CPU dconvatac —
+# there is no config-sharing logic in tjp-launch; use_gpu defaults to true here)
+dconvatac_gpu_config="$USER_PIPELINES/dconvatac-gpu/config.yaml"
+if [[ -f "$dconvatac_gpu_config" ]]; then
+    warn "Config already exists, skipping: $dconvatac_gpu_config"
+else
+    _substitute_placeholders "$REPO_ROOT/templates/dconvatac-gpu/config.yaml" > "$dconvatac_gpu_config"
+    info "Created: $dconvatac_gpu_config"
+fi
+dconvatac_gpu_sheet="$USER_PIPELINES/dconvatac-gpu/samplesheet.csv"
+if [[ ! -f "$dconvatac_gpu_sheet" ]]; then
+    _substitute_placeholders "$REPO_ROOT/templates/dconvatac-gpu/samplesheet.csv" > "$dconvatac_gpu_sheet"
+    info "Created: $dconvatac_gpu_sheet"
+fi
+
 # ── Add to PATH ────────────────────────────────────────────────────────────
 PATH_LINE="export PATH=\"$REPO_ROOT/bin:\$PATH\""
 BASHRC="$HOME/.bashrc"

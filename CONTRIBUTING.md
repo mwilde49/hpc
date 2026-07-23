@@ -9,11 +9,12 @@ This guide covers how to propose changes, add new pipelines, maintain submodules
 1. [Getting Started](#1-getting-started)
 2. [Branch Conventions](#2-branch-conventions)
 3. [Adding a New Pipeline](#3-adding-a-new-pipeline)
-4. [Modifying Existing Pipelines](#4-modifying-existing-pipelines)
-5. [Submodule Releases](#5-submodule-releases)
-6. [PR Checklist](#6-pr-checklist)
-7. [Release Process](#7-release-process)
-8. [Documentation Standards](#8-documentation-standards)
+4. [Test Module Requirements](#4-test-module-requirements)
+5. [Modifying Existing Pipelines](#5-modifying-existing-pipelines)
+6. [Submodule Releases](#6-submodule-releases)
+7. [PR Checklist](#7-pr-checklist)
+8. [Release Process](#8-release-process)
+9. [Documentation Standards](#9-documentation-standards)
 
 ---
 
@@ -52,6 +53,7 @@ For pipelines where code lives directly in this repo.
 - [ ] Create `pipelines/<name>/` with pipeline script and README
 - [ ] Add or extend a container definition in `containers/`; rebuild `.sif`
 - [ ] Add `slurm_templates/<name>_slurm_template.sh`
+- [ ] Wire in the reproducibility framework (`bin/lib/repro.sh`) — see below
 - [ ] Add `templates/<name>/config.yaml` with `__USER__`/`__SCRATCH__`/`__WORK__` placeholders and Titan block
 - [ ] Add `templates/<name>/samplesheet.csv` if batch mode is needed
 - [ ] Add `_SAMPLESHEET_REQUIRED_COLS[<name>]` in `bin/lib/samplesheet.sh`
@@ -84,6 +86,34 @@ For tools that manage their own execution without a container.
 - [ ] Add `[<name>]` to `PIPELINE_TOOL_PATHS` in `bin/lib/common.sh`
 - [ ] Add `<name>` to `NATIVE_PIPELINES` in `bin/lib/common.sh`
 - [ ] All other Pattern A steps
+
+### Wiring in the reproducibility framework (all patterns)
+
+Every SLURM template — inline, submoduled, or native — must source `bin/lib/repro.sh`
+and call its three hooks so the run directory gets `juno_environment.json` and
+`invocation.log` like every other pipeline. Copy the pattern from
+`slurm_templates/addone_slurm_template.sh`:
+
+```bash
+source "$PROJECT_ROOT/bin/lib/repro.sh"
+...
+capture_juno_env "$RUN_DIR"
+trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT
+...
+run_logged "${RUN_DIR:+$RUN_DIR/invocation.log}" \
+    apptainer exec ... $CONTAINER ...
+```
+
+- [ ] `source "$PROJECT_ROOT/bin/lib/repro.sh"` near the top of the template
+- [ ] `capture_juno_env "$RUN_DIR"` called right after `RUN_DIR` is parsed, before any pre-flight checks
+- [ ] `trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT` set immediately after the `capture_juno_env` call
+- [ ] The actual pipeline invocation wrapped in `run_logged "${RUN_DIR:+$RUN_DIR/invocation.log}" ...` (for SQANTI3-style multi-job orchestrators, wrap each `sbatch` call individually)
+- [ ] If the pipeline is Nextflow-based, add `-with-trace -with-report -with-timeline -with-dag` writing into `$RUN_DIR/nextflow_logs/` (see the bulkrnaseq/psoma/virome/wf-transcriptomes templates for the exact flags)
+
+No action needed for `manifest.sh` — `snapshot_slurm_template`/`snapshot_pipeline_source`
+run automatically for every pipeline in the registry at manifest-generation time
+(before the job is submitted), as long as the pipeline was added to
+`bin/lib/common.sh` per the steps above.
 
 ### After adding any pipeline
 
@@ -128,7 +158,7 @@ auto-discovers modules by name, so no registration step is needed.
 
 **SLURM resource changes:** Update `slurm_templates/<name>_slurm_template.sh`, `PIPELINE_DESIGN_REVIEW.md` (resources table), and `DEVELOPER_ONBOARDING.md` (Layer 2 table).
 
-**Submodule updates:** See §7.
+**Submodule updates:** See §6.
 
 **Version bumps:** See §8.
 
@@ -187,6 +217,7 @@ Before merging any PR to `master`:
 - [ ] `bin/check-docs-freshness` passes (no pipeline count drift)
 - [ ] Config validator handles all new keys
 - [ ] Template config has comments for all fields
+- [ ] New SLURM templates source `bin/lib/repro.sh` and wire `capture_juno_env`/`finalize_juno_env`/`run_logged` (see §3)
 
 **Testing**
 - [ ] Create `bin/lib/tests/test_<name>.sh` with all six functions (see §4 below)

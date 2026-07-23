@@ -56,7 +56,7 @@ This guide covers how to configure and run bioinformatics pipelines available on
 7. [wf-transcriptomes (ONT Full-Length Transcript Analysis)](#7-wf-transcriptomes-ont-full-length-transcript-analysis)
 8. [SQANTI3 (Long-Read Isoform QC)](#8-sqanti3-long-read-isoform-qc)
 9. [10x Genomics Pipelines](#9-10x-genomics-pipelines)
-10. [DeconvATAC (Spatial ATAC Deconvolution)](#10-dconvatac-spatial-atac-deconvolution)
+10. [DeconvATAC (Spatial ATAC Deconvolution)](#10-deconvatac-spatial-atac-deconvolution)
 11. [Batch Launching (Multiple Samples)](#11-batch-launching-multiple-samples)
 12. [Launching a Pipeline](#12-launching-a-pipeline)
 13. [Monitoring Your Job](#13-monitoring-your-job)
@@ -351,13 +351,36 @@ Format: one sample per row with columns `sample,fastq_r1,fastq_r2`.
 vi /work/$USER/pipelines/virome/config.yaml
 ```
 
-Key fields:
+The fields you **must** edit:
 
-| Field | Description |
-|-------|-------------|
-| `outdir` | Output directory (on scratch) |
-| `kraken2_db` | Path to Kraken2 database |
-| `ref_genome` | Reference genome for host removal |
+```yaml
+project_name: My-Virome-Project
+samplesheet: /work/$USER/pipelines/virome/samplesheet.csv
+outdir: /scratch/juno/YOUR_NETID/virome/results
+```
+
+Fields you **may** need to change:
+
+| Field | Default | When to change |
+|-------|---------|-----------------|
+| `trim_headcrop` | `0` | Hard-clip N bases from read start |
+| `trim_leading` | `3` | Cut bases from start below this quality |
+| `trim_trailing` | `3` | Cut bases from end below this quality |
+| `trim_slidingwindow` | `4:15` | Window size:quality threshold |
+| `trim_minlen` | `36` | Drop reads shorter than this |
+| `kraken2_confidence` | `0.1` | Kraken2 confidence threshold for classification |
+| `min_reads_per_taxon` | `5` | Minimum reads to report a taxon in the abundance matrix |
+| `save_kraken2_output` | `false` | Publish per-sample `{id}.kraken2.output` to `outdir/kraken2_output/` |
+| `save_unmapped_reads` | `false` | Publish STAR-unmapped FASTQs — warning: ~2 GB/sample |
+
+Fields you should **not** change (shared references and containers are pre-installed):
+
+```yaml
+star_index: /groups/tprice/pipelines/references/star_index
+kraken2_db: /groups/tprice/pipelines/references/kraken2_viral_db
+adapters: /groups/tprice/pipelines/containers/virome/assets/NexteraPE-PE.fa
+container_dir: /groups/tprice/pipelines/containers/virome/containers/
+```
 
 ### Step 3: Launch
 
@@ -453,7 +476,7 @@ The fields you **must** edit:
 sample_id: my_sample                        # output directory name
 sample_name: MySample                       # matches FASTQ filename prefix
 fastq_dir: /scratch/juno/YOUR_NETID/myproject/fastq
-transcriptome: /groups/tprice/pipelines/references/cellranger/refdata-gex-GRCh38-2024-A
+transcriptome: /groups/tprice/pipelines/references/refdata-gex-GRCh38-2024-A
 create_bam: true                            # required in Cell Ranger 10+
 ```
 
@@ -475,7 +498,7 @@ The fields you **must** edit:
 sample_id: my_sample
 sample_name: MySample
 fastq_dir: /scratch/juno/YOUR_NETID/myproject/fastq
-transcriptome: /groups/tprice/pipelines/references/spaceranger/refdata-gex-GRCh38-2024-A
+transcriptome: /groups/tprice/pipelines/references/refdata-gex-GRCh38-2024-A
 image: /scratch/juno/YOUR_NETID/myproject/image.tif
 slide: V19J25-123                           # your Visium slide serial number
 area: A1                                    # A1, B1, C1, or D1
@@ -585,6 +608,8 @@ Fields:
 | `labels_key` | yes | `obs` column name for cell-type labels in the reference |
 | `output_dir` | yes | Directory for Cell2Location outputs |
 | `run_hvp` | no | Run highly-variable peak selection before deconvolution (default: `true`) |
+| `spatial_batch_key` | no | `obs` column in `spatial_h5ad` identifying distinct sections/batches, for joint multi-section modeling. Leave blank for single-section data (default: none) |
+| `spatial_batch_size` | no | Minibatch size for spatial model training. Leave blank for full-data batches (fine under a few thousand spots); set e.g. `2048` for larger datasets to avoid GPU OOM on the A30's 24GB (default: full data) |
 | `N_cells_per_location` | no | Expected cells per spatial location (default: `8`) |
 | `detection_alpha` | no | Detection model tuning parameter (default: `20`) |
 | `max_epochs_spatial` | no | Training epochs for the spatial model (default: `400`) |

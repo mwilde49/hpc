@@ -1,0 +1,2 @@
+sample,spatial_h5ad,reference_h5ad,labels_key
+Sample_A,/scratch/juno/__USER__/myproject/spatial_a.h5ad,/scratch/juno/__USER__/reference_a.h5ad,cell_type

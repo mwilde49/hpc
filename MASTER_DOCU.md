@@ -1,6 +1,6 @@
 # Hyperion Compute — Documentation Master Index
 
-**Version:** v7.0.0 &nbsp;|&nbsp; **Last updated:** 2026-07-20 (v7.0.0 — reproducibility & provenance logging framework, DeconvATAC, tjp-test-suite docs caught up)
+**Version:** v7.1.0 &nbsp;|&nbsp; **Last updated:** 2026-07-23 (v7.1.0 — Cell Ranger mkfastq/Multi batch support, DeconvATAC GPU templates/validator, repo-wide consistency audit)
 
 This file is the single entry point for all documentation in the TJP HPC pipeline framework. It describes what every document covers, who should read it, and where to look for specific information.
 
@@ -22,12 +22,12 @@ This file is the single entry point for all documentation in the TJP HPC pipelin
 | Set up DeconvATAC specifically | [DCONVATAC_HPC_GUIDE.md](#16-dconvatac_hpc_guidemd) |
 | Understand Titan metadata | [metadata/SCHEMA.md](#11-metadataschemamd) |
 | Deploy or develop in this repo | [TJP_HPC_COMPLETE_GUIDE.md](#6-tjp_hpc_complete_guidemd) |
-| Debug a pipeline failure | [TROUBLESHOOTING.md](#16-troubleshootingmd) |
-| Understand an unfamiliar term | [GLOSSARY.md](#17-glossarymd) |
+| Debug a pipeline failure | [TROUBLESHOOTING.md](#17-troubleshootingmd) |
+| Understand an unfamiliar term | [GLOSSARY.md](#18-glossarymd) |
 | See what changed in a release | [CHANGELOG.md](#13-changelogmd) |
 | Contribute a new pipeline | [CONTRIBUTING.md](#14-contributingmd) |
 | Understand a design choice | [docs/decisions/](docs/decisions/README.md) |
-| See all config keys for a pipeline | [templates/schemas/](#20-templatesschemas) |
+| See all config keys for a pipeline | [templates/schemas/](#21-templatesschemas) |
 
 ---
 
@@ -254,7 +254,7 @@ python3 docs/generate_diagrams.py
 
 **What it covers:**
 - Version-by-version changelog in [Keep a Changelog](https://keepachangelog.com/) format
-- Sections for every release from v2.0.0 through v6.1.0
+- Sections for every release from v2.0.0 through v7.1.0, plus an `[Unreleased]` section
 - Added / Changed / Fixed / Removed categories per release
 
 **When to read:** When upgrading to a new framework version to understand what changed.
@@ -431,6 +431,8 @@ Use this table to find which documents cover a specific pipeline.
 | Cell Ranger Multi | § config | §9 | §6.11 | §4.5 | §3 |
 | Space Ranger | § config | §9 | §6.8 | §4.6 | §3 |
 | Xenium Ranger | § config | §9 | §6.9 | §4.7 | §3 |
+| DeconvATAC | § config | §10 | §6.12 | §1 (overview table only — no dedicated §4.x flow) | §1 (comparison matrix only — no dedicated §3 assessment) |
+| DeconvATAC GPU | § config | §10 | §6.13 | §1 (overview table only — no dedicated §4.x flow) | §1 (comparison matrix only — no dedicated §3 assessment) |
 
 ---
 
@@ -461,8 +463,9 @@ These are not documentation but are essential references when developing:
 | `containers/bulkrnaseq/` | `mwilde49/bulkseq` | v1.0.1 | Container def + build scripts |
 | `containers/psoma/` | `mwilde49/psoma` | v2.0.2 | Container def + pipeline scripts |
 | `containers/virome/` | `mwilde49/virome-pipeline` | v1.5.0 | Nextflow workflow + per-process container defs |
-| `containers/sqanti3/` | `mwilde49/longreads` | v1.1.0 | SQANTI3 + wf-transcriptomes stage scripts, configs, SIF |
-| `containers/10x/` | `mwilde49/10x` | v1.2.0 | Wrapper scripts + validators for all 5 10x tools |
+| `containers/sqanti3/` | `mwilde49/longreads` | v1.1.0 +6 commits | SQANTI3 + wf-transcriptomes stage scripts, configs, SIF |
+| `containers/10x/` | `mwilde49/10x` | v1.2.0 +1 commit | Wrapper scripts + validators for all 5 10x tools |
+| `containers/dconvatac/` | `mwilde49/dconvatac` | v1.0.0 +4 commits | Container def + Python pipeline script (Cell2Location, CPU + GPU) |
 
 ---
 

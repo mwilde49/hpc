@@ -6,7 +6,8 @@
 #   sample_id      - output directory name for this Cell Ranger multi run
 #   transcriptome  - path to Cell Ranger reference genome (for GEX library)
 #   libraries_file - path to a pre-built libraries CSV for this sample
-#                    The libraries CSV has columns: fastq_path, sample_name, feature_types
+#                    The libraries CSV has a header row and columns:
+#                    fastq_id, fastqs, feature_types
 #
 # Note: for complex multi experiments, prepare a per-sample libraries CSV
 # and reference it via the libraries_file column. The config.yaml inline

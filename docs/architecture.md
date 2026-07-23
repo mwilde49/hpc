@@ -23,7 +23,7 @@ These diagrams are intended for both **technical HPC users** setting up or debug
 
 ## 1. System Architecture Overview
 
-Hyperion Compute is composed of five logical layers, each with a distinct responsibility. Researchers interact exclusively with the **User Interface** layer — the CLI tools and config files — and never need to touch the underlying SLURM or container machinery directly. The **Execution Engine** handles resource allocation and environment isolation. The **Pipeline Layer** hosts all eight bioinformatics workflows, grouped by how their dependencies are packaged. The **Storage Layer** spans three tiers: the shared group repository (read-only for users), ephemeral per-user compute scratch, and persistent per-user work directories. The **Metadata Layer** currently records every pipeline run as a local JSON file (PLR-xxxx format); this will migrate to a centralized PostgreSQL database on the forthcoming Titan storage system.
+Hyperion Compute is composed of five logical layers, each with a distinct responsibility. Researchers interact exclusively with the **User Interface** layer — the CLI tools and config files — and never need to touch the underlying SLURM or container machinery directly. The **Execution Engine** handles resource allocation and environment isolation. The **Pipeline Layer** hosts all thirteen bioinformatics workflows, grouped by how their dependencies are packaged. The **Storage Layer** spans three tiers: the shared group repository (read-only for users), ephemeral per-user compute scratch, and persistent per-user work directories. The **Metadata Layer** currently records every pipeline run as a local JSON file (PLR-xxxx format); this will migrate to a centralized PostgreSQL database on the forthcoming Titan storage system.
 
 ```mermaid
 graph TB
@@ -57,9 +57,13 @@ graph TB
             p_virome["virome\nKraken2 / MetaPhlAn3"]
             p_sqanti["sqanti3\nLong-read isoform QC"]
             p_wftx["wf-transcriptomes\nONT / EPI2ME"]
+            p_dconv["dconvatac\nCell2Location (CPU)"]
+            p_dconvgpu["dconvatac-gpu\nCell2Location (A30 GPU)"]
         end
         subgraph native_grp["Native"]
             p_cr["cellranger\n10x scRNA-seq"]
+            p_crmk["cellranger-mkfastq\n10x BCL demux"]
+            p_crmulti["cellranger-multi\n10x multi-library"]
             p_sr["spaceranger\n10x Spatial"]
             p_xr["xeniumranger\n10x In Situ"]
         end
@@ -102,7 +106,7 @@ graph TB
     class slurm,apptainer,native compute
     class store_repo,store_work,store_scratch storage
     class store_titan,meta_json,meta_db titan
-    class p_addone,p_bulk,p_psoma,p_virome,p_sqanti,p_wftx,p_cr,p_sr,p_xr pipeline
+    class p_addone,p_bulk,p_psoma,p_virome,p_sqanti,p_wftx,p_dconv,p_dconvgpu,p_cr,p_crmk,p_crmulti,p_sr,p_xr pipeline
 ```
 
 ---
@@ -156,7 +160,7 @@ sequenceDiagram
 
 ## 3. Pipeline Taxonomy
 
-Hyperion Compute hosts eight bioinformatics pipelines organized into three architectural families. **Inline** pipelines bundle their code directly in the shared repository and are suitable for simple tasks or framework testing. **Submoduled** pipelines reference external container repositories (git submodules), each encapsulating a container definition and pipeline scripts; this keeps the main repo lean while enabling independent versioning of each pipeline's dependencies. **Native** pipelines require no container at all — the 10x Genomics tools are installed from vendor tarballs and manage their own parallelism. All three families share the same CLI interface (`tjp-launch`, `tjp-batch`) and produce the same run-directory and manifest structure.
+Hyperion Compute hosts thirteen bioinformatics pipelines organized into three architectural families. **Inline** pipelines bundle their code directly in the shared repository and are suitable for simple tasks or framework testing. **Submoduled** pipelines reference external container repositories (git submodules), each encapsulating a container definition and pipeline scripts; this keeps the main repo lean while enabling independent versioning of each pipeline's dependencies. **Native** pipelines require no container at all — the 10x Genomics tools are installed from vendor tarballs and manage their own parallelism. All three families share the same CLI interface (`tjp-launch`, `tjp-batch`) and produce the same run-directory and manifest structure.
 
 ```mermaid
 graph LR
@@ -181,9 +185,13 @@ graph LR
     P_virome["virome\nNextflow + Kraken2\nMetaPhlAn3"]
     P_sqanti["sqanti3\n4-stage SLURM DAG\nSQANTI3 v5.5.4"]
     P_wftx["wf-transcriptomes\nNextflow (EPI2ME)\nONT long-read"]
+    P_dconv["dconvatac\nCell2Location (CPU)"]
+    P_dconvgpu["dconvatac-gpu\nCell2Location (A30 GPU)"]
 
     %% Native leaves
     P_cr["cellranger\n10x binary\nscRNA-seq (v10.0.0)"]
+    P_crmk["cellranger-mkfastq\n10x binary\nBCL demux (v10.0.0)"]
+    P_crmulti["cellranger-multi\n10x binary\nmulti-library (v10.0.0)"]
     P_sr["spaceranger\n10x binary\nSpatial (v4.0.1)"]
     P_xr["xeniumranger\n10x binary\nIn Situ (v4.0)"]
 
@@ -193,7 +201,11 @@ graph LR
     B_sub --> P_virome
     B_sub --> P_sqanti
     B_sub --> P_wftx
+    B_sub --> P_dconv
+    B_sub --> P_dconvgpu
     B_native --> P_cr
+    B_native --> P_crmk
+    B_native --> P_crmulti
     B_native --> P_sr
     B_native --> P_xr
 
@@ -207,8 +219,8 @@ graph LR
     class HC root
     class B_inline,B_sub,B_native branch
     class P_addone inlinePipe
-    class P_bulk,P_psoma,P_virome,P_sqanti,P_wftx subPipe
-    class P_cr,P_sr,P_xr nativePipe
+    class P_bulk,P_psoma,P_virome,P_sqanti,P_wftx,P_dconv,P_dconvgpu subPipe
+    class P_cr,P_crmk,P_crmulti,P_sr,P_xr nativePipe
 ```
 
 ---

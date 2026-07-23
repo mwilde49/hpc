@@ -5,6 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); version
 
 ## [Unreleased]
 
+## [v7.1.0] — 2026-07-23
+
+### Added
+- `templates/dconvatac-gpu/config.yaml` and `samplesheet.csv` — the GPU variant had no config/samplesheet templates of its own; `tjp-setup` was silently scaffolding nothing for it.
+- `_validate_dconvatac_gpu()` in `bin/lib/validate.sh` — the dispatcher previously fell back to the CPU validator, so a `dconvatac-gpu` config with `use_gpu: false` (or unset) validated cleanly and would have wasted an A30 allocation running CPU-only. Now delegates to `_validate_dconvatac` plus enforces `use_gpu: true`.
+- `bin/tjp-batch` support for `cellranger-mkfastq` and `cellranger-multi` (`_gen_cellranger_mkfastq_config`, `_gen_cellranger_multi_config`) — both were documented in COMMAND_REFERENCE.md/ONBOARDING.md as batch-capable but were never wired into `_BATCH_PER_ROW` or the dispatcher; `tjp-batch cellranger-multi ...` would `die "Batch submission not supported"`. Cell Ranger Multi's per-row `libraries_file` (a small CSV of `fastq_id,fastqs,feature_types`) is translated into the generated config's inline YAML `libraries:` block entirely within `tjp-batch` — no submodule changes needed. Also fixed a latent column collision in the shared per-row loop and `_titan_ids_from_row`: both pipelines reuse `run_id`/`sample_id` as their own primary-key column, which would otherwise have been misread as Titan RUN/SMP identifiers.
+- `bin/tjp-setup` now scaffolds config + samplesheet for `cellranger-mkfastq`, `cellranger-multi`, `dconvatac`, and `dconvatac-gpu` — previously only `bulkrnaseq` through `wf-transcriptomes`/10x-count/spaceranger/xeniumranger were scaffolded; these four got an empty `runs/` directory and nothing else.
+
+### Fixed
+- **Submodule pins**: `containers/10x`, `containers/dconvatac`, and `containers/sqanti3` are 1, 4, and 6 commits ahead of their last tag respectively (untagged) — flagged across README.md, PIPELINE_DESIGN_REVIEW.md, HPC_SYSTEM_MAP.md, MASTER_DOCU.md, and DEVELOPER_ONBOARDING.md with the actual commit drift noted. New tags are **not** cut as part of this pass — left for a deliberate release decision.
+- `templates/cellranger-multi/config.yaml` shipped with `fastq_path`/`sample_name` library fields, but `containers/10x/bin/cellranger-multi-run.sh` only reads `fastq_id`/`fastqs` — the template as shipped would fail at launch. Fixed the template and its `feature_types` enum comment (was missing `VDJ-T-GD`/had the old `CRISPR Screen` name instead of `CRISPR Guide Capture`).
+- `capture_juno_env` was called *after* an early pre-flight exit in three SLURM templates (`addone`, `virome`, `wf_transcriptomes`) — a job that failed validation (bad config arg, missing nextflow, missing required arg) wrote no `juno_environment.json` at all, defeating the v7.0.0 design goal that "even a job that fails pre-flight still gets a record." Reordered so provenance capture and the `EXIT` trap are always set up first; worst case was `virome`, where the check ran before `repro.sh` was even sourced.
+- `slurm_templates/wf_transcriptomes_slurm_template.sh`'s own fallback default for `wf_version` was `v1.7.2` — stale against `templates/wf-transcriptomes/config.yaml` and `tjp-batch`'s generator, both already on `v2.3.0`. A config that omitted `wf_version` would have silently run an old workflow release. Fixed to `v2.3.0`.
+- `bin/check-docs-freshness`: fixed a false-positive "dconvatac-gpu missing from README.md pipeline table" (the checker's substring match doesn't know "dconvatac" → "DeconvATAC" is the same pipeline), and a false-positive "count pattern not found" warning on DEVELOPER_ONBOARDING.md (its number-word matcher didn't recognize "thirteen").
+- `CONTRIBUTING.md`: pipeline checklists (§3) and the PR checklist (§7) didn't mention the v7.0.0 reproducibility framework — new pipelines could ship without `repro.sh` wired into their SLURM template. Added explicit steps and the `addone` template as a reference pattern. Also fixed its Table of Contents, which was one section behind after §4 (Test Module Requirements) was added without renumbering §5-§9, plus one stale internal `§7` cross-reference that should have pointed at §6.
+- **Documentation now matches actual config/code across the board** — SQANTI3's YAML keys were documented as `ref_gtf`/`ref_fasta` (those are only valid as samplesheet CSV columns; the real YAML keys are camelCase `refGTF`/`refFasta`), plus wrong `filter_mode`/`rescue_mode` enums and a missing required `sample` field; wf-transcriptomes was missing required `sample`/`outdir` fields and had the same stale `wf_version` default noted above; USER_GUIDE.md's DeconvATAC field table was missing `spatial_batch_key`/`spatial_batch_size`, its Virome field table listed a nonexistent `ref_genome` key and was missing most real fields, and it had stale Cell Ranger/Space Ranger reference paths with an extra subdirectory that doesn't exist; ONBOARDING.md had the same Virome field-table problem and no DeconvATAC section at all (not even in the `tjp-launch` command list). Fixed across ONBOARDING.md, COMMAND_REFERENCE.md, and USER_GUIDE.md.
+- **DEVELOPER_ONBOARDING.md** claimed execution-flow coverage for "all thirteen pipelines" but had no DeconvATAC/DeconvATAC GPU walkthrough, no DeconvATAC rows in its Pipeline Comparison Matrix or Key Files Reference tables (also missing Cell Ranger mkfastq/Multi from the matrix), and a submodule table with several wrong pins (psoma listed as v1.0.0, actually v2.0.2; bulkrnaseq listed as v1.0.0, actually v1.0.1; virome's repo given as `mwilde49/virome` instead of `mwilde49/virome-pipeline`; sqanti3 listed as just "current"; no dconvatac row). Added the missing sections/rows and corrected every pin.
+- **MASTER_DOCU.md**: stale CHANGELOG coverage claim ("through v6.1.0"), stale submodule map (sqanti3/10x tags, missing dconvatac row), Pipeline × Document matrix missing DeconvATAC/DeconvATAC GPU rows, and three Quick Navigation links pointing at the wrong document-inventory item after a numbering shift.
+- **PIPELINE_DESIGN_REVIEW.md**: submodule table wrongly marked 10x/longreads as cleanly tagged and had no dconvatac row; all three Pipeline Comparison Matrix tables (§1) were missing DeconvATAC/DeconvATAC GPU entirely; SQANTI3's input descriptor had the same `ref_gtf`/`ref_fasta` naming bug noted above.
+- **HPC_SYSTEM_MAP.md**: SLURM resource table was missing Cell Ranger mkfastq/Multi and both DeconvATAC variants, and had wrong CPU/RAM values for BulkRNASeq/Psoma (said 20 CPU/64GB; SLURM templates actually request 40 CPU/128GB).
+- **docs/architecture.md**: both Mermaid diagrams and their surrounding prose said "eight pipelines" and only drew 9 pipeline nodes — missing Cell Ranger mkfastq/Multi and both DeconvATAC variants. Updated prose to "thirteen" and added all four missing nodes to both diagrams.
+- Version-string drift: `CELLRANGER_GUIDE.md` said framework v6.1.0 (six releases stale); `README.md`'s directory-tree ASCII art disagreed with its own pipeline table 20 lines above (v1.0.0/v2.0.0/v1.4.0 vs. the table's correct v1.0.1/v2.0.2/v1.5.0); `TJP_HPC_COMPLETE_GUIDE.md`'s directory tree had the same stale bulkrnaseq pin; `CLAUDE.md` said 9 samplesheet templates, actually 12.
+
 ## [v7.0.0] — 2026-07-20
 
 ### Added
@@ -185,7 +208,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); version
 
 ---
 
-[Unreleased]: https://github.com/mwilde49/hpc/compare/v6.1.0...HEAD
+[Unreleased]: https://github.com/mwilde49/hpc/compare/v7.1.0...HEAD
+[v7.1.0]: https://github.com/mwilde49/hpc/compare/v7.0.0...v7.1.0
 [v6.1.0]: https://github.com/mwilde49/hpc/compare/v6.0.0...v6.1.0
 [v6.0.0]: https://github.com/mwilde49/hpc/compare/v5.4.0...v6.0.0
 [v5.4.0]: https://github.com/mwilde49/hpc/compare/v5.3.1...v5.4.0

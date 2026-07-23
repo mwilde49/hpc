@@ -21,14 +21,14 @@ PIPELINE=$PROJECT_ROOT/pipelines/addone/addone.py
 CONFIG=$1
 RUN_DIR=${2:-}
 
+# --- Reproducibility capture (node, partition, resources, invocation log) ---
+capture_juno_env "$RUN_DIR"
+trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT
+
 if [ -z "$CONFIG" ]; then
     echo "Usage: sbatch addone_slurm_template.sh <config.yaml>"
     exit 1
 fi
-
-# --- Reproducibility capture (node, partition, resources, invocation log) ---
-capture_juno_env "$RUN_DIR"
-trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT
 
 mkdir -p logs
 

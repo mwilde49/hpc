@@ -123,10 +123,15 @@ Fields:
 
 | Key | Description |
 |-----|-------------|
-| `fastq_dir` | Directory containing FASTQ input files |
+| `project_name` | Name for this run |
+| `samplesheet` | CSV samplesheet (columns: `sample,fastq_r1,fastq_r2`) |
 | `outdir` | Output directory (on scratch) |
-| `kraken2_db` | Path to Kraken2 database |
-| `ref_genome` | Reference genome for host read removal |
+| `star_index` | Reference genome index for host read removal (pre-installed — leave as-is) |
+| `kraken2_db` | Path to Kraken2 database (pre-installed — leave as-is) |
+| `trim_headcrop` / `trim_leading` / `trim_trailing` / `trim_slidingwindow` / `trim_minlen` | Trimmomatic quality-trimming parameters (rarely need changing) |
+| `kraken2_confidence` | Kraken2 confidence threshold for classification (default `0.1`) |
+| `min_reads_per_taxon` | Minimum reads to report a taxon in the abundance matrix (default `5`) |
+| `save_kraken2_output` / `save_unmapped_reads` | Optional intermediate-file publishing (default `false`) |
 | `titan_project_id` / `titan_sample_id` / `titan_library_id` / `titan_run_id` | Optional Titan metadata |
 
 ### SQANTI3 (long-read isoform QC)
@@ -139,9 +144,10 @@ Fields:
 
 | Key | Description |
 |-----|-------------|
+| `sample` | Sample identifier (used in output naming) |
 | `isoforms` | Collapsed isoforms GTF (from wf-transcriptomes or FLAIR) |
-| `ref_gtf` | Reference annotation GTF |
-| `ref_fasta` | Reference genome FASTA |
+| `refGTF` | Reference annotation GTF |
+| `refFasta` | Reference genome FASTA |
 | `outdir` | Output directory |
 | `coverage` | Optional: STAR SJ.out.tab file for short-read splice junction support |
 | `titan_project_id` / `titan_sample_id` / `titan_library_id` / `titan_run_id` | Optional Titan metadata |
@@ -156,11 +162,13 @@ Fields:
 
 | Key | Description |
 |-----|-------------|
+| `sample` | Experiment/sample name (used in output naming) |
 | `fastq_dir` | ONT fastq_pass directory (with barcode subdirs) |
 | `sample_sheet` | EPI2ME barcode samplesheet CSV (barcode,alias) |
 | `ref_genome` | Reference genome FASTA |
 | `ref_annotation` | Reference annotation GTF |
-| `wf_version` | Pipeline version (default: `v1.7.2`) |
+| `outdir` | Output directory |
+| `wf_version` | Pipeline version (default: `v2.3.0`) |
 | `direct_rna` | `true` for direct RNA, `false` for cDNA/PCR |
 | `titan_project_id` / `titan_sample_id` / `titan_library_id` / `titan_run_id` | Optional Titan metadata |
 
@@ -268,6 +276,33 @@ Fields:
 | `tool_path` | no | Override default tool location |
 | `segmentation_file` | conditional | Required when command is `import-segmentation` |
 
+### DeconvATAC (spatial ATAC deconvolution)
+
+```bash
+vi /work/$USER/pipelines/dconvatac/config.yaml
+```
+
+Two registered pipelines share this config: `dconvatac` (CPU) and `dconvatac-gpu` (A30 GPU — also set `use_gpu: true`).
+
+Fields:
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `spatial_h5ad` | yes | Path to spatial ATAC AnnData file (`.h5ad`) |
+| `reference_h5ad` | yes | Path to single-cell reference AnnData file (`.h5ad`) |
+| `labels_key` | yes | `obs` column name for cell-type labels in the reference |
+| `output_dir` | yes | Directory for Cell2Location outputs |
+| `run_hvp` | no | Run highly-variable peak selection before deconvolution (default `true`) |
+| `spatial_batch_key` | no | `obs` column identifying distinct sections/batches for multi-section data (default: none) |
+| `spatial_batch_size` | no | Minibatch size for spatial model training — set e.g. `2048` on large datasets to avoid GPU OOM (default: full data) |
+| `N_cells_per_location` | no | Expected cells per spatial location (default `8`) |
+| `detection_alpha` | no | Detection model tuning parameter (default `20`) |
+| `max_epochs_spatial` / `max_epochs_ref` | no | Training epochs for the spatial/reference models (default `400`) |
+| `use_gpu` | no | Enable GPU training — set `true` when using `dconvatac-gpu` (default `false`) |
+| `titan_project_id` / `titan_sample_id` / `titan_library_id` / `titan_run_id` | no | Optional Titan metadata |
+
+See `DCONVATAC_HPC_GUIDE.md` for full Cell2Location parameter guidance.
+
 ## 3. Launch
 
 ```bash
@@ -282,6 +317,8 @@ tjp-launch cellranger-mkfastq
 tjp-launch cellranger-multi
 tjp-launch spaceranger
 tjp-launch xeniumranger
+tjp-launch dconvatac
+tjp-launch dconvatac-gpu
 ```
 
 Use a custom config path:

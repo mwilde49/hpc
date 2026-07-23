@@ -22,7 +22,7 @@ validate_config() {
         sqanti3)           _validate_sqanti3 "$config" errors ;;
         wf-transcriptomes) _validate_wf_transcriptomes "$config" errors ;;
         dconvatac)     _validate_dconvatac "$config" errors ;;
-        dconvatac-gpu) _validate_dconvatac "$config" errors ;;
+        dconvatac-gpu) _validate_dconvatac_gpu "$config" errors ;;
         *)              die "No validator for pipeline: $pipeline" ;;
     esac
 
@@ -663,4 +663,20 @@ _validate_dconvatac() {
             fi
         fi
     done
+}
+
+# ── DeconvATAC GPU validator ──────────────────────────────────────────────────
+# Same config schema as CPU DeconvATAC, plus: use_gpu must be true, since the
+# whole point of routing to the A30-gated pipeline is GPU-accelerated training.
+_validate_dconvatac_gpu() {
+    local config="$1"
+    local -n _gpu_errs=$2
+
+    _validate_dconvatac "$config" _gpu_errs
+
+    local val
+    val=$(yaml_get "$config" "use_gpu" 2>/dev/null) || val=""
+    if [[ "$val" != "true" ]]; then
+        _gpu_errs+=("use_gpu must be 'true' when using the dconvatac-gpu pipeline (got: '$val')")
+    fi
 }

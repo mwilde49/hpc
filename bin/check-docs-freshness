@@ -89,6 +89,16 @@ for pipeline in "${REGISTRY_PIPELINES[@]}"; do
         fi
     fi
 
+    # 4. "dconvatac"/"dconvatac-gpu" are the internal registry names for the
+    #    human-readable "DeconvATAC" display name (which has an extra "e").
+    if [[ $found -eq 0 ]] && [[ "$pipeline" == dconvatac* ]]; then
+        deconv="${pipeline/dconvatac/deconvatac}"
+        deconv="${deconv//-/ }"
+        if grep -qiE "^\|.*${deconv}.*\|" "$README" 2>/dev/null; then
+            found=1
+        fi
+    fi
+
     if [[ $found -eq 1 ]]; then
         pass "$pipeline in README pipeline table"
     else
@@ -125,12 +135,13 @@ check_count() {
     if [[ -z "$found_count" ]]; then
         # Try English word-to-number conversion for common counts
         case "${matched,,}" in
-            *eight*)  found_count=8 ;;
-            *nine*)   found_count=9 ;;
-            *ten*)    found_count=10 ;;
-            *eleven*) found_count=11 ;;
-            *twelve*) found_count=12 ;;
-            *)        warn "Could not extract count from '$matched' in $file"; return ;;
+            *eight*)    found_count=8 ;;
+            *nine*)     found_count=9 ;;
+            *ten*)      found_count=10 ;;
+            *eleven*)   found_count=11 ;;
+            *twelve*)   found_count=12 ;;
+            *thirteen*) found_count=13 ;;
+            *)          warn "Could not extract count from '$matched' in $file"; return ;;
         esac
     fi
 
@@ -142,11 +153,11 @@ check_count() {
 }
 
 check_count "$REPO_ROOT/README.md" \
-    "(Eleven|Ten|Nine|Eight|[0-9]+) pipeline" \
+    "(Thirteen|Eleven|Ten|Nine|Eight|[0-9]+) pipeline" \
     "README.md pipeline count"
 
 check_count "$REPO_ROOT/DEVELOPER_ONBOARDING.md" \
-    "(eleven|ten|nine|eight|[0-9]+) pipeline" \
+    "(thirteen|eleven|ten|nine|eight|[0-9]+) pipeline" \
     "DEVELOPER_ONBOARDING.md pipeline count"
 
 check_count "$REPO_ROOT/TJP_HPC_COMPLETE_GUIDE.md" \

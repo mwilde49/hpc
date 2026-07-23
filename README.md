@@ -2,7 +2,7 @@
 
 HPC pipeline framework for the TJP group on Juno HPC (UT Dallas). Uses Apptainer containers, SLURM scheduling, and config-driven YAML execution. Deployed to the shared group location at `/groups/tprice/pipelines`.
 
-**Version:** v7.0.0 &nbsp;|&nbsp; **Platform:** Juno HPC &nbsp;|&nbsp; **Branding:** Hyperion Compute
+**Version:** v7.1.0 &nbsp;|&nbsp; **Platform:** Juno HPC &nbsp;|&nbsp; **Branding:** Hyperion Compute
 
 ---
 
@@ -16,15 +16,15 @@ Thirteen pipelines are currently supported across three architecture patterns:
 | **BulkRNASeq** | Submoduled (mwilde49/bulkseq @ v1.0.1) | Bulk RNA-seq via STAR aligner, wrapped in an Apptainer container. |
 | **Psoma** | Submoduled (mwilde49/psoma @ v2.0.2) | Psomagen bulk RNA-seq via HISAT2 + Trimmomatic, Apptainer container. |
 | **Virome** | Submoduled (mwilde49/virome-pipeline @ v1.5.0) | Viral profiling — host depletion, Kraken2, MetaPhlAn3. |
-| **SQANTI3** | Submoduled (mwilde49/longreads @ v1.1.0) | Long-read isoform QC — 4-stage SLURM DAG with dynamic resource scaling. |
-| **wf-transcriptomes** | Submoduled (mwilde49/longreads @ v1.1.0) | ONT full-length transcript analysis via EPI2ME Nextflow pipeline. |
+| **SQANTI3** | Submoduled (mwilde49/longreads @ v1.1.0, +6 commits untagged) | Long-read isoform QC — 4-stage SLURM DAG with dynamic resource scaling. |
+| **wf-transcriptomes** | Submoduled (mwilde49/longreads @ v1.1.0, +6 commits untagged) | ONT full-length transcript analysis via EPI2ME Nextflow pipeline. |
 | **Cell Ranger** | Native 10x (v10.0.0) | Single-cell gene expression (10x Genomics). |
 | **Cell Ranger mkfastq** | Native 10x (v10.0.0) | BCL demultiplexing — converts instrument run folders to per-sample FASTQs. |
 | **Cell Ranger Multi** | Native 10x (v10.0.0) | Multi-library runs — GEX + VDJ, CITE-seq, CellPlex, Flex, CRISPR. |
 | **Space Ranger** | Native 10x (v4.0.1) | Spatial gene expression — Visium (10x Genomics). |
 | **Xenium Ranger** | Native 10x (v4.0) | In situ transcriptomics — Xenium (10x Genomics). |
-| **DeconvATAC** | Submoduled (mwilde49/dconvatac @ v1.0.0) | Spatial ATAC deconvolution — Cell2Location (CPU). |
-| **DeconvATAC GPU** | Submoduled (mwilde49/dconvatac @ v1.0.0) | Spatial ATAC deconvolution — Cell2Location (A30 GPU). |
+| **DeconvATAC** | Submoduled (mwilde49/dconvatac @ v1.0.0, +4 commits untagged) | Spatial ATAC deconvolution — Cell2Location (CPU). |
+| **DeconvATAC GPU** | Submoduled (mwilde49/dconvatac @ v1.0.0, +4 commits untagged) | Spatial ATAC deconvolution — Cell2Location (A30 GPU). |
 
 **Architecture patterns:**
 - **Inline** — pipeline code lives directly in this repo (`pipelines/<name>/`)
@@ -44,12 +44,12 @@ hpc/
 ├── containers/
 │   ├── apptainer.def         # AddOne container definition
 │   ├── addone_latest.sif
-│   ├── bulkrnaseq/           # submodule: mwilde49/bulkseq @ v1.0.0
-│   ├── psoma/                # submodule: mwilde49/psoma @ v2.0.0
-│   ├── virome/               # submodule: mwilde49/virome-pipeline @ v1.4.0
-│   ├── sqanti3/              # submodule: mwilde49/longreads (SQANTI3 + wf-transcriptomes)
-│   ├── dconvatac/            # submodule: mwilde49/dconvatac @ v1.0.0 (spatial ATAC deconvolution)
-│   └── 10x/                  # submodule: mwilde49/10x @ v1.2.0 (Cell Ranger / Space Ranger / Xenium Ranger wrappers)
+│   ├── bulkrnaseq/           # submodule: mwilde49/bulkseq @ v1.0.1
+│   ├── psoma/                # submodule: mwilde49/psoma @ v2.0.2
+│   ├── virome/               # submodule: mwilde49/virome-pipeline @ v1.5.0
+│   ├── sqanti3/              # submodule: mwilde49/longreads @ v1.1.0, +6 commits untagged (SQANTI3 + wf-transcriptomes)
+│   ├── dconvatac/            # submodule: mwilde49/dconvatac @ v1.0.0, +4 commits untagged (spatial ATAC deconvolution)
+│   └── 10x/                  # submodule: mwilde49/10x @ v1.2.0, +1 commit untagged (Cell Ranger / Space Ranger / Xenium Ranger wrappers)
 ├── pipelines/
 │   └── addone/               # AddOne pipeline code
 ├── slurm_templates/          # 13 SLURM job scripts (one per pipeline)

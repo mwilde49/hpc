@@ -9,14 +9,6 @@
 # Load modules
 module load apptainer
 
-# Nextflow runs natively (not inside a container) and invokes each per-process
-# container. Ensure nextflow is available on the PATH or loaded as a module.
-command -v nextflow &>/dev/null || { module load nextflow 2>/dev/null || true; }
-if ! command -v nextflow &>/dev/null; then
-    echo "ERROR: nextflow not found. Run 'module load nextflow' or add it to PATH."
-    exit 1
-fi
-
 PROJECT_ROOT=/groups/tprice/pipelines
 SCRATCH_ROOT=/scratch/juno/$USER
 WORK_ROOT=/work/$USER
@@ -38,6 +30,14 @@ capture_juno_env "$RUN_DIR"
 trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT
 
 # --- Pre-flight checks ---
+
+# Nextflow runs natively (not inside a container) and invokes each per-process
+# container. Ensure nextflow is available on the PATH or loaded as a module.
+command -v nextflow &>/dev/null || { module load nextflow 2>/dev/null || true; }
+if ! command -v nextflow &>/dev/null; then
+    echo "ERROR: nextflow not found. Run 'module load nextflow' or add it to PATH."
+    exit 1
+fi
 
 if [ ! -d "$PIPELINE_REPO" ]; then
     echo "ERROR: Virome pipeline repo not found at $PIPELINE_REPO"

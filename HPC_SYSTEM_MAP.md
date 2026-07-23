@@ -85,14 +85,14 @@ Technical reference for the TJP pipeline system on Juno HPC at UT Dallas.
 │   │   ├── main.nf
 │   │   ├── blast_verify.nf  ← BLAST verification offshoot (manual, not wired into tjp-launch)
 │   │   └── containers/      ← 6 per-process .sif files
-│   ├── sqanti3/             ← submodule: mwilde49/longreads (SQANTI3 + wf-transcriptomes)
+│   ├── sqanti3/             ← submodule: mwilde49/longreads @ v1.1.0, +6 commits untagged (SQANTI3 + wf-transcriptomes)
 │   │   ├── sqanti3_v5.5.4.sif
 │   │   ├── slurm_templates/ ← stage scripts for 4-stage DAG
 │   │   └── configs/         ← wf_transcriptomes/juno.config etc.
-│   ├── dconvatac/           ← submodule: mwilde49/dconvatac @ v1.0.0
+│   ├── dconvatac/           ← submodule: mwilde49/dconvatac @ v1.0.0, +4 commits untagged
 │   │   ├── pipeline/dconvatac.py
 │   │   └── dconvatac_v1.0.0.sif
-│   └── 10x/                 ← submodule: mwilde49/10x @ v1.2.0
+│   └── 10x/                 ← submodule: mwilde49/10x @ v1.2.0, +1 commit untagged
 │       ├── bin/             ← cellranger-run.sh, spaceranger-run.sh, xeniumranger-run.sh
 │       └── lib/             ← 10x_common.sh, validate_*.sh
 ├── Bulk-RNA-Seq-Nextflow-Pipeline/  ← cloned UTDal repo (not a submodule)
@@ -295,14 +295,18 @@ The psoma pipeline was modified to accept a separate `output_directory` paramete
 | Pipeline | Time | CPUs | RAM | Exclusive | Notes |
 |----------|------|------|-----|-----------|-------|
 | AddOne | 5 min | 1 | 1 GB | No | Demo only |
-| BulkRNASeq | 12 h | 20 | 64 GB | No | Nextflow inside container |
-| Psoma | 12 h | 20 | 64 GB | No | Nextflow inside container |
+| BulkRNASeq | 12 h | 40 | 128 GB | No | Nextflow inside container |
+| Psoma | 12 h | 40 | 128 GB | No | Nextflow inside container |
 | Virome | 12 h | 16 | 128 GB | No | Nextflow on host |
 | SQANTI3 | varies | varies | varies | No | 4-stage DAG, dynamic scaling by GTF transcript count |
 | wf-transcriptomes | 24 h | 8 | 32 GB | No | Head job only; Nextflow submits per-process sub-jobs |
 | Cell Ranger | 24 h | 16 | 128 GB | Yes | `--exclusive`; tool manages threading internally |
+| Cell Ranger mkfastq | 12 h | 16 | 128 GB | Yes | `--exclusive`; tool manages threading internally |
+| Cell Ranger Multi | 24 h | 16 | 128 GB | Yes | `--exclusive`; tool manages threading internally |
 | Space Ranger | 24 h | 16 | 128 GB | Yes | `--exclusive`; tool manages threading internally |
 | Xenium Ranger | 12 h | 16 | 128 GB | Yes | `--exclusive`; tool manages threading internally |
+| DeconvATAC | 24 h | 16 | 128 GB | No | CPU training |
+| DeconvATAC GPU | 24 h | 16 | 128 GB | No | 1× A30 GPU (`--partition=a30 --gres=gpu:nvidia_a30:1`) |
 
 ### Benchmark: Psoma 10-sample run (job 151456)
 

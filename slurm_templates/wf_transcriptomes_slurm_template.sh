@@ -26,12 +26,14 @@ source "$PROJECT_ROOT/bin/lib/repro.sh"
 PIPELINE_REPO=$PROJECT_ROOT/containers/sqanti3   # longreads repo deployment path
 NEXTFLOW=$PROJECT_ROOT/bin/nextflow
 
-USER_CONFIG="${1:?ERROR: Config not provided}"
-RUN_DIR="${2:?ERROR: Run dir not provided}"
+RUN_DIR="${2:-}"
 
 # --- Reproducibility capture (node, partition, resources, invocation log) ---
 capture_juno_env "$RUN_DIR"
 trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT
+
+USER_CONFIG="${1:?ERROR: Config not provided}"
+[[ -z "$RUN_DIR" ]] && { echo "ERROR: Run dir not provided" >&2; exit 1; }
 
 NF_CONFIG="$PIPELINE_REPO/configs/wf_transcriptomes/juno.config"
 PREFLIGHT="$PIPELINE_REPO/scripts/wf_transcriptomes_preflight.sh"
@@ -78,7 +80,7 @@ DIRECT_RNA=$(yaml_get "$USER_CONFIG" "direct_rna")
 DE_ANALYSIS=$(yaml_get "$USER_CONFIG" "de_analysis")
 MINIMAP2_OPTS=$(yaml_get "$USER_CONFIG" "minimap2_index_opts")
 # Defaults
-[[ -z "$WF_VERSION" ]]       && WF_VERSION="v1.7.2"
+[[ -z "$WF_VERSION" ]]       && WF_VERSION="v2.3.0"
 [[ -z "$DIRECT_RNA" ]]       && DIRECT_RNA="false"
 [[ -z "$DE_ANALYSIS" ]]      && DE_ANALYSIS="false"
 [[ -z "$MINIMAP2_OPTS" ]]    && MINIMAP2_OPTS="-k 15"
