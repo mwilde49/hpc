@@ -14,6 +14,7 @@ SCRATCH_ROOT=/scratch/juno/$USER
 WORK_ROOT=/work/$USER
 
 source "$PROJECT_ROOT/bin/lib/repro.sh"
+source "$PROJECT_ROOT/bin/lib/provenance.sh"
 
 CONTAINER=$PROJECT_ROOT/containers/addone_latest.sif
 PIPELINE=$PROJECT_ROOT/pipelines/addone/addone.py
@@ -23,7 +24,8 @@ RUN_DIR=${2:-}
 
 # --- Reproducibility capture (node, partition, resources, invocation log) ---
 capture_juno_env "$RUN_DIR"
-trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT
+start_console_log "$RUN_DIR"
+trap '_EC=$?; finalize_juno_env "$RUN_DIR" "$_EC"; generate_provenance_readme "$RUN_DIR" "addone" "AddOne — Inline Demo Pipeline" "$_EC" "$CONTAINER" ""' EXIT
 
 if [ -z "$CONFIG" ]; then
     echo "Usage: sbatch addone_slurm_template.sh <config.yaml>"
@@ -31,6 +33,8 @@ if [ -z "$CONFIG" ]; then
 fi
 
 mkdir -p logs
+
+capture_software_versions "$RUN_DIR" "addone" "$CONTAINER"
 
 run_logged "${RUN_DIR:+$RUN_DIR/invocation.log}" \
     apptainer exec \

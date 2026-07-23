@@ -14,6 +14,7 @@ SCRATCH_ROOT=/scratch/juno/$USER
 WORK_ROOT=/work/$USER
 
 source "$PROJECT_ROOT/bin/lib/repro.sh"
+source "$PROJECT_ROOT/bin/lib/provenance.sh"
 
 PIPELINE_REPO=$PROJECT_ROOT/containers/virome
 
@@ -27,7 +28,8 @@ SCRATCH_OUTPUT_DIR=${3:-}
 
 # --- Reproducibility capture (node, partition, resources, invocation log) ---
 capture_juno_env "$RUN_DIR"
-trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT
+start_console_log "$RUN_DIR"
+trap '_EC=$?; finalize_juno_env "$RUN_DIR" "$_EC"; generate_provenance_readme "$RUN_DIR" "virome" "Virome — DRG Virome Profiling (Nextflow, multi-container)" "$_EC" "$PIPELINE_REPO (multi-container — see software_versions.txt)" "$SCRATCH_ROOT/nextflow_work/virome"' EXIT
 
 # --- Pre-flight checks ---
 
@@ -63,6 +65,9 @@ for sif in fastqc trimmomatic star kraken2 python multiqc; do
         exit 1
     fi
 done
+
+# --- Software version capture (queried live from each per-process container) ---
+capture_software_versions "$RUN_DIR" "virome" "$PIPELINE_REPO"
 
 # --- Run pipeline ---
 

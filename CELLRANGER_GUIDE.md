@@ -1,6 +1,6 @@
 # Cell Ranger Suite — HPC Guide
 
-**Framework version:** 7.2.0 | **Cell Ranger version:** 10.0.0 | **Cluster:** Juno HPC, UT Dallas
+**Framework version:** 7.3.0 | **Cell Ranger version:** 10.0.0 | **Cluster:** Juno HPC, UT Dallas
 
 The Cell Ranger suite covers three distinct pipelines that map a typical 10x Genomics single-cell workflow from raw instrument data to analysis-ready matrices:
 

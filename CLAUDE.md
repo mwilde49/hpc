@@ -176,13 +176,24 @@ Note: `snapshot_pipeline_source` detects a submodule with `git -C <dir> rev-pars
 
 Per-stage node/resource capture for SQANTI3's 4 sub-jobs is out of scope here — those stage scripts live in the `containers/sqanti3` submodule, a separate repo.
 
-### Provenance README (v7.2.0, psoma + bulkrnaseq only so far)
+### Provenance README (v7.2.0, full rollout v7.3.0)
 
-`bin/lib/provenance.sh` builds on `repro.sh` to add three more things, currently wired into **psoma and bulkrnaseq only** — the other eleven pipelines still need this (see the module's own header comment and `CONTRIBUTING.md` §3):
+`bin/lib/provenance.sh` builds on `repro.sh` to add three more things, wired into **all thirteen pipelines**:
 
 - **`CONSOLE_LOG.txt`** — `start_console_log` tees all subsequent stdout/stderr through `exec > >(tee -a ...) 2>&1`, called right after `capture_juno_env` so pre-flight failures are captured too. This duplicates SLURM's own `slurm_<jobid>.out`/`.err` split logs, intentionally — `CONSOLE_LOG.txt` is the single chronologically-interleaved transcript.
-- **`software_versions.txt`** — `capture_software_versions` queries real per-tool version strings (HISAT2, STAR, Trimmomatic, Samtools, Nextflow, etc.) live from the run's container via `apptainer exec`, using the exact commands each container's own `.def` `%test` block already runs. This is necessary, not cosmetic: both `psomagen.def` and `bulkrnaseq.def` install tools via `mamba install` with no version pins, so the built `.sif` is the only source of truth for what actually ran. Called after the container-exists pre-flight check, before the pipeline runs.
-- **`PROVENANCE_README.md`** — `generate_provenance_readme`, called from the `EXIT` trap after `finalize_juno_env`, assembles a single Hyperion-branded Markdown report: run status/timing, the full `config.yaml`, the software-versions table, the pipeline invocation from `invocation.log`, one representative resolved command per Nextflow process (pulled from that task's `.command.sh` in the Nextflow work dir, deduplicated across samples), and a signpost table to every other artifact in the run directory. Runs on both success and failure.
+- **`software_versions.txt`** — `capture_software_versions` dispatches by pipeline architecture, since not every pipeline has a single container to probe:
+  - Single-container pipelines (psoma, bulkrnaseq, dconvatac(-gpu), addone, sqanti3) — real per-tool version strings queried live via `apptainer exec`, reusing the exact commands each container's own `.def` `%test` block already runs where one exists. Necessary, not cosmetic: several of these containers install tools via `mamba install`/`pip install` with no version pins, so the built `.sif` is the only source of truth for what actually ran.
+  - Multi-container (virome) — loops over each per-process `.sif` (`fastqc.sif`, `star.sif`, etc.), probing each one's own primary tool.
+  - Native 10x pipelines (cellranger, cellranger-mkfastq, cellranger-multi, spaceranger, xeniumranger) — sources `containers/10x/lib/10x_common.sh`'s own `find_10x_binary`/`get_10x_version` in a `set +e` subshell (that file sets `-euo pipefail` itself) to resolve the exact binary the wrapper script would use, honoring a config-level `tool_path:` override.
+  - wf-transcriptomes — captures only the `nextflow` binary's own version; per-process containers are pulled and managed by the external `epi2me-labs/wf-transcriptomes` workflow at run time, not declared anywhere in this repo, so probing them directly is out of scope (`nextflow_logs/report.html` shows what each process actually used).
+  - sqanti3 — probes the shared container the orchestrator and its 4 stage jobs all use, but only from the orchestrator job (see below).
+  
+  Called after the container/tool-exists pre-flight check, before the pipeline runs.
+- **`PROVENANCE_README.md`** — `generate_provenance_readme`, called from the `EXIT` trap after `finalize_juno_env`, assembles a single Hyperion-branded Markdown report: run status/timing, the full `config.yaml`, the software-versions table, the pipeline invocation from `invocation.log`, one representative resolved command per Nextflow process (pulled from that task's `.command.sh` in the Nextflow work dir, deduplicated across samples — skipped entirely for non-Nextflow pipelines), and a signpost table to every other artifact in the run directory. Runs on both success and failure.
+
+Two templates (`sqanti3`, `wf-transcriptomes`) already run under `set -euo pipefail`. `capture_software_versions` and `generate_provenance_readme` run their real work inside a `set +e` subshell (`_run_guarded`) specifically so this best-effort instrumentation can never abort the pipeline run it's documenting — a missing tool, an empty grep match, or a failed probe just produces a `(not captured)` note instead of killing the job. `start_console_log` is the one function that can't use a subshell (it has to modify the current shell's file descriptors) and saves/restores `set -e` manually instead.
+
+For SQANTI3 specifically: only the lightweight orchestrator job (`slurm_templates/sqanti3_slurm_template.sh`) gets this instrumentation. The four stage jobs (qc/refqc/filter/rescue) run from scripts in the `containers/sqanti3` submodule — a separate repo — so per-stage console logs/software versions/provenance READMEs are out of scope, same as the existing `juno_environment.json` limitation noted above.
 
 ## BulkRNASeq Pipeline
 

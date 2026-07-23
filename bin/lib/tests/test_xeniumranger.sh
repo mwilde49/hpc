@@ -160,6 +160,20 @@ YAML
         bash -c "source '$REPO_ROOT/bin/lib/repro.sh'"
     ts_assert_contains "l2: xeniumranger template sources repro.sh" \
         "$REPO_ROOT/slurm_templates/xeniumranger_slurm_template.sh" "repro.sh"
+
+    # Provenance README: provenance.sh sources cleanly and is wired into the
+    # SLURM template (L3 is skipped for this pipeline, so this L2 check is
+    # the only automated coverage it gets)
+    ts_assert_pass "l2: provenance.sh sources cleanly" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh' && source '$REPO_ROOT/bin/lib/provenance.sh'"
+    ts_assert_pass "l2: provenance.sh defines its hooks" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh' && source '$REPO_ROOT/bin/lib/provenance.sh' && declare -f start_console_log capture_software_versions generate_provenance_readme >/dev/null"
+    ts_assert_contains "l2: xeniumranger template sources provenance.sh" \
+        "$REPO_ROOT/slurm_templates/xeniumranger_slurm_template.sh" "provenance.sh"
+    ts_assert_contains "l2: xeniumranger template captures software versions" \
+        "$REPO_ROOT/slurm_templates/xeniumranger_slurm_template.sh" "capture_software_versions"
+    ts_assert_contains "l2: xeniumranger template generates provenance README on exit" \
+        "$REPO_ROOT/slurm_templates/xeniumranger_slurm_template.sh" "generate_provenance_readme"
     ts_assert_contains "l2: xeniumranger template wraps invocation with run_logged" \
         "$REPO_ROOT/slurm_templates/xeniumranger_slurm_template.sh" "run_logged"
 

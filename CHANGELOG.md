@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); version
 
 ## [Unreleased]
 
+## [v7.3.0] — 2026-07-23
+
+### Added
+- **Provenance README rolled out to all remaining eleven pipelines** (`addone`, `virome`, `sqanti3`, `wf-transcriptomes`, `dconvatac`, `dconvatac-gpu`, `cellranger`, `cellranger-mkfastq`, `cellranger-multi`, `spaceranger`, `xeniumranger`) — every pipeline's SLURM template now sources `bin/lib/provenance.sh` and generates `CONSOLE_LOG.txt`, `software_versions.txt`, and `PROVENANCE_README.md`. `capture_software_versions` gained four new architecture-specific strategies beyond the original single-container probe:
+  - **Multi-container** (`virome`) — loops over each per-process `.sif` (`fastqc.sif`, `star.sif`, `trimmomatic.sif`, `kraken2.sif`, `python.sif`, `multiqc.sif`), probing each one's own primary tool.
+  - **Native, no container** (`cellranger`, `cellranger-mkfastq`, `cellranger-multi`, `spaceranger`, `xeniumranger`) — sources `containers/10x/lib/10x_common.sh`'s own `find_10x_binary`/`get_10x_version` in a guarded subshell to resolve the exact binary the wrapper script would use, correctly honoring a config-level `tool_path:` override rather than always reporting the registry default.
+  - **Nextflow-managed, externally-defined containers** (`wf-transcriptomes`) — captures only the `nextflow` binary's own version; per-process containers are pulled and managed by the external `epi2me-labs/wf-transcriptomes` workflow at run time, not declared anywhere in this repo, so probing them directly would require vendoring or parsing a third-party repo's Nextflow config — out of scope, and noted as such in the generated report rather than silently omitted.
+  - **Multi-job orchestrator** (`sqanti3`) — probes the shared container from the lightweight orchestrator job only; the 4 stage jobs it dispatches (qc/refqc/filter/rescue) run from scripts in the `containers/sqanti3` submodule, a separate repo, so per-stage instrumentation remains out of scope (same limit already documented for `juno_environment.json` since v7.0.0).
+- `generate_provenance_readme` gained a `native:<tool>` convention for its `<container>` argument (relabels the summary table's "Container"/"Container checksum" rows to "Tool"/"Tool version" for pipelines with no Apptainer container), and now skips the "Per-step tool invocations" subsection entirely — rather than printing a misleading "trace.txt not found" message — for the 7 pipelines that never use Nextflow (`addone`, `dconvatac`, `dconvatac-gpu`, `sqanti3`, and the 5 10x pipelines).
+- `_run_guarded` in `bin/lib/provenance.sh`: `capture_software_versions` and `generate_provenance_readme` now run their real work inside a `set +e` subshell. Two SLURM templates (`sqanti3`, `wf-transcriptomes`) already run under `set -euo pipefail` — without this guard, a missing tool, an empty `grep` match, or any other non-zero exit inside this file's best-effort instrumentation could have aborted the pipeline run it was trying to document. `start_console_log` is the one function that can't run in a subshell (it modifies the current shell's file descriptors via `exec`) and instead saves/restores `set -e` manually around its own `exec` call.
+- Layer 2 (offline wiring) `tjp-test-suite` coverage for all eleven newly-wired pipelines, plus Layer 3 (post-run artifact) coverage for the ten that run L3 (`xeniumranger` and `dconvatac`/`dconvatac-gpu` skip L3 for pre-existing fixture-availability reasons unrelated to this change).
+- `CONTRIBUTING.md` §3: rewrote the provenance-README wiring guide with an architecture-selection table (single-container / multi-container / native / Nextflow-managed-external / orchestrator) now that all five patterns exist in the codebase, and documented the `set -e` safety guarantee so future pipeline authors don't need to re-derive it.
+
+### Fixed
+- `CONTRIBUTING.md`'s v7.2.0-era wiring example had `capture_software_versions "$RUN_DIR" "$CONTAINER" "<pipeline>"` — backwards from the actual function signature, `capture_software_versions <run_dir> <pipeline> <primary> [secondary]`. The real templates were always correct; only the doc example had the argument order swapped. Fixed, and called out explicitly in the checklist so it doesn't happen again.
+
 ## [v7.2.0] — 2026-07-23
 
 ### Added
@@ -217,7 +233,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); version
 
 ---
 
-[Unreleased]: https://github.com/mwilde49/hpc/compare/v7.2.0...HEAD
+[Unreleased]: https://github.com/mwilde49/hpc/compare/v7.3.0...HEAD
+[v7.3.0]: https://github.com/mwilde49/hpc/compare/v7.2.0...v7.3.0
 [v7.2.0]: https://github.com/mwilde49/hpc/compare/v7.1.0...v7.2.0
 [v7.1.0]: https://github.com/mwilde49/hpc/compare/v7.0.0...v7.1.0
 [v6.1.0]: https://github.com/mwilde49/hpc/compare/v6.0.0...v6.1.0

@@ -15,6 +15,7 @@ SCRATCH_ROOT=/scratch/juno/$USER
 WORK_ROOT=/work/$USER
 
 source "$PROJECT_ROOT/bin/lib/repro.sh"
+source "$PROJECT_ROOT/bin/lib/provenance.sh"
 
 CONTAINER=$PROJECT_ROOT/containers/dconvatac/dconvatac_v1.0.0.sif
 PIPELINE_SCRIPT=$PROJECT_ROOT/containers/dconvatac/pipeline/dconvatac.py
@@ -25,7 +26,8 @@ SCRATCH_OUTPUT_DIR=${3:-}
 
 # --- Reproducibility capture (node, partition, resources, invocation log) ---
 capture_juno_env "$RUN_DIR"
-trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT
+start_console_log "$RUN_DIR"
+trap '_EC=$?; finalize_juno_env "$RUN_DIR" "$_EC"; generate_provenance_readme "$RUN_DIR" "dconvatac-gpu" "DeconvATAC — Spatial ATAC Deconvolution (GPU: A30)" "$_EC" "$CONTAINER" ""' EXIT
 
 # --- Pre-flight checks ---
 
@@ -51,6 +53,9 @@ if [ ! -f "$PIPELINE_SCRIPT" ]; then
     echo "Run: git submodule update --init --recursive"
     exit 1
 fi
+
+# --- Software version capture ---
+capture_software_versions "$RUN_DIR" "dconvatac-gpu" "$CONTAINER"
 
 # --- Run pipeline ---
 

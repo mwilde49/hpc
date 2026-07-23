@@ -167,6 +167,25 @@ YAML
     ts_assert_contains "l2: dconvatac-gpu template wraps invocation with run_logged" \
         "$REPO_ROOT/slurm_templates/dconvatac_gpu_slurm_template.sh" "run_logged"
 
+    # Provenance README: provenance.sh sources cleanly and is wired into
+    # both the CPU and GPU SLURM templates
+    ts_assert_pass "l2: provenance.sh sources cleanly" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh' && source '$REPO_ROOT/bin/lib/provenance.sh'"
+    ts_assert_pass "l2: provenance.sh defines its hooks" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh' && source '$REPO_ROOT/bin/lib/provenance.sh' && declare -f start_console_log capture_software_versions generate_provenance_readme >/dev/null"
+    ts_assert_contains "l2: dconvatac (CPU) template sources provenance.sh" \
+        "$REPO_ROOT/slurm_templates/dconvatac_slurm_template.sh" "provenance.sh"
+    ts_assert_contains "l2: dconvatac (CPU) template captures software versions" \
+        "$REPO_ROOT/slurm_templates/dconvatac_slurm_template.sh" "capture_software_versions"
+    ts_assert_contains "l2: dconvatac (CPU) template generates provenance README on exit" \
+        "$REPO_ROOT/slurm_templates/dconvatac_slurm_template.sh" "generate_provenance_readme"
+    ts_assert_contains "l2: dconvatac-gpu template sources provenance.sh" \
+        "$REPO_ROOT/slurm_templates/dconvatac_gpu_slurm_template.sh" "provenance.sh"
+    ts_assert_contains "l2: dconvatac-gpu template captures software versions" \
+        "$REPO_ROOT/slurm_templates/dconvatac_gpu_slurm_template.sh" "capture_software_versions"
+    ts_assert_contains "l2: dconvatac-gpu template generates provenance README on exit" \
+        "$REPO_ROOT/slurm_templates/dconvatac_gpu_slurm_template.sh" "generate_provenance_readme"
+
     rm -rf "$tmpdir"
 }
 

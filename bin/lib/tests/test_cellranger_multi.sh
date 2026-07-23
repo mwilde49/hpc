@@ -134,6 +134,19 @@ YAML
         bash -c "source '$REPO_ROOT/bin/lib/repro.sh'"
     ts_assert_contains "l2: cellranger-multi template sources repro.sh" \
         "$REPO_ROOT/slurm_templates/cellranger_multi_slurm_template.sh" "repro.sh"
+
+    # Provenance README: provenance.sh sources cleanly and is wired into the
+    # SLURM template
+    ts_assert_pass "l2: provenance.sh sources cleanly" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh' && source '$REPO_ROOT/bin/lib/provenance.sh'"
+    ts_assert_pass "l2: provenance.sh defines its hooks" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh' && source '$REPO_ROOT/bin/lib/provenance.sh' && declare -f start_console_log capture_software_versions generate_provenance_readme >/dev/null"
+    ts_assert_contains "l2: cellranger-multi template sources provenance.sh" \
+        "$REPO_ROOT/slurm_templates/cellranger_multi_slurm_template.sh" "provenance.sh"
+    ts_assert_contains "l2: cellranger-multi template captures software versions" \
+        "$REPO_ROOT/slurm_templates/cellranger_multi_slurm_template.sh" "capture_software_versions"
+    ts_assert_contains "l2: cellranger-multi template generates provenance README on exit" \
+        "$REPO_ROOT/slurm_templates/cellranger_multi_slurm_template.sh" "generate_provenance_readme"
     ts_assert_contains "l2: cellranger-multi template wraps invocation with run_logged" \
         "$REPO_ROOT/slurm_templates/cellranger_multi_slurm_template.sh" "run_logged"
 
@@ -234,6 +247,15 @@ l3_validate_cellranger_multi() {
                        "$work_run/invocation.log" "cellranger-multi-run.sh"
     ts_assert_fail     "cellranger-multi: juno_environment.json end_time populated" \
                        bash -c "grep -q '\"end_time\": null' '$work_run/juno_environment.json'"
+
+    # Provenance README artifacts
+    ts_assert_exists   "cellranger-multi: CONSOLE_LOG.txt"       "$work_run/CONSOLE_LOG.txt"
+    ts_assert_nonempty "cellranger-multi: CONSOLE_LOG.txt"       "$work_run/CONSOLE_LOG.txt"
+    ts_assert_exists   "cellranger-multi: software_versions.txt" "$work_run/software_versions.txt"
+    ts_assert_contains "cellranger-multi: software_versions.txt has cellranger entry" \
+                       "$work_run/software_versions.txt" "cellranger:"
+    ts_assert_exists   "cellranger-multi: PROVENANCE_README.md" "$work_run/PROVENANCE_README.md"
+    ts_assert_nonempty "cellranger-multi: PROVENANCE_README.md" "$work_run/PROVENANCE_README.md"
 }
 
 l3_teardown_cellranger_multi() {

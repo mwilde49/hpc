@@ -28,6 +28,7 @@ SCRATCH_ROOT=/scratch/juno/$USER
 WORK_ROOT=/work/$USER
 
 source "$PROJECT_ROOT/bin/lib/repro.sh"
+source "$PROJECT_ROOT/bin/lib/provenance.sh"
 
 PIPELINE_REPO=$PROJECT_ROOT/containers/sqanti3
 SIF=$PIPELINE_REPO/sqanti3_v5.5.4.sif
@@ -41,9 +42,13 @@ SCRATCH_OUTPUT_DIR=${3:-}
 # Note: this only covers the lightweight orchestrator job itself. The four
 # stage jobs it submits (qc/refqc/filter/rescue) run as separate SLURM jobs
 # from scripts in the containers/sqanti3 submodule and are not instrumented
-# here — that would require changes in that submodule, not this repo.
+# here — that would require changes in that submodule, not this repo. Same
+# scope limit applies to the provenance README below: it documents the
+# orchestrator's own config generation and the 4 sbatch dispatches, not
+# per-stage node/resource/command detail.
 capture_juno_env "$RUN_DIR"
-trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT
+start_console_log "$RUN_DIR"
+trap '_EC=$?; finalize_juno_env "$RUN_DIR" "$_EC"; generate_provenance_readme "$RUN_DIR" "sqanti3" "SQANTI3 — Long-Read Transcriptome QC (Orchestrator)" "$_EC" "$SIF" ""' EXIT
 
 # ── Pre-flight checks ─────────────────────────────────────────────────────────
 
@@ -57,6 +62,10 @@ if [[ ! -f "$SIF" ]]; then
     echo "  Build it: apptainer pull $SIF docker://anaconesalab/sqanti3:v5.5.4"
     exit 1
 fi
+
+# --- Software version capture (the 4 stage jobs use this same SIF; see the
+#     note above for why per-stage capture is out of scope) ---
+capture_software_versions "$RUN_DIR" "sqanti3" "$SIF"
 
 # ── Read user config ──────────────────────────────────────────────────────────
 

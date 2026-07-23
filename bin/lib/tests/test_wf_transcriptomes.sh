@@ -175,6 +175,19 @@ YAML
         bash -c "source '$REPO_ROOT/bin/lib/repro.sh'"
     ts_assert_contains "l2: wf-transcriptomes template sources repro.sh" \
         "$REPO_ROOT/slurm_templates/wf_transcriptomes_slurm_template.sh" "repro.sh"
+
+    # Provenance README: provenance.sh sources cleanly and is wired into the
+    # SLURM template
+    ts_assert_pass "l2: provenance.sh sources cleanly" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh' && source '$REPO_ROOT/bin/lib/provenance.sh'"
+    ts_assert_pass "l2: provenance.sh defines its hooks" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh' && source '$REPO_ROOT/bin/lib/provenance.sh' && declare -f start_console_log capture_software_versions generate_provenance_readme >/dev/null"
+    ts_assert_contains "l2: wf-transcriptomes template sources provenance.sh" \
+        "$REPO_ROOT/slurm_templates/wf_transcriptomes_slurm_template.sh" "provenance.sh"
+    ts_assert_contains "l2: wf-transcriptomes template captures software versions" \
+        "$REPO_ROOT/slurm_templates/wf_transcriptomes_slurm_template.sh" "capture_software_versions"
+    ts_assert_contains "l2: wf-transcriptomes template generates provenance README on exit" \
+        "$REPO_ROOT/slurm_templates/wf_transcriptomes_slurm_template.sh" "generate_provenance_readme"
     ts_assert_contains "l2: wf-transcriptomes template wraps invocation with run_logged" \
         "$REPO_ROOT/slurm_templates/wf_transcriptomes_slurm_template.sh" "run_logged"
     ts_assert_contains "l2: wf-transcriptomes template enables Nextflow trace/report" \
@@ -283,6 +296,19 @@ l3_validate_wf_transcriptomes() {
     ts_assert_exists   "wf-transcriptomes: nextflow_logs/trace.txt"   "$work_run/nextflow_logs/trace.txt"
     ts_assert_fail     "wf-transcriptomes: juno_environment.json end_time populated" \
                        bash -c "grep -q '\"end_time\": null' '$work_run/juno_environment.json'"
+
+    # Provenance README artifacts (Nextflow version only — per-process
+    # containers are managed by the external epi2me-labs workflow, out of
+    # scope to probe directly; see the SLURM template)
+    ts_assert_exists   "wf-transcriptomes: CONSOLE_LOG.txt"            "$work_run/CONSOLE_LOG.txt"
+    ts_assert_nonempty "wf-transcriptomes: CONSOLE_LOG.txt"            "$work_run/CONSOLE_LOG.txt"
+    ts_assert_exists   "wf-transcriptomes: software_versions.txt"      "$work_run/software_versions.txt"
+    ts_assert_contains "wf-transcriptomes: software_versions.txt has Nextflow entry" \
+                       "$work_run/software_versions.txt" "Nextflow:"
+    ts_assert_exists   "wf-transcriptomes: PROVENANCE_README.md"       "$work_run/PROVENANCE_README.md"
+    ts_assert_nonempty "wf-transcriptomes: PROVENANCE_README.md"       "$work_run/PROVENANCE_README.md"
+    ts_assert_contains "wf-transcriptomes: PROVENANCE_README.md has Hyperion banner" \
+                       "$work_run/PROVENANCE_README.md" "H Y P E R I O N"
 }
 
 l3_teardown_wf_transcriptomes() {

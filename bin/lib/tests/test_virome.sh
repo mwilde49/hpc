@@ -171,6 +171,19 @@ YAML
         bash -c "source '$REPO_ROOT/bin/lib/repro.sh'"
     ts_assert_contains "l2: virome template sources repro.sh" \
         "$REPO_ROOT/slurm_templates/virome_slurm_template.sh" "repro.sh"
+
+    # Provenance README: provenance.sh sources cleanly and is wired into the
+    # SLURM template
+    ts_assert_pass "l2: provenance.sh sources cleanly" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh' && source '$REPO_ROOT/bin/lib/provenance.sh'"
+    ts_assert_pass "l2: provenance.sh defines its hooks" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh' && source '$REPO_ROOT/bin/lib/provenance.sh' && declare -f start_console_log capture_software_versions generate_provenance_readme >/dev/null"
+    ts_assert_contains "l2: virome template sources provenance.sh" \
+        "$REPO_ROOT/slurm_templates/virome_slurm_template.sh" "provenance.sh"
+    ts_assert_contains "l2: virome template captures software versions" \
+        "$REPO_ROOT/slurm_templates/virome_slurm_template.sh" "capture_software_versions"
+    ts_assert_contains "l2: virome template generates provenance README on exit" \
+        "$REPO_ROOT/slurm_templates/virome_slurm_template.sh" "generate_provenance_readme"
     ts_assert_contains "l2: virome template wraps invocation with run_logged" \
         "$REPO_ROOT/slurm_templates/virome_slurm_template.sh" "run_logged"
     ts_assert_contains "l2: virome template enables Nextflow trace/report" \
@@ -280,6 +293,17 @@ l3_validate_virome() {
                        bash -c "grep -q '\"end_time\": null' '$work_run/juno_environment.json'"
     ts_assert_fail     "virome: manifest submodule commit resolved" \
                        bash -c "grep -q '\"pipeline_submodule_commit\": \"unknown\"' '$work_run/manifest.json'"
+
+    # Provenance README artifacts
+    ts_assert_exists   "virome: CONSOLE_LOG.txt"            "$work_run/CONSOLE_LOG.txt"
+    ts_assert_nonempty "virome: CONSOLE_LOG.txt"            "$work_run/CONSOLE_LOG.txt"
+    ts_assert_exists   "virome: software_versions.txt"      "$work_run/software_versions.txt"
+    ts_assert_contains "virome: software_versions.txt has fastqc entry" \
+                       "$work_run/software_versions.txt" "fastqc:"
+    ts_assert_exists   "virome: PROVENANCE_README.md"       "$work_run/PROVENANCE_README.md"
+    ts_assert_nonempty "virome: PROVENANCE_README.md"       "$work_run/PROVENANCE_README.md"
+    ts_assert_contains "virome: PROVENANCE_README.md has Hyperion banner" \
+                       "$work_run/PROVENANCE_README.md" "H Y P E R I O N"
 }
 
 l3_teardown_virome() {

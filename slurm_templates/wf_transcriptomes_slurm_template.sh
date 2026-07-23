@@ -22,6 +22,7 @@ set -euo pipefail
 
 PROJECT_ROOT=/groups/tprice/pipelines
 source "$PROJECT_ROOT/bin/lib/repro.sh"
+source "$PROJECT_ROOT/bin/lib/provenance.sh"
 
 PIPELINE_REPO=$PROJECT_ROOT/containers/sqanti3   # longreads repo deployment path
 NEXTFLOW=$PROJECT_ROOT/bin/nextflow
@@ -30,7 +31,8 @@ RUN_DIR="${2:-}"
 
 # --- Reproducibility capture (node, partition, resources, invocation log) ---
 capture_juno_env "$RUN_DIR"
-trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT
+start_console_log "$RUN_DIR"
+trap '_EC=$?; finalize_juno_env "$RUN_DIR" "$_EC"; generate_provenance_readme "$RUN_DIR" "wf-transcriptomes" "wf-transcriptomes — ONT Long-Read Transcriptome Assembly" "$_EC" "$NEXTFLOW (workflow-managed containers — see nextflow_logs/report.html)" "${NF_WORK_DIR:-}"' EXIT
 
 USER_CONFIG="${1:?ERROR: Config not provided}"
 [[ -z "$RUN_DIR" ]] && { echo "ERROR: Run dir not provided" >&2; exit 1; }
@@ -89,6 +91,10 @@ MINIMAP2_OPTS=$(yaml_get "$USER_CONFIG" "minimap2_index_opts")
 NF_WORK_DIR="/scratch/juno/$USER/nf_work/wf_transcriptomes/$SAMPLE"
 
 mkdir -p "$OUTDIR" "$NF_WORK_DIR"
+
+# --- Software version capture (Nextflow itself only — per-process containers
+#     are managed by the external epi2me-labs/wf-transcriptomes workflow) ---
+capture_software_versions "$RUN_DIR" "wf-transcriptomes" "$NEXTFLOW"
 
 echo "====================================================================="
 echo "  wf-transcriptomes — Nextflow head job"

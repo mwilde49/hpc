@@ -117,17 +117,24 @@ run automatically for every pipeline in the registry at manifest-generation time
 
 ### Wiring in the provenance README (all patterns)
 
-> **Rollout status:** wired into `psoma` and `bulkrnaseq` only, as of v7.2.0. The
-> other eleven pipelines still need this — see `bin/lib/provenance.sh`'s module
-> comment. Do it for any pipeline you touch next; new pipelines should ship
-> with it from day one.
+> **Rollout status:** wired into all thirteen pipelines as of v7.3.0. New
+> pipelines must ship with it from day one — see the checklist below.
 
-On top of `repro.sh`, every SLURM template should also source `bin/lib/provenance.sh`
-and call its three hooks, so every run gets a live console transcript, real
-per-tool software versions pulled from the container, and a single polished
-`PROVENANCE_README.md` that signposts everything else in the run directory.
-Copy the pattern from `slurm_templates/psoma_slurm_template.sh` or
-`slurm_templates/bulkrnaseq_slurm_template.sh`:
+On top of `repro.sh`, every SLURM template also sources `bin/lib/provenance.sh`
+and calls its hooks, so every run gets a live console transcript
+(`CONSOLE_LOG.txt`), real software versions pulled from the container/tool
+(`software_versions.txt`), and a single polished `PROVENANCE_README.md` that
+signposts everything else in the run directory. The exact shape depends on
+the pipeline's architecture — pick the closest existing template to copy
+from:
+
+| Architecture | Example template | `capture_software_versions` `<primary>`/`[secondary]` |
+|---|---|---|
+| Single Apptainer container | `psoma`, `bulkrnaseq`, `dconvatac(-gpu)`, `addone` | `<primary>` = path to the `.sif` |
+| Multi-container (per-process `.sif`) | `virome` | `<primary>` = dir holding the per-process `.sif` files; add a `_capture_versions_<pipeline>`-style helper in `provenance.sh` if the tool-per-container mapping isn't 1:1 |
+| Native (no container) | `cellranger`, `cellranger-mkfastq`, `cellranger-multi`, `spaceranger`, `xeniumranger` | `<primary>` = config path (honors a `tool_path:` override), `[secondary]` = repo root holding the tool-discovery helpers (e.g. `containers/10x`) |
+| Nextflow-managed, externally-defined containers | `wf-transcriptomes` | `<primary>` = path to the `nextflow` binary; per-process container versions are out of scope (see the module comment in `provenance.sh`) |
+| Multi-job orchestrator | `sqanti3` | `<primary>` = shared container path; only the orchestrator job itself gets a `PROVENANCE_README.md` — stage sub-jobs live in a separate submodule and are out of scope |
 
 ```bash
 source "$PROJECT_ROOT/bin/lib/repro.sh"
@@ -137,8 +144,8 @@ capture_juno_env "$RUN_DIR"
 start_console_log "$RUN_DIR"
 trap '_EC=$?; finalize_juno_env "$RUN_DIR" "$_EC"; generate_provenance_readme "$RUN_DIR" "<pipeline>" "<Display Name>" "$_EC" "$CONTAINER" "$SCRATCH_ROOT/nextflow_work"' EXIT
 ...
-# after pre-flight checks confirm the container exists, before running the pipeline
-capture_software_versions "$RUN_DIR" "$CONTAINER" "<pipeline>"
+# after pre-flight checks confirm the container/tool exists, before running the pipeline
+capture_software_versions "$RUN_DIR" "<pipeline>" "$CONTAINER"
 ...
 run_logged "${RUN_DIR:+$RUN_DIR/invocation.log}" \
     apptainer exec ... $CONTAINER ...
@@ -147,9 +154,10 @@ run_logged "${RUN_DIR:+$RUN_DIR/invocation.log}" \
 - [ ] `source "$PROJECT_ROOT/bin/lib/provenance.sh"` right after `repro.sh`
 - [ ] `start_console_log "$RUN_DIR"` called right after `capture_juno_env`, before any pre-flight checks, so a pre-flight failure still gets a console transcript
 - [ ] The `EXIT` trap captures `$?` into a local var **once** (`_EC=$?`) and passes it to both `finalize_juno_env` and `generate_provenance_readme` — calling `"$?"` twice in the same trap string is a bug, since the first command can change it before the second reads it
-- [ ] `capture_software_versions "$RUN_DIR" "$CONTAINER" "<pipeline>"` added to `bin/lib/provenance.sh`'s tool-probe `case` statement for the new pipeline, called after the container-exists pre-flight check, before the pipeline runs — reuse the exact `--version` commands the container's own `.def` `%test` block already runs, if it has one
+- [ ] `capture_software_versions "$RUN_DIR" "<pipeline>" "<primary>" ["<secondary>"]` — note the arg order is **`<pipeline>` before `<primary>`**, not the other way around — added to `bin/lib/provenance.sh`'s dispatcher, called after the container/tool-exists pre-flight check, before the pipeline runs. For a single-container pipeline, reuse the exact `--version` commands the container's own `.def` `%test` block already runs, if it has one, rather than guessing tool names/flags.
 - [ ] `generate_provenance_readme` in the trap, **after** `finalize_juno_env` (it reads the finalized `juno_environment.json`)
-- [ ] For Nextflow-based pipelines, pass `$SCRATCH_ROOT/nextflow_work` (or wherever `-w` points) as the trailing arg — that's where `generate_provenance_readme` finds each process's `.command.sh` for the "Per-step tool invocations" section
+- [ ] For Nextflow-based pipelines, pass `$SCRATCH_ROOT/nextflow_work` (or wherever `-w` points) as the trailing arg — that's where `generate_provenance_readme` finds each process's `.command.sh` for the "Per-step tool invocations" section. Pass `""` for non-Nextflow pipelines to skip that section entirely rather than print a misleading "trace.txt not found" message.
+- [ ] If your template runs under `set -euo pipefail` (like `sqanti3`/`wf-transcriptomes`), you don't need to do anything extra — `capture_software_versions` and `generate_provenance_readme` already run their bodies in a `set +e` subshell (`_run_guarded` in `provenance.sh`) specifically so this file's best-effort instrumentation can never abort the pipeline it's documenting. `start_console_log` is the one exception (it must modify the current shell's file descriptors) and saves/restores `set -e` manually instead — copy that pattern if you add another function that can't run in a subshell.
 
 ### After adding any pipeline
 

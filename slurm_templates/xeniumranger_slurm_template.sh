@@ -12,8 +12,10 @@ SCRATCH_ROOT=/scratch/juno/$USER
 WORK_ROOT=/work/$USER
 
 source "$PROJECT_ROOT/bin/lib/repro.sh"
+source "$PROJECT_ROOT/bin/lib/provenance.sh"
 
 WRAPPER=$PROJECT_ROOT/containers/10x/bin/xeniumranger-run.sh
+TENX_REPO_ROOT=$PROJECT_ROOT/containers/10x
 
 # Accept config as $1 (used by tjp-launch)
 CONFIG=${1:-}
@@ -23,7 +25,8 @@ INPUT_DIR=${4:-}
 
 # --- Reproducibility capture (node, partition, resources, invocation log) ---
 capture_juno_env "$RUN_DIR"
-trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT
+start_console_log "$RUN_DIR"
+trap '_EC=$?; finalize_juno_env "$RUN_DIR" "$_EC"; generate_provenance_readme "$RUN_DIR" "xeniumranger" "Xenium Ranger — 10x Genomics Xenium In Situ" "$_EC" "native:xeniumranger" ""' EXIT
 
 # --- Pre-flight checks ---
 
@@ -42,6 +45,9 @@ if [ ! -f "$WRAPPER" ]; then
     echo "Run: git submodule update --init --recursive"
     exit 1
 fi
+
+# --- Software version capture ---
+capture_software_versions "$RUN_DIR" "xeniumranger" "$CONFIG" "$TENX_REPO_ROOT"
 
 # --- Run pipeline ---
 

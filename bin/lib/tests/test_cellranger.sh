@@ -164,6 +164,20 @@ YAML
         bash -c "source '$REPO_ROOT/bin/lib/repro.sh' && declare -f capture_juno_env finalize_juno_env run_logged >/dev/null"
     ts_assert_contains "l2: cellranger template sources repro.sh" \
         "$REPO_ROOT/slurm_templates/cellranger_slurm_template.sh" "repro.sh"
+
+    # Provenance README: provenance.sh sources cleanly and is wired into the
+    # SLURM template. capture_software_versions here resolves the tool
+    # binary directly (no Apptainer container for native 10x pipelines).
+    ts_assert_pass "l2: provenance.sh sources cleanly" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh' && source '$REPO_ROOT/bin/lib/provenance.sh'"
+    ts_assert_pass "l2: provenance.sh defines its hooks" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh' && source '$REPO_ROOT/bin/lib/provenance.sh' && declare -f start_console_log capture_software_versions generate_provenance_readme >/dev/null"
+    ts_assert_contains "l2: cellranger template sources provenance.sh" \
+        "$REPO_ROOT/slurm_templates/cellranger_slurm_template.sh" "provenance.sh"
+    ts_assert_contains "l2: cellranger template captures software versions" \
+        "$REPO_ROOT/slurm_templates/cellranger_slurm_template.sh" "capture_software_versions"
+    ts_assert_contains "l2: cellranger template generates provenance README on exit" \
+        "$REPO_ROOT/slurm_templates/cellranger_slurm_template.sh" "generate_provenance_readme"
     ts_assert_contains "l2: cellranger template wraps invocation with run_logged" \
         "$REPO_ROOT/slurm_templates/cellranger_slurm_template.sh" "run_logged"
 
@@ -270,6 +284,17 @@ l3_validate_cellranger() {
                        bash -c "grep -q '\"exit_code\": null' '$work_run/juno_environment.json'"
     ts_assert_fail     "cellranger: manifest submodule commit resolved" \
                        bash -c "grep -q '\"pipeline_submodule_commit\": \"unknown\"' '$work_run/manifest.json'"
+
+    # Provenance README artifacts
+    ts_assert_exists   "cellranger: CONSOLE_LOG.txt"            "$work_run/CONSOLE_LOG.txt"
+    ts_assert_nonempty "cellranger: CONSOLE_LOG.txt"            "$work_run/CONSOLE_LOG.txt"
+    ts_assert_exists   "cellranger: software_versions.txt"      "$work_run/software_versions.txt"
+    ts_assert_contains "cellranger: software_versions.txt has cellranger entry" \
+                       "$work_run/software_versions.txt" "cellranger:"
+    ts_assert_exists   "cellranger: PROVENANCE_README.md"       "$work_run/PROVENANCE_README.md"
+    ts_assert_nonempty "cellranger: PROVENANCE_README.md"       "$work_run/PROVENANCE_README.md"
+    ts_assert_contains "cellranger: PROVENANCE_README.md labels the native tool row" \
+                       "$work_run/PROVENANCE_README.md" "| Tool | \`cellranger\` |"
 }
 
 l3_teardown_cellranger() {
