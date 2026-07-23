@@ -14,6 +14,7 @@ SCRATCH_ROOT=/scratch/juno/$USER
 WORK_ROOT=/work/$USER
 
 source "$PROJECT_ROOT/bin/lib/repro.sh"
+source "$PROJECT_ROOT/bin/lib/provenance.sh"
 
 CONTAINER=$PROJECT_ROOT/containers/bulkrnaseq/bulkrnaseq_v1.0.0.sif
 PIPELINE_REPO=$PROJECT_ROOT/Bulk-RNA-Seq-Nextflow-Pipeline
@@ -28,7 +29,8 @@ FASTQ_DIR=${4:-}
 
 # --- Reproducibility capture (node, partition, resources, invocation log) ---
 capture_juno_env "$RUN_DIR"
-trap 'finalize_juno_env "$RUN_DIR" "$?"' EXIT
+start_console_log "$RUN_DIR"
+trap '_EC=$?; finalize_juno_env "$RUN_DIR" "$_EC"; generate_provenance_readme "$RUN_DIR" "bulkrnaseq" "BulkRNASeq — UTDal STAR Bulk RNA-Seq" "$_EC" "$CONTAINER" "$SCRATCH_ROOT/nextflow_work"' EXIT
 
 # --- Pre-flight checks ---
 
@@ -48,6 +50,11 @@ if [ ! -f "$PIPELINE_CONFIG" ]; then
     echo "ERROR: Pipeline config not found at $PIPELINE_CONFIG"
     exit 1
 fi
+
+# --- Software version capture (queried live from the container — see
+#     bin/lib/provenance.sh for why these tools aren't version-pinned at
+#     build time) ---
+capture_software_versions "$RUN_DIR" "$CONTAINER" "bulkrnaseq"
 
 # --- Run pipeline ---
 

@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); version
 
 ## [Unreleased]
 
+## [v7.2.0] — 2026-07-23
+
+### Added
+- **Provenance README** (`bin/lib/provenance.sh`), wired into `psoma` and `bulkrnaseq` so far (the other eleven pipelines still need this — see `CONTRIBUTING.md` §3):
+  - `start_console_log` tees the full stdout+stderr transcript of every run into `CONSOLE_LOG.txt` from job start (including pre-flight failures), alongside SLURM's own split `slurm_<jobid>.out`/`.err`.
+  - `capture_software_versions` queries real per-tool version strings (HISAT2, STAR, Trimmomatic, Samtools, Sambamba, Bedtools, StringTie, HTSeq, Qualimap, R/Rsubread, Python/pandas, Nextflow, Java) live from the run's own container into `software_versions.txt`, reusing the exact commands each container's own `.def` `%test` block already runs — necessary because `psomagen.def`/`bulkrnaseq.def` install tools via `mamba install` with no version pins, so the built `.sif` is the only authoritative source.
+  - `generate_provenance_readme` assembles `PROVENANCE_README.md` — a single Hyperion-branded report combining run status/timing, the full `config.yaml`, the software-versions table, the exact pipeline invocation, one representative resolved shell command per Nextflow process (pulled from that task's `.command.sh`, deduplicated across samples), and a signpost table to every other run-directory artifact. Runs from the `EXIT` trap on both success and failure.
+- Layer 2 (offline wiring) and Layer 3 (post-run artifact) `tjp-test-suite` coverage for the new provenance artifacts in `test_psoma.sh`/`test_bulkrnaseq.sh`.
+
 ## [v7.1.0] — 2026-07-23
 
 ### Added
@@ -208,7 +217,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); version
 
 ---
 
-[Unreleased]: https://github.com/mwilde49/hpc/compare/v7.1.0...HEAD
+[Unreleased]: https://github.com/mwilde49/hpc/compare/v7.2.0...HEAD
+[v7.2.0]: https://github.com/mwilde49/hpc/compare/v7.1.0...v7.2.0
 [v7.1.0]: https://github.com/mwilde49/hpc/compare/v7.0.0...v7.1.0
 [v6.1.0]: https://github.com/mwilde49/hpc/compare/v6.0.0...v6.1.0
 [v6.0.0]: https://github.com/mwilde49/hpc/compare/v5.4.0...v6.0.0

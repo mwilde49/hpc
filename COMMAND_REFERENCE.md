@@ -1,6 +1,6 @@
 # Hyperion Compute — Command Reference
 
-**Version:** 7.1.0 | **Cluster:** Juno HPC, UT Dallas | **Updated:** 2026-07-23
+**Version:** 7.2.0 | **Cluster:** Juno HPC, UT Dallas | **Updated:** 2026-07-23
 
 Comprehensive reference for every command available in the Hyperion Compute / TJP pipeline framework. Organized from general cluster commands inward to per-pipeline specifics. Use `Ctrl+F` / `grep` to jump to any command, flag, or config key.
 
@@ -1893,6 +1893,9 @@ Every `tjp-launch`/`tjp-batch` run directory (`/work/$USER/pipelines/<pipeline>/
 | `juno_environment.json` | `bin/lib/repro.sh` | job start → finalized on exit | node, partition, allocated CPUs/mem/GPU, time limit, start/end time, duration, exit code, best-effort `sacct` accounting |
 | `invocation.log` | `bin/lib/repro.sh` (`run_logged`) | during job | the exact, fully-quoted, resolved command line that ran |
 | `nextflow_logs/{trace.txt,report.html,timeline.html,dag.html}` | Nextflow (`-with-trace` etc.) | during job | Nextflow's own per-process command/resource tracing — BulkRNASeq, Psoma, Virome, wf-transcriptomes only |
+| `CONSOLE_LOG.txt` | `bin/lib/provenance.sh` (`start_console_log`) | from job start | full stdout+stderr transcript, chronologically interleaved — Psoma, BulkRNASeq only (v7.2.0+) |
+| `software_versions.txt` | `bin/lib/provenance.sh` (`capture_software_versions`) | pre-run, once container is confirmed | real per-tool version strings queried live from the container (`.sif` build doesn't pin versions) — Psoma, BulkRNASeq only (v7.2.0+) |
+| `PROVENANCE_README.md` | `bin/lib/provenance.sh` (`generate_provenance_readme`) | job exit (success or failure) | single Hyperion-branded report: status, parameters, software versions, exact commands, and a signpost to every other artifact above — Psoma, BulkRNASeq only (v7.2.0+) |
 
 For SQANTI3 (which submits 4 separate stage jobs rather than running the pipeline itself), `invocation.log` in the orchestrator's run dir captures all 4 `sbatch` calls; per-stage node capture is not available (those stage scripts live in the `containers/sqanti3` submodule).
 

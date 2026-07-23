@@ -176,6 +176,14 @@ Note: `snapshot_pipeline_source` detects a submodule with `git -C <dir> rev-pars
 
 Per-stage node/resource capture for SQANTI3's 4 sub-jobs is out of scope here — those stage scripts live in the `containers/sqanti3` submodule, a separate repo.
 
+### Provenance README (v7.2.0, psoma + bulkrnaseq only so far)
+
+`bin/lib/provenance.sh` builds on `repro.sh` to add three more things, currently wired into **psoma and bulkrnaseq only** — the other eleven pipelines still need this (see the module's own header comment and `CONTRIBUTING.md` §3):
+
+- **`CONSOLE_LOG.txt`** — `start_console_log` tees all subsequent stdout/stderr through `exec > >(tee -a ...) 2>&1`, called right after `capture_juno_env` so pre-flight failures are captured too. This duplicates SLURM's own `slurm_<jobid>.out`/`.err` split logs, intentionally — `CONSOLE_LOG.txt` is the single chronologically-interleaved transcript.
+- **`software_versions.txt`** — `capture_software_versions` queries real per-tool version strings (HISAT2, STAR, Trimmomatic, Samtools, Nextflow, etc.) live from the run's container via `apptainer exec`, using the exact commands each container's own `.def` `%test` block already runs. This is necessary, not cosmetic: both `psomagen.def` and `bulkrnaseq.def` install tools via `mamba install` with no version pins, so the built `.sif` is the only source of truth for what actually ran. Called after the container-exists pre-flight check, before the pipeline runs.
+- **`PROVENANCE_README.md`** — `generate_provenance_readme`, called from the `EXIT` trap after `finalize_juno_env`, assembles a single Hyperion-branded Markdown report: run status/timing, the full `config.yaml`, the software-versions table, the pipeline invocation from `invocation.log`, one representative resolved command per Nextflow process (pulled from that task's `.command.sh` in the Nextflow work dir, deduplicated across samples), and a signpost table to every other artifact in the run directory. Runs on both success and failure.
+
 ## BulkRNASeq Pipeline
 
 ### Submodule

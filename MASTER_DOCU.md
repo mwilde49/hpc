@@ -1,6 +1,6 @@
 # Hyperion Compute — Documentation Master Index
 
-**Version:** v7.1.0 &nbsp;|&nbsp; **Last updated:** 2026-07-23 (v7.1.0 — Cell Ranger mkfastq/Multi batch support, DeconvATAC GPU templates/validator, repo-wide consistency audit)
+**Version:** v7.2.0 &nbsp;|&nbsp; **Last updated:** 2026-07-23 (v7.2.0 — Provenance README for Psoma/BulkRNASeq: PROVENANCE_README.md, CONSOLE_LOG.txt, live software-version capture)
 
 This file is the single entry point for all documentation in the TJP HPC pipeline framework. It describes what every document covers, who should read it, and where to look for specific information.
 
@@ -254,7 +254,7 @@ python3 docs/generate_diagrams.py
 
 **What it covers:**
 - Version-by-version changelog in [Keep a Changelog](https://keepachangelog.com/) format
-- Sections for every release from v2.0.0 through v7.1.0, plus an `[Unreleased]` section
+- Sections for every release from v2.0.0 through v7.2.0, plus an `[Unreleased]` section
 - Added / Changed / Fixed / Removed categories per release
 
 **When to read:** When upgrading to a new framework version to understand what changed.

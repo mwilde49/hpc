@@ -115,6 +115,42 @@ run automatically for every pipeline in the registry at manifest-generation time
 (before the job is submitted), as long as the pipeline was added to
 `bin/lib/common.sh` per the steps above.
 
+### Wiring in the provenance README (all patterns)
+
+> **Rollout status:** wired into `psoma` and `bulkrnaseq` only, as of v7.2.0. The
+> other eleven pipelines still need this — see `bin/lib/provenance.sh`'s module
+> comment. Do it for any pipeline you touch next; new pipelines should ship
+> with it from day one.
+
+On top of `repro.sh`, every SLURM template should also source `bin/lib/provenance.sh`
+and call its three hooks, so every run gets a live console transcript, real
+per-tool software versions pulled from the container, and a single polished
+`PROVENANCE_README.md` that signposts everything else in the run directory.
+Copy the pattern from `slurm_templates/psoma_slurm_template.sh` or
+`slurm_templates/bulkrnaseq_slurm_template.sh`:
+
+```bash
+source "$PROJECT_ROOT/bin/lib/repro.sh"
+source "$PROJECT_ROOT/bin/lib/provenance.sh"
+...
+capture_juno_env "$RUN_DIR"
+start_console_log "$RUN_DIR"
+trap '_EC=$?; finalize_juno_env "$RUN_DIR" "$_EC"; generate_provenance_readme "$RUN_DIR" "<pipeline>" "<Display Name>" "$_EC" "$CONTAINER" "$SCRATCH_ROOT/nextflow_work"' EXIT
+...
+# after pre-flight checks confirm the container exists, before running the pipeline
+capture_software_versions "$RUN_DIR" "$CONTAINER" "<pipeline>"
+...
+run_logged "${RUN_DIR:+$RUN_DIR/invocation.log}" \
+    apptainer exec ... $CONTAINER ...
+```
+
+- [ ] `source "$PROJECT_ROOT/bin/lib/provenance.sh"` right after `repro.sh`
+- [ ] `start_console_log "$RUN_DIR"` called right after `capture_juno_env`, before any pre-flight checks, so a pre-flight failure still gets a console transcript
+- [ ] The `EXIT` trap captures `$?` into a local var **once** (`_EC=$?`) and passes it to both `finalize_juno_env` and `generate_provenance_readme` — calling `"$?"` twice in the same trap string is a bug, since the first command can change it before the second reads it
+- [ ] `capture_software_versions "$RUN_DIR" "$CONTAINER" "<pipeline>"` added to `bin/lib/provenance.sh`'s tool-probe `case` statement for the new pipeline, called after the container-exists pre-flight check, before the pipeline runs — reuse the exact `--version` commands the container's own `.def` `%test` block already runs, if it has one
+- [ ] `generate_provenance_readme` in the trap, **after** `finalize_juno_env` (it reads the finalized `juno_environment.json`)
+- [ ] For Nextflow-based pipelines, pass `$SCRATCH_ROOT/nextflow_work` (or wherever `-w` points) as the trailing arg — that's where `generate_provenance_readme` finds each process's `.command.sh` for the "Per-step tool invocations" section
+
 ### After adding any pipeline
 
 - [ ] Run `bin/check-docs-freshness` and fix any reported gaps

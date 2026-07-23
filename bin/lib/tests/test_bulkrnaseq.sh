@@ -160,6 +160,20 @@ YAML
     ts_assert_contains "l2: bulkrnaseq template enables Nextflow trace/report" \
         "$REPO_ROOT/slurm_templates/bulkrnaseq_slurm_template.sh" "with-trace"
 
+    # Provenance README: provenance.sh sources cleanly and is wired into the
+    # SLURM template (console log tee, live software-version capture,
+    # PROVENANCE_README.md generated in the EXIT trap)
+    ts_assert_pass "l2: provenance.sh sources cleanly" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh' && source '$REPO_ROOT/bin/lib/provenance.sh'"
+    ts_assert_pass "l2: provenance.sh defines its hooks" \
+        bash -c "source '$REPO_ROOT/bin/lib/repro.sh' && source '$REPO_ROOT/bin/lib/provenance.sh' && declare -f start_console_log capture_software_versions generate_provenance_readme >/dev/null"
+    ts_assert_contains "l2: bulkrnaseq template sources provenance.sh" \
+        "$REPO_ROOT/slurm_templates/bulkrnaseq_slurm_template.sh" "provenance.sh"
+    ts_assert_contains "l2: bulkrnaseq template captures software versions" \
+        "$REPO_ROOT/slurm_templates/bulkrnaseq_slurm_template.sh" "capture_software_versions"
+    ts_assert_contains "l2: bulkrnaseq template generates provenance README on exit" \
+        "$REPO_ROOT/slurm_templates/bulkrnaseq_slurm_template.sh" "generate_provenance_readme"
+
     rm -rf "$tmpdir"
 }
 
@@ -252,6 +266,19 @@ l3_validate_bulkrnaseq() {
                        bash -c "grep -q '\"exit_code\": null' '$latest_run/juno_environment.json'"
     ts_assert_fail     "bulkrnaseq: manifest submodule commit resolved" \
                        bash -c "grep -q '\"pipeline_submodule_commit\": \"unknown\"' '$latest_run/manifest.json'"
+
+    # Provenance README artifacts
+    ts_assert_exists   "bulkrnaseq: CONSOLE_LOG.txt"            "$latest_run/CONSOLE_LOG.txt"
+    ts_assert_nonempty "bulkrnaseq: CONSOLE_LOG.txt"            "$latest_run/CONSOLE_LOG.txt"
+    ts_assert_exists   "bulkrnaseq: software_versions.txt"      "$latest_run/software_versions.txt"
+    ts_assert_contains "bulkrnaseq: software_versions.txt has STAR entry" \
+                       "$latest_run/software_versions.txt" "STAR:"
+    ts_assert_exists   "bulkrnaseq: PROVENANCE_README.md"       "$latest_run/PROVENANCE_README.md"
+    ts_assert_nonempty "bulkrnaseq: PROVENANCE_README.md"       "$latest_run/PROVENANCE_README.md"
+    ts_assert_contains "bulkrnaseq: PROVENANCE_README.md has Hyperion banner" \
+                       "$latest_run/PROVENANCE_README.md" "H Y P E R I O N"
+    ts_assert_contains "bulkrnaseq: PROVENANCE_README.md has software versions section" \
+                       "$latest_run/PROVENANCE_README.md" "## 3. Software Versions"
 }
 
 l3_teardown_bulkrnaseq() {
