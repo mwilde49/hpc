@@ -28,3 +28,17 @@ test_data/rnaseq/fastq/
 
 # Metadata store data (lives on HPC work filesystem, not in repo)
 metadata/pipeline_runs/
+
+# Nextflow's own log/cache files — created wherever `nextflow` is invoked
+# from as CWD (e.g. ad-hoc manual runs, or local testing outside the normal
+# scratch-staged flow). Seen accumulating both in local dev testing and
+# directly on the Juno production checkout.
+.nextflow.log
+.nextflow.log.*
+.nextflow/
+bin/.nextflow.log
+bin/.nextflow.log.*
+bin/.nextflow/
+
+# JVM crash logs (e.g. from Qualimap/Nextflow's own JVM)
+hs_err_pid*.log
