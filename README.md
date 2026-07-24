@@ -2,7 +2,7 @@
 
 HPC pipeline framework for the TJP group on Juno HPC (UT Dallas). Uses Apptainer containers, SLURM scheduling, and config-driven YAML execution. Deployed to the shared group location at `/groups/tprice/pipelines`.
 
-**Version:** v7.3.1 &nbsp;|&nbsp; **Platform:** Juno HPC &nbsp;|&nbsp; **Branding:** Hyperion Compute
+**Version:** v7.3.2 &nbsp;|&nbsp; **Platform:** Juno HPC &nbsp;|&nbsp; **Branding:** Hyperion Compute
 
 ---
 

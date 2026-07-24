@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); version
 
 ## [Unreleased]
 
+## [v7.3.2] — 2026-07-23
+
+### Fixed
+- `slurm_templates/psoma_slurm_template.sh`: `#SBATCH --time` bumped from `12:00:00` to `48:00:00`. Found as an uncommitted local edit directly on the Juno production deployment while preparing to pull v7.3.1 there — someone had hand-patched the time limit on production (presumably because a real run needed more than 12h) and it was never committed, so every prior release silently reverted it back to 12h. Committing it here so it's no longer lost on the next update.
+
 ## [v7.3.1] — 2026-07-23
 
 ### Added
@@ -243,7 +248,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); version
 
 ---
 
-[Unreleased]: https://github.com/mwilde49/hpc/compare/v7.3.1...HEAD
+[Unreleased]: https://github.com/mwilde49/hpc/compare/v7.3.2...HEAD
+[v7.3.2]: https://github.com/mwilde49/hpc/compare/v7.3.1...v7.3.2
 [v7.3.1]: https://github.com/mwilde49/hpc/compare/v7.3.0...v7.3.1
 [v7.3.0]: https://github.com/mwilde49/hpc/compare/v7.2.0...v7.3.0
 [v7.2.0]: https://github.com/mwilde49/hpc/compare/v7.1.0...v7.2.0

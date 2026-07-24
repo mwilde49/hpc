@@ -1,0 +1,180 @@
+Jul-23 18:57:46.902 [main] DEBUG nextflow.cli.Launcher - $> nextflow run /home/mwild/.tjp_local_test/external_repos/Bulk-RNA-Seq-Nextflow-Pipeline/bulk_rna_seq_nextflow_pipeline.nf -c /home/mwild/.tjp_local_test/work/mwild/pipelines/bulkrnaseq/runs/manifest_check_2026-07-23_18-57-39/config.yaml -w /home/mwild/.tjp_local_test/scratch/mwild/nextflow_work -with-trace /home/mwild/.tjp_local_test/work/mwild/pipelines/bulkrnaseq/runs/manifest_check_2026-07-23_18-57-39/nextflow_logs/trace.txt -with-report /home/mwild/.tjp_local_test/work/mwild/pipelines/bulkrnaseq/runs/manifest_check_2026-07-23_18-57-39/nextflow_logs/report.html -with-timeline /home/mwild/.tjp_local_test/work/mwild/pipelines/bulkrnaseq/runs/manifest_check_2026-07-23_18-57-39/nextflow_logs/timeline.html -with-dag /home/mwild/.tjp_local_test/work/mwild/pipelines/bulkrnaseq/runs/manifest_check_2026-07-23_18-57-39/nextflow_logs/dag.html
+Jul-23 18:57:47.026 [main] DEBUG nextflow.cli.CmdRun - N E X T F L O W  ~  version 24.04.2
+Jul-23 18:57:47.055 [main] DEBUG nextflow.plugin.PluginsFacade - Setting up plugin manager > mode=prod; embedded=false; plugins-dir=/tmp/nxf_home/plugins; core-plugins: nf-amazon@2.5.2,nf-azure@1.6.0,nf-cloudcache@0.4.1,nf-codecommit@0.2.0,nf-console@1.1.3,nf-ga4gh@1.3.0,nf-google@1.13.2,nf-tower@1.9.1,nf-wave@1.4.2
+Jul-23 18:57:47.069 [main] INFO  o.pf4j.DefaultPluginStatusProvider - Enabled plugins: []
+Jul-23 18:57:47.072 [main] INFO  o.pf4j.DefaultPluginStatusProvider - Disabled plugins: []
+Jul-23 18:57:47.076 [main] INFO  org.pf4j.DefaultPluginManager - PF4J version 3.10.0 in 'deployment' mode
+Jul-23 18:57:47.103 [main] INFO  org.pf4j.AbstractPluginManager - No plugins
+Jul-23 18:57:47.141 [main] DEBUG nextflow.config.ConfigBuilder - User config file: /home/mwild/.tjp_local_test/work/mwild/pipelines/bulkrnaseq/runs/manifest_check_2026-07-23_18-57-39/config.yaml
+Jul-23 18:57:47.143 [main] DEBUG nextflow.config.ConfigBuilder - Parsing config file: /home/mwild/.tjp_local_test/work/mwild/pipelines/bulkrnaseq/runs/manifest_check_2026-07-23_18-57-39/config.yaml
+Jul-23 18:57:47.184 [main] DEBUG n.secret.LocalSecretsProvider - Secrets store: /tmp/nxf_home/secrets/store.json
+Jul-23 18:57:47.188 [main] DEBUG nextflow.secret.SecretsLoader - Discovered secrets providers: [nextflow.secret.LocalSecretsProvider@143d9a93] - activable => nextflow.secret.LocalSecretsProvider@143d9a93
+Jul-23 18:57:47.194 [main] DEBUG nextflow.config.ConfigBuilder - Applying config profile: `standard`
+Jul-23 18:57:47.764 [main] DEBUG nextflow.cli.CmdRun - Applied DSL=2 by global default
+Jul-23 18:57:47.792 [main] DEBUG nextflow.cli.CmdRun - Launching `/home/mwild/.tjp_local_test/external_repos/Bulk-RNA-Seq-Nextflow-Pipeline/bulk_rna_seq_nextflow_pipeline.nf` [elegant_solvay] DSL2 - revision: f7120161dc
+Jul-23 18:57:47.795 [main] DEBUG nextflow.plugin.PluginsFacade - Plugins default=[]
+Jul-23 18:57:47.796 [main] DEBUG nextflow.plugin.PluginsFacade - Plugins resolved requirement=[]
+Jul-23 18:57:47.866 [main] DEBUG nextflow.Session - Session UUID: c411d725-8353-4a6e-81e1-7fe00373beb4
+Jul-23 18:57:47.867 [main] DEBUG nextflow.Session - Run name: elegant_solvay
+Jul-23 18:57:47.867 [main] DEBUG nextflow.Session - Executor pool size: 32
+Jul-23 18:57:47.875 [main] DEBUG nextflow.file.FilePorter - File porter settings maxRetries=3; maxTransfers=50; pollTimeout=null
+Jul-23 18:57:47.883 [main] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'FileTransfer' minSize=10; maxSize=96; workQueue=LinkedBlockingQueue[10000]; allowCoreThreadTimeout=false
+Jul-23 18:57:47.910 [main] DEBUG nextflow.cli.CmdRun - 
+  Version: 24.04.2 build 5914
+  Created: 29-05-2024 06:19 UTC (01:19 CDT)
+  System: Linux 6.6.87.2-microsoft-standard-WSL2
+  Runtime: Groovy 4.0.21 on OpenJDK 64-Bit Server VM 17.0.19+10
+  Encoding: UTF-8 (UTF-8)
+  Process: 299850@MSI [127.0.1.1]
+  CPUs: 32 - Mem: 46.6 GB (41.7 GB) - Swap: 12 GB (12 GB)
+Jul-23 18:57:47.950 [main] DEBUG nextflow.Session - Work-dir: /home/mwild/.tjp_local_test/scratch/mwild/nextflow_work [ext2/ext3]
+Jul-23 18:57:47.951 [main] DEBUG nextflow.Session - Script base path does not exist or is not a directory: /home/mwild/.tjp_local_test/external_repos/Bulk-RNA-Seq-Nextflow-Pipeline/bin
+Jul-23 18:57:47.961 [main] DEBUG nextflow.executor.ExecutorFactory - Extension executors providers=[]
+Jul-23 18:57:47.969 [main] DEBUG nextflow.Session - Observer factory: DefaultObserverFactory
+Jul-23 18:57:48.025 [main] DEBUG nextflow.cache.CacheFactory - Using Nextflow cache factory: nextflow.cache.DefaultCacheFactory
+Jul-23 18:57:48.038 [main] DEBUG nextflow.util.CustomThreadPool - Creating default thread pool > poolSize: 33; maxThreads: 1000
+Jul-23 18:57:48.143 [main] DEBUG nextflow.Session - Session start
+Jul-23 18:57:48.147 [main] DEBUG nextflow.trace.TraceFileObserver - Workflow started -- trace file: /home/mwild/.tjp_local_test/work/mwild/pipelines/bulkrnaseq/runs/manifest_check_2026-07-23_18-57-39/nextflow_logs/trace.txt
+Jul-23 18:57:49.074 [main] DEBUG nextflow.script.ScriptRunner - > Launching execution
+Jul-23 18:57:49.084 [main] INFO  nextflow.script.BaseScript - Bulk RNA-seq Pipeline
+Jul-23 18:57:49.085 [main] INFO  nextflow.script.BaseScript -   
+Jul-23 18:57:49.085 [main] INFO  nextflow.script.BaseScript - Here are the steps involved in the Bulk RNA-seq Analysis:
+Jul-23 18:57:49.086 [main] INFO  nextflow.script.BaseScript - 1. Quality Control - Generate FastQC and MultiQC reports
+Jul-23 18:57:49.087 [main] INFO  nextflow.script.BaseScript - 2. Genome Alignment - Map reads to the reference genome using STAR
+Jul-23 18:57:49.087 [main] INFO  nextflow.script.BaseScript - 2_1. Mapping Metrics - Generate mapping statistics and quality reports
+Jul-23 18:57:49.088 [main] INFO  nextflow.script.BaseScript - 3. Post-Alignment Processing - Filter, deduplicate, and index aligned reads
+Jul-23 18:57:49.088 [main] INFO  nextflow.script.BaseScript - 3_1. Quality Assessment - Generate Qualimap reports for aligned reads
+Jul-23 18:57:49.089 [main] INFO  nextflow.script.BaseScript - 4. Transcript Assembly and Quantification - Generate counts using StringTie
+Jul-23 18:57:49.089 [main] INFO  nextflow.script.BaseScript - 5. Raw Count Generation - Generate raw counts using HTSeq && Feature Counts - Generate counts using Rsubread's featureCounts
+Jul-23 18:57:49.125 [main] INFO  nextflow.Nextflow -  
+Jul-23 18:57:49.126 [main] INFO  nextflow.Nextflow - Config directory: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot
+Jul-23 18:57:49.127 [main] INFO  nextflow.Nextflow - Fastq files directory: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/test_data/fastq
+Jul-23 18:57:49.127 [main] INFO  nextflow.Nextflow -  
+Jul-23 18:57:49.131 [main] INFO  nextflow.Nextflow - Running FastQC and MultiQC
+Jul-23 18:57:49.132 [main] INFO  nextflow.script.BaseScript - FastQC and MultiQC output directory: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/fastqc_and_multiqc_reports
+Jul-23 18:57:49.133 [main] INFO  nextflow.script.BaseScript - No. of cores to be used for generating FastQC reports: 2
+Jul-23 18:57:49.211 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Jul-23 18:57:49.212 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Jul-23 18:57:49.218 [main] DEBUG nextflow.executor.Executor - [warm up] executor > local
+Jul-23 18:57:49.224 [main] DEBUG n.processor.LocalPollingMonitor - Creating local task monitor for executor 'local' > cpus=32; memory=46.6 GB; capacity=32; pollInterval=100ms; dumpInterval=5m
+Jul-23 18:57:49.227 [main] DEBUG n.processor.TaskPollingMonitor - >>> barrier register (monitor: local)
+Jul-23 18:57:49.302 [main] INFO  nextflow.Nextflow - Running STAR Mapping
+Jul-23 18:57:49.304 [main] INFO  nextflow.script.BaseScript - STAR mapping output directory: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/2_star_mapping_output
+Jul-23 18:57:49.314 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Jul-23 18:57:49.315 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Jul-23 18:57:49.323 [main] INFO  nextflow.Nextflow - Generating Mapping Metrics
+Jul-23 18:57:49.328 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Jul-23 18:57:49.328 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Jul-23 18:57:49.335 [main] INFO  nextflow.Nextflow - Running Filtering and Deduplication
+Jul-23 18:57:49.336 [main] INFO  nextflow.script.BaseScript - Filtering, deduplication and sorting output directory: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/3_filter_output
+Jul-23 18:57:49.342 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Jul-23 18:57:49.343 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Jul-23 18:57:49.351 [main] INFO  nextflow.Nextflow - Running Qualimap for quality control
+Jul-23 18:57:49.352 [main] INFO  nextflow.script.BaseScript - Generating qualimap reports for filtered BAM files: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/3_1_qualimap_filter_output_qc
+Jul-23 18:57:49.359 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Jul-23 18:57:49.360 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Jul-23 18:57:49.366 [main] INFO  nextflow.Nextflow - Running StringTie and Raw Counts Generation
+Jul-23 18:57:49.385 [main] INFO  nextflow.script.BaseScript - Generating StringTie and raw counts in: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/4_stringtie_counts_output and /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/5_raw_counts_output
+Jul-23 18:57:49.392 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Jul-23 18:57:49.393 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Jul-23 18:57:49.403 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Jul-23 18:57:49.403 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Jul-23 18:57:49.413 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Jul-23 18:57:49.414 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Jul-23 18:57:49.419 [main] INFO  nextflow.Nextflow - Generating Pipeline Stats
+Jul-23 18:57:49.420 [main] INFO  nextflow.script.BaseScript - Generating Stats for the current run: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/6_pipeline_stats_<TIMESTAMP>.log
+Jul-23 18:57:49.423 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Jul-23 18:57:49.424 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Jul-23 18:57:49.430 [main] DEBUG nextflow.Session - Workflow process names [dsl2]: generate_feature_counts, generate_stats, generate_fastqc_multiqc_reports, star_mapping, generate_stringtie_counts, generate_mapping_metrics, generate_qualimap_reports, filter_samples, generate_raw_counts
+Jul-23 18:57:49.433 [main] DEBUG nextflow.Session - Igniting dataflow network (9)
+Jul-23 18:57:49.434 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > generate_fastqc_multiqc_reports
+Jul-23 18:57:49.435 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > star_mapping
+Jul-23 18:57:49.435 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > generate_mapping_metrics
+Jul-23 18:57:49.436 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > filter_samples
+Jul-23 18:57:49.437 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > generate_qualimap_reports
+Jul-23 18:57:49.438 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > generate_stringtie_counts
+Jul-23 18:57:49.438 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > generate_feature_counts
+Jul-23 18:57:49.439 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > generate_raw_counts
+Jul-23 18:57:49.439 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > generate_stats
+Jul-23 18:57:49.440 [main] DEBUG nextflow.script.ScriptRunner - Parsed script files:
+  Script_d28186ed17915562: /home/mwild/.tjp_local_test/external_repos/Bulk-RNA-Seq-Nextflow-Pipeline/bulk_rna_seq_nextflow_pipeline.nf
+Jul-23 18:57:49.441 [main] DEBUG nextflow.script.ScriptRunner - > Awaiting termination 
+Jul-23 18:57:49.441 [main] DEBUG nextflow.Session - Session await
+Jul-23 18:57:49.575 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Jul-23 18:57:49.578 [Task submitter] INFO  nextflow.Session - [37/d10b16] Submitted process > generate_fastqc_multiqc_reports
+Jul-23 18:57:49.589 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Jul-23 18:57:49.590 [Task submitter] INFO  nextflow.Session - [b6/6000d6] Submitted process > star_mapping
+Jul-23 18:57:49.780 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 2; name: star_mapping; status: COMPLETED; exit: 0; error: -; workDir: /home/mwild/.tjp_local_test/scratch/mwild/nextflow_work/b6/6000d6c850e6ed61e0a0a10c19f4d3]
+Jul-23 18:57:49.781 [Task monitor] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'TaskFinalizer' minSize=10; maxSize=96; workQueue=LinkedBlockingQueue[10000]; allowCoreThreadTimeout=false
+Jul-23 18:57:49.814 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Jul-23 18:57:49.815 [Task submitter] INFO  nextflow.Session - [c9/9f841d] Submitted process > generate_mapping_metrics
+Jul-23 18:57:49.821 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Jul-23 18:57:49.822 [Task submitter] INFO  nextflow.Session - [17/31ca62] Submitted process > filter_samples
+Jul-23 18:57:49.848 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 1; name: generate_fastqc_multiqc_reports; status: COMPLETED; exit: 0; error: -; workDir: /home/mwild/.tjp_local_test/scratch/mwild/nextflow_work/37/d10b163fbea1959e5cc50c13fb0653]
+Jul-23 18:57:49.951 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 3; name: filter_samples; status: COMPLETED; exit: 1; error: -; workDir: /home/mwild/.tjp_local_test/scratch/mwild/nextflow_work/17/31ca629bb291bcfc5876410ca0cbc2]
+Jul-23 18:57:49.956 [TaskFinalizer-3] DEBUG nextflow.processor.TaskProcessor - Handling unexpected condition for
+  task: name=filter_samples; work-dir=/home/mwild/.tjp_local_test/scratch/mwild/nextflow_work/17/31ca629bb291bcfc5876410ca0cbc2
+  error [nextflow.exception.ProcessFailedException]: Process `filter_samples` terminated with an error exit status (1)
+Jul-23 18:57:49.978 [TaskFinalizer-3] ERROR nextflow.processor.TaskProcessor - Error executing process > 'filter_samples'
+
+Caused by:
+  Process `filter_samples` terminated with an error exit status (1)
+
+
+Command executed:
+
+  echo "[INFO] Starting filtering and deduplication at $(date)" | tee -a /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/0_nextflow_logs/filtering.log
+  
+  if [ ! -f "/home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/dedup_and_filtering.sh" ]; then
+      echo "[ERROR] Deduplication and filtering script not found: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/dedup_and_filtering.sh" | tee -a /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/0_nextflow_logs/filtering.log
+      exit 1
+  fi
+  
+  if [ ! -f "" ] && [ ! -f "/home/mwild/.tjp_local_test/groups_tprice_pipelines/references/tiny/placeholder_exclude.bed" ]; then
+      echo "[ERROR] Both blacklist and exclude BED files are missing." | tee -a /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/0_nextflow_logs/filtering.log
+      exit 1
+  fi
+  
+  echo "[INFO] Running deduplication and filtering with the following parameters:" | tee -a /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/0_nextflow_logs/filtering.log
+  echo "  Config directory: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot" | tee -a /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/0_nextflow_logs/filtering.log
+  echo "  Number of threads: 2" | tee -a /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/0_nextflow_logs/filtering.log
+  echo "  Blacklist BED file: " | tee -a /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/0_nextflow_logs/filtering.log
+  echo "  Exclude BED file: /home/mwild/.tjp_local_test/groups_tprice_pipelines/references/tiny/placeholder_exclude.bed" | tee -a /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/0_nextflow_logs/filtering.log
+  
+  echo '/home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/dedup_and_filtering.sh /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot 2  /home/mwild/.tjp_local_test/groups_tprice_pipelines/references/tiny/placeholder_exclude.bed' | tee -a /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/0_nextflow_logs/filtering.log
+  bash /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/dedup_and_filtering.sh /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot 2  /home/mwild/.tjp_local_test/groups_tprice_pipelines/references/tiny/placeholder_exclude.bed | tee -a /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/0_nextflow_logs/filtering.log
+  if [ "$?" -ne 0 ]; then
+      echo "[ERROR] Filtering and deduplication failed" | tee -a /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/0_nextflow_logs/filtering.log
+      exit 1
+  else
+      echo "[INFO] Filtering and deduplication completed successfully at $(date)" | tee -a /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/0_nextflow_logs/filtering.log
+  fi
+  
+  echo "[INFO] Filtering process completed at $(date)" | tee -a /home/mwild/.tjp_local_test/scratch/mwild/pipelines/bulkrnaseq/runs/tier0_pilot/0_nextflow_logs/filtering.log
+
+Command exit status:
+  1
+
+Command output:
+  [INFO] Starting filtering and deduplication at Thu Jul 23 18:57:49 CDT 2026
+  [ERROR] Both blacklist and exclude BED files are missing.
+
+Command error:
+  [INFO] Starting filtering and deduplication at Thu Jul 23 18:57:49 CDT 2026
+  [ERROR] Both blacklist and exclude BED files are missing.
+
+Work dir:
+  /home/mwild/.tjp_local_test/scratch/mwild/nextflow_work/17/31ca629bb291bcfc5876410ca0cbc2
+
+Tip: you can replicate the issue by changing to the process work dir and entering the command `bash .command.run`
+Jul-23 18:57:49.983 [TaskFinalizer-3] DEBUG nextflow.Session - Session aborted -- Cause: Process `filter_samples` terminated with an error exit status (1)
+Jul-23 18:57:50.006 [main] DEBUG nextflow.Session - Session await > all processes finished
+Jul-23 18:57:50.006 [Task monitor] DEBUG n.processor.TaskPollingMonitor - <<< barrier arrives (monitor: local) - terminating tasks monitor poll loop
+Jul-23 18:57:50.006 [main] DEBUG nextflow.Session - Session await > all barriers passed
+Jul-23 18:57:50.012 [main] WARN  n.processor.TaskPollingMonitor - Killing running tasks (1)
+Jul-23 18:57:50.030 [main] DEBUG n.trace.WorkflowStatsObserver - Workflow completed > WorkflowStats[succeededCount=2; failedCount=1; ignoredCount=0; cachedCount=0; pendingCount=0; submittedCount=0; runningCount=0; retriesCount=0; abortedCount=1; succeedDuration=231ms; failedDuration=101ms; cachedDuration=0ms;loadCpus=0; loadMemory=0; peakRunning=3; peakCpus=3; peakMemory=0; ]
+Jul-23 18:57:50.031 [main] DEBUG nextflow.trace.TraceFileObserver - Workflow completed -- saving trace file
+Jul-23 18:57:50.032 [main] DEBUG nextflow.trace.ReportObserver - Workflow completed -- rendering execution report
+Jul-23 18:57:50.327 [main] DEBUG nextflow.trace.TimelineObserver - Workflow completed -- rendering execution timeline
+Jul-23 18:57:50.402 [main] DEBUG nextflow.cache.CacheDB - Closing CacheDB done
+Jul-23 18:57:50.426 [main] DEBUG nextflow.script.ScriptRunner - > Execution complete -- Goodbye

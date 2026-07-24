@@ -1,6 +1,6 @@
 # Hyperion Compute — Troubleshooting Guide
 
-**Version:** 7.3.1 | **Cluster:** Juno HPC, UT Dallas | **Updated:** 2026-07-23
+**Version:** 7.3.2 | **Cluster:** Juno HPC, UT Dallas | **Updated:** 2026-07-23
 
 ---
 

@@ -1,0 +1,198 @@
+Jul-23 18:43:39.304 [main] DEBUG nextflow.cli.Launcher - $> nextflow run /home/mwild/.tjp_local_test/groups_tprice_pipelines/containers/psoma/psomagen_bulk_rna_seq_pipeline.nf -c /home/mwild/.tjp_local_test/work/mwild/pipelines/psoma/runs/manifest_check_2026-07-23_18-43-31/config.yaml -w /home/mwild/.tjp_local_test/scratch/mwild/nextflow_work -with-trace /home/mwild/.tjp_local_test/work/mwild/pipelines/psoma/runs/manifest_check_2026-07-23_18-43-31/nextflow_logs/trace.txt -with-report /home/mwild/.tjp_local_test/work/mwild/pipelines/psoma/runs/manifest_check_2026-07-23_18-43-31/nextflow_logs/report.html -with-timeline /home/mwild/.tjp_local_test/work/mwild/pipelines/psoma/runs/manifest_check_2026-07-23_18-43-31/nextflow_logs/timeline.html -with-dag /home/mwild/.tjp_local_test/work/mwild/pipelines/psoma/runs/manifest_check_2026-07-23_18-43-31/nextflow_logs/dag.html
+Jul-23 18:43:39.392 [main] DEBUG nextflow.cli.CmdRun - N E X T F L O W  ~  version 24.04.2
+Jul-23 18:43:39.421 [main] DEBUG nextflow.plugin.PluginsFacade - Setting up plugin manager > mode=prod; embedded=false; plugins-dir=/tmp/nxf_home/plugins; core-plugins: nf-amazon@2.5.2,nf-azure@1.6.0,nf-cloudcache@0.4.1,nf-codecommit@0.2.0,nf-console@1.1.3,nf-ga4gh@1.3.0,nf-google@1.13.2,nf-tower@1.9.1,nf-wave@1.4.2
+Jul-23 18:43:39.441 [main] INFO  o.pf4j.DefaultPluginStatusProvider - Enabled plugins: []
+Jul-23 18:43:39.443 [main] INFO  o.pf4j.DefaultPluginStatusProvider - Disabled plugins: []
+Jul-23 18:43:39.446 [main] INFO  org.pf4j.DefaultPluginManager - PF4J version 3.10.0 in 'deployment' mode
+Jul-23 18:43:39.469 [main] INFO  org.pf4j.AbstractPluginManager - No plugins
+Jul-23 18:43:39.514 [main] DEBUG nextflow.config.ConfigBuilder - User config file: /home/mwild/.tjp_local_test/work/mwild/pipelines/psoma/runs/manifest_check_2026-07-23_18-43-31/config.yaml
+Jul-23 18:43:39.516 [main] DEBUG nextflow.config.ConfigBuilder - Parsing config file: /home/mwild/.tjp_local_test/work/mwild/pipelines/psoma/runs/manifest_check_2026-07-23_18-43-31/config.yaml
+Jul-23 18:43:39.560 [main] DEBUG n.secret.LocalSecretsProvider - Secrets store: /tmp/nxf_home/secrets/store.json
+Jul-23 18:43:39.564 [main] DEBUG nextflow.secret.SecretsLoader - Discovered secrets providers: [nextflow.secret.LocalSecretsProvider@6f8d7714] - activable => nextflow.secret.LocalSecretsProvider@6f8d7714
+Jul-23 18:43:39.571 [main] DEBUG nextflow.config.ConfigBuilder - Applying config profile: `standard`
+Jul-23 18:43:40.172 [main] DEBUG nextflow.cli.CmdRun - Applied DSL=2 by global default
+Jul-23 18:43:40.211 [main] DEBUG nextflow.cli.CmdRun - Launching `/home/mwild/.tjp_local_test/groups_tprice_pipelines/containers/psoma/psomagen_bulk_rna_seq_pipeline.nf` [tender_waddington] DSL2 - revision: ac677d8adc
+Jul-23 18:43:40.215 [main] DEBUG nextflow.plugin.PluginsFacade - Plugins default=[]
+Jul-23 18:43:40.215 [main] DEBUG nextflow.plugin.PluginsFacade - Plugins resolved requirement=[]
+Jul-23 18:43:40.293 [main] DEBUG nextflow.Session - Session UUID: 5933840c-4b93-4fd3-a238-c553d8ccbcd5
+Jul-23 18:43:40.294 [main] DEBUG nextflow.Session - Run name: tender_waddington
+Jul-23 18:43:40.295 [main] DEBUG nextflow.Session - Executor pool size: 32
+Jul-23 18:43:40.306 [main] DEBUG nextflow.file.FilePorter - File porter settings maxRetries=3; maxTransfers=50; pollTimeout=null
+Jul-23 18:43:40.316 [main] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'FileTransfer' minSize=10; maxSize=96; workQueue=LinkedBlockingQueue[10000]; allowCoreThreadTimeout=false
+Jul-23 18:43:40.350 [main] DEBUG nextflow.cli.CmdRun - 
+  Version: 24.04.2 build 5914
+  Created: 29-05-2024 06:19 UTC (01:19 CDT)
+  System: Linux 6.6.87.2-microsoft-standard-WSL2
+  Runtime: Groovy 4.0.21 on OpenJDK 64-Bit Server VM 17.0.19+10
+  Encoding: UTF-8 (UTF-8)
+  Process: 296424@MSI [127.0.1.1]
+  CPUs: 32 - Mem: 46.6 GB (41.8 GB) - Swap: 12 GB (12 GB)
+Jul-23 18:43:40.397 [main] DEBUG nextflow.Session - Work-dir: /home/mwild/.tjp_local_test/scratch/mwild/nextflow_work [ext2/ext3]
+Jul-23 18:43:40.400 [main] DEBUG nextflow.Session - Script base path does not exist or is not a directory: /home/mwild/.tjp_local_test/groups_tprice_pipelines/containers/psoma/bin
+Jul-23 18:43:40.411 [main] DEBUG nextflow.executor.ExecutorFactory - Extension executors providers=[]
+Jul-23 18:43:40.420 [main] DEBUG nextflow.Session - Observer factory: DefaultObserverFactory
+Jul-23 18:43:40.489 [main] DEBUG nextflow.cache.CacheFactory - Using Nextflow cache factory: nextflow.cache.DefaultCacheFactory
+Jul-23 18:43:40.509 [main] DEBUG nextflow.util.CustomThreadPool - Creating default thread pool > poolSize: 33; maxThreads: 1000
+Jul-23 18:43:40.628 [main] DEBUG nextflow.Session - Session start
+Jul-23 18:43:40.632 [main] DEBUG nextflow.trace.TraceFileObserver - Workflow started -- trace file: /home/mwild/.tjp_local_test/work/mwild/pipelines/psoma/runs/manifest_check_2026-07-23_18-43-31/nextflow_logs/trace.txt
+Jul-23 18:43:41.601 [main] DEBUG nextflow.script.ScriptRunner - > Launching execution
+Jul-23 18:43:41.610 [main] INFO  nextflow.script.BaseScript - Psomagen Bulk RNA-seq Pipeline
+Jul-23 18:43:41.612 [main] INFO  nextflow.script.BaseScript -   
+Jul-23 18:43:41.612 [main] INFO  nextflow.script.BaseScript - Here are the steps involved in the Psomagen Bulk RNA-seq Analysis:
+Jul-23 18:43:41.613 [main] INFO  nextflow.script.BaseScript - 1. Quality Control - Generate FastQC and MultiQC reports
+Jul-23 18:43:41.614 [main] INFO  nextflow.script.BaseScript - 2. Trimming - Adapter and quality trimming using Trimmomatic
+Jul-23 18:43:41.615 [main] INFO  nextflow.script.BaseScript - 3. Genome Alignment - Map reads to the reference genome using HISAT2
+Jul-23 18:43:41.616 [main] INFO  nextflow.script.BaseScript - 3_1. Mapping Metrics - Generate mapping statistics and quality reports
+Jul-23 18:43:41.617 [main] INFO  nextflow.script.BaseScript - 4. Post-Alignment Processing - Filter, deduplicate, and index aligned reads
+Jul-23 18:43:41.617 [main] INFO  nextflow.script.BaseScript - 4_1. Quality Assessment - Generate Qualimap reports for aligned reads
+Jul-23 18:43:41.618 [main] INFO  nextflow.script.BaseScript - 5. Transcript Assembly and Quantification - Generate counts using StringTie
+Jul-23 18:43:41.619 [main] INFO  nextflow.script.BaseScript - 6. Raw Count Generation - Generate raw counts using HTSeq && Feature Counts using Rsubread's featureCounts
+Jul-23 18:43:41.653 [main] INFO  nextflow.Nextflow -  
+Jul-23 18:43:41.654 [main] INFO  nextflow.Nextflow - Config directory: /home/mwild/.tjp_local_test/groups_tprice_pipelines/containers/psoma
+Jul-23 18:43:41.655 [main] INFO  nextflow.Nextflow - Output directory: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot
+Jul-23 18:43:41.656 [main] INFO  nextflow.Nextflow - Fastq files directory: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/test_data/fastq
+Jul-23 18:43:41.657 [main] INFO  nextflow.Nextflow -  
+Jul-23 18:43:41.660 [main] INFO  nextflow.Nextflow - Running FastQC and MultiQC
+Jul-23 18:43:41.661 [main] INFO  nextflow.script.BaseScript - FastQC and MultiQC output directory: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/1_fastqc_and_multiqc_reports
+Jul-23 18:43:41.662 [main] INFO  nextflow.script.BaseScript - No. of cores to be used for generating FastQC reports: 2
+Jul-23 18:43:41.741 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Jul-23 18:43:41.742 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Jul-23 18:43:41.748 [main] DEBUG nextflow.executor.Executor - [warm up] executor > local
+Jul-23 18:43:41.755 [main] DEBUG n.processor.LocalPollingMonitor - Creating local task monitor for executor 'local' > cpus=32; memory=46.6 GB; capacity=32; pollInterval=100ms; dumpInterval=5m
+Jul-23 18:43:41.759 [main] DEBUG n.processor.TaskPollingMonitor - >>> barrier register (monitor: local)
+Jul-23 18:43:41.850 [main] INFO  nextflow.Nextflow - Running Trimmomatic Trimming
+Jul-23 18:43:41.853 [main] INFO  nextflow.script.BaseScript - Trimmomatic output directory: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/2_trim_output
+Jul-23 18:43:41.868 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Jul-23 18:43:41.869 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Jul-23 18:43:41.882 [main] INFO  nextflow.Nextflow - Running HISAT2 Mapping
+Jul-23 18:43:41.883 [main] INFO  nextflow.script.BaseScript - HISAT2 mapping output directory: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/3_hisat2_mapping_output
+Jul-23 18:43:41.892 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Jul-23 18:43:41.892 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Jul-23 18:43:41.902 [main] INFO  nextflow.Nextflow - Generating Mapping Metrics
+Jul-23 18:43:41.909 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Jul-23 18:43:41.910 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Jul-23 18:43:41.916 [main] INFO  nextflow.Nextflow - Running Filtering and Deduplication
+Jul-23 18:43:41.917 [main] INFO  nextflow.script.BaseScript - Filtering, deduplication and sorting output directory: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/4_filter_output
+Jul-23 18:43:41.924 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Jul-23 18:43:41.925 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Jul-23 18:43:41.931 [main] INFO  nextflow.Nextflow - Running Qualimap for quality control
+Jul-23 18:43:41.931 [main] INFO  nextflow.script.BaseScript - Generating qualimap reports for filtered BAM files: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/4_1_qualimap_filter_output_qc
+Jul-23 18:43:41.936 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Jul-23 18:43:41.936 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Jul-23 18:43:41.941 [main] INFO  nextflow.Nextflow - Running StringTie and Raw Counts Generation
+Jul-23 18:43:41.942 [main] INFO  nextflow.script.BaseScript - Generating StringTie and raw counts in: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/5_stringtie_counts_output and /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/6_raw_counts_output
+Jul-23 18:43:41.948 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Jul-23 18:43:41.949 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Jul-23 18:43:41.956 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Jul-23 18:43:41.957 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Jul-23 18:43:41.968 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Jul-23 18:43:41.969 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Jul-23 18:43:41.974 [main] INFO  nextflow.Nextflow - Generating Pipeline Stats
+Jul-23 18:43:41.975 [main] INFO  nextflow.script.BaseScript - Generating Stats for the current run: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/7_pipeline_stats_<TIMESTAMP>.log
+Jul-23 18:43:41.978 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+Jul-23 18:43:41.979 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+Jul-23 18:43:41.984 [main] DEBUG nextflow.Session - Workflow process names [dsl2]: hisat2_mapping, generate_feature_counts, generate_stats, generate_fastqc_multiqc_reports, trimmomatic_trimming, generate_mapping_metrics, generate_stringtie_counts, generate_qualimap_reports, filter_samples, generate_raw_counts
+Jul-23 18:43:41.984 [main] DEBUG nextflow.Session - Igniting dataflow network (10)
+Jul-23 18:43:41.985 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > generate_fastqc_multiqc_reports
+Jul-23 18:43:41.986 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > trimmomatic_trimming
+Jul-23 18:43:41.987 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > hisat2_mapping
+Jul-23 18:43:41.988 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > generate_mapping_metrics
+Jul-23 18:43:41.988 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > filter_samples
+Jul-23 18:43:41.989 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > generate_qualimap_reports
+Jul-23 18:43:41.990 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > generate_stringtie_counts
+Jul-23 18:43:41.991 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > generate_feature_counts
+Jul-23 18:43:41.991 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > generate_raw_counts
+Jul-23 18:43:41.992 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > generate_stats
+Jul-23 18:43:41.993 [main] DEBUG nextflow.script.ScriptRunner - Parsed script files:
+  Script_e0bd28c83d08a0c3: /home/mwild/.tjp_local_test/groups_tprice_pipelines/containers/psoma/psomagen_bulk_rna_seq_pipeline.nf
+Jul-23 18:43:41.994 [main] DEBUG nextflow.script.ScriptRunner - > Awaiting termination 
+Jul-23 18:43:41.994 [main] DEBUG nextflow.Session - Session await
+Jul-23 18:43:42.132 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Jul-23 18:43:42.135 [Task submitter] INFO  nextflow.Session - [88/4c87e2] Submitted process > trimmomatic_trimming
+Jul-23 18:43:42.146 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Jul-23 18:43:42.147 [Task submitter] INFO  nextflow.Session - [2a/9a025a] Submitted process > generate_fastqc_multiqc_reports
+Jul-23 18:43:42.427 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 2; name: generate_fastqc_multiqc_reports; status: COMPLETED; exit: 0; error: -; workDir: /home/mwild/.tjp_local_test/scratch/mwild/nextflow_work/2a/9a025a7a0bb6d05dffa088823a3b41]
+Jul-23 18:43:42.428 [Task monitor] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'TaskFinalizer' minSize=10; maxSize=96; workQueue=LinkedBlockingQueue[10000]; allowCoreThreadTimeout=false
+Jul-23 18:43:42.446 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 1; name: trimmomatic_trimming; status: COMPLETED; exit: 0; error: -; workDir: /home/mwild/.tjp_local_test/scratch/mwild/nextflow_work/88/4c87e2d0cfb7879c3db3c88afe3ee9]
+Jul-23 18:43:42.466 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+Jul-23 18:43:42.467 [Task submitter] INFO  nextflow.Session - [3a/5fbf62] Submitted process > hisat2_mapping
+Jul-23 18:43:42.614 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[id: 3; name: hisat2_mapping; status: COMPLETED; exit: 1; error: -; workDir: /home/mwild/.tjp_local_test/scratch/mwild/nextflow_work/3a/5fbf627f53d73f99af05e449d0e30f]
+Jul-23 18:43:42.617 [TaskFinalizer-3] DEBUG nextflow.processor.TaskProcessor - Handling unexpected condition for
+  task: name=hisat2_mapping; work-dir=/home/mwild/.tjp_local_test/scratch/mwild/nextflow_work/3a/5fbf627f53d73f99af05e449d0e30f
+  error [nextflow.exception.ProcessFailedException]: Process `hisat2_mapping` terminated with an error exit status (1)
+Jul-23 18:43:42.635 [TaskFinalizer-3] ERROR nextflow.processor.TaskProcessor - Error executing process > 'hisat2_mapping'
+
+Caused by:
+  Process `hisat2_mapping` terminated with an error exit status (1)
+
+
+Command executed:
+
+  mkdir -p "/home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/0_nextflow_logs"
+  echo "[INFO] Starting HISAT2 mapping at $(date)" | tee -a /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/0_nextflow_logs/hisat2_mapping.log
+  
+  if [ ! -f "/home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/test_data/samples.txt" ]; then
+      echo "[ERROR] Samples file not found: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/test_data/samples.txt" | tee -a /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/0_nextflow_logs/hisat2_mapping.log
+      exit 1
+  fi
+  
+  if [ ! -d "/home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/2_trim_output" ]; then
+      echo "[ERROR] Trimmed files directory not found: /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/2_trim_output" | tee -a /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/0_nextflow_logs/hisat2_mapping.log
+      exit 1
+  fi
+  
+  mkdir -p /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/3_hisat2_mapping_output /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/3_hisat2_mapping_output/log
+  
+  for sample_name in $(cat /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/test_data/samples.txt)
+  do
+      echo "Running HISAT2 for sample: $sample_name"
+  
+      if [ "true" = true ]; then
+          hisat2 --summary-file /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/3_hisat2_mapping_output/log/${sample_name}_h2report.txt                 -p 2                 -x /home/mwild/.tjp_local_test/groups_tprice_pipelines/references/tiny/hisat2_index/tiny                 -1 /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/2_trim_output/${sample_name}_1.trim.fastq.gz                 -2 /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/2_trim_output/${sample_name}_2.trim.fastq.gz                 -S /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/3_hisat2_mapping_output/${sample_name}.sam                 2> /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/3_hisat2_mapping_output/log/${sample_name}_mapping_step.log
+      else
+          hisat2 --summary-file /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/3_hisat2_mapping_output/log/${sample_name}_h2report.txt                 -p 2                 -x /home/mwild/.tjp_local_test/groups_tprice_pipelines/references/tiny/hisat2_index/tiny                 -U /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/2_trim_output/${sample_name}_1.trim.fastq.gz                 -S /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/3_hisat2_mapping_output/${sample_name}.sam                 2> /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/3_hisat2_mapping_output/log/${sample_name}_mapping_step.log
+      fi
+  
+      if [ "$?" -ne 0 ]; then
+          echo "[ERROR] HISAT2 mapping failed for sample: ${sample_name}" | tee -a /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/0_nextflow_logs/hisat2_mapping.log
+          exit 1
+      fi
+  
+      echo "Sorting BAM for: ${sample_name}"
+      samtools sort -@ 2 -o /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/3_hisat2_mapping_output/${sample_name}.sorted.bam /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/3_hisat2_mapping_output/${sample_name}.sam 2> /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/3_hisat2_mapping_output/log/${sample_name}_sorting_step.log
+      rm /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/3_hisat2_mapping_output/${sample_name}.sam
+  
+      echo "Indexing BAM for: ${sample_name}"
+      samtools index /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/3_hisat2_mapping_output/${sample_name}.sorted.bam 2> /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/3_hisat2_mapping_output/log/${sample_name}_indexing_step.log
+  done
+  
+  echo "[INFO] HISAT2 mapping process completed at $(date)" | tee -a /home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/0_nextflow_logs/hisat2_mapping.log
+
+Command exit status:
+  1
+
+Command output:
+  [INFO] Starting HISAT2 mapping at Thu Jul 23 18:43:42 CDT 2026
+  Running HISAT2 for sample: Sample_A
+  Sorting BAM for: Sample_A
+
+Command error:
+  [INFO] Starting HISAT2 mapping at Thu Jul 23 18:43:42 CDT 2026
+  Running HISAT2 for sample: Sample_A
+  Sorting BAM for: Sample_A
+  rm: cannot remove '/home/mwild/.tjp_local_test/scratch/mwild/pipelines/psoma/runs/tier0_pilot/3_hisat2_mapping_output/Sample_A.sam': No such file or directory
+
+Work dir:
+  /home/mwild/.tjp_local_test/scratch/mwild/nextflow_work/3a/5fbf627f53d73f99af05e449d0e30f
+
+Tip: when you have fixed the problem you can continue the execution adding the option `-resume` to the run command line
+Jul-23 18:43:42.642 [main] DEBUG nextflow.Session - Session await > all processes finished
+Jul-23 18:43:42.642 [TaskFinalizer-3] DEBUG nextflow.Session - Session aborted -- Cause: Process `hisat2_mapping` terminated with an error exit status (1)
+Jul-23 18:43:42.665 [Task monitor] DEBUG n.processor.TaskPollingMonitor - <<< barrier arrives (monitor: local) - terminating tasks monitor poll loop
+Jul-23 18:43:42.665 [main] DEBUG nextflow.Session - Session await > all barriers passed
+Jul-23 18:43:42.670 [main] DEBUG n.trace.WorkflowStatsObserver - Workflow completed > WorkflowStats[succeededCount=2; failedCount=1; ignoredCount=0; cachedCount=0; pendingCount=0; submittedCount=0; runningCount=0; retriesCount=0; abortedCount=0; succeedDuration=370ms; failedDuration=68ms; cachedDuration=0ms;loadCpus=0; loadMemory=0; peakRunning=2; peakCpus=2; peakMemory=0; ]
+Jul-23 18:43:42.670 [main] DEBUG nextflow.trace.TraceFileObserver - Workflow completed -- saving trace file
+Jul-23 18:43:42.671 [main] DEBUG nextflow.trace.ReportObserver - Workflow completed -- rendering execution report
+Jul-23 18:43:42.978 [main] DEBUG nextflow.trace.TimelineObserver - Workflow completed -- rendering execution timeline
+Jul-23 18:43:43.069 [main] DEBUG nextflow.cache.CacheDB - Closing CacheDB done
+Jul-23 18:43:43.093 [main] DEBUG nextflow.script.ScriptRunner - > Execution complete -- Goodbye

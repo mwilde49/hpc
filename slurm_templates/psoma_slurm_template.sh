@@ -2,7 +2,7 @@
 #SBATCH --job-name=psoma
 #SBATCH --output=logs/psoma_%j.out
 #SBATCH --error=logs/psoma_%j.err
-#SBATCH --time=12:00:00
+#SBATCH --time=48:00:00
 #SBATCH --cpus-per-task=40
 #SBATCH --mem=128G
 
