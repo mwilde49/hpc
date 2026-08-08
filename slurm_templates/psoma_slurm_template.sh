@@ -30,7 +30,7 @@ FASTQ_DIR=${4:-}
 # --- Reproducibility capture (node, partition, resources, invocation log) ---
 capture_juno_env "$RUN_DIR"
 start_console_log "$RUN_DIR"
-trap '_EC=$?; finalize_juno_env "$RUN_DIR" "$_EC"; generate_provenance_readme "$RUN_DIR" "psoma" "Psoma — HISAT2 + Trimmomatic Bulk RNA-Seq" "$_EC" "$CONTAINER" "$SCRATCH_ROOT/nextflow_work"' EXIT
+trap '_EC=$?; finalize_juno_env "$RUN_DIR" "$_EC"; generate_provenance_readme "$RUN_DIR" "psoma" "Psoma — HISAT2 + Trimmomatic Bulk RNA-Seq" "$_EC" "$CONTAINER" "${NF_WORK_DIR:-$SCRATCH_ROOT/nextflow_work}"' EXIT
 
 # --- Pre-flight checks ---
 
@@ -73,6 +73,15 @@ NF_LOG_DIR="${RUN_DIR:+$RUN_DIR/nextflow_logs}"
 NF_LOG_DIR="${NF_LOG_DIR:-$SCRATCH_ROOT/pipelines/psoma/nextflow_logs_$SLURM_JOB_ID}"
 mkdir -p "$NF_LOG_DIR"
 
+# Per-run work dir (not the old fixed/shared $SCRATCH_ROOT/nextflow_work) so -resume's
+# cache is scoped to THIS run and isn't clobbered by/doesn't clobber other psoma runs.
+# To actually resume a timed-out run: resubmit with the SAME RUN_DIR/SCRATCH_OUTPUT_DIR
+# args as the original submission (don't regenerate via tjp-batch, which mints a new
+# timestamp and therefore a fresh, empty work dir with nothing to resume from).
+NF_WORK_DIR="${RUN_DIR:+$SCRATCH_ROOT/pipelines/psoma/nextflow_work_$(basename "$RUN_DIR")}"
+NF_WORK_DIR="${NF_WORK_DIR:-$SCRATCH_ROOT/nextflow_work}"
+mkdir -p "$NF_WORK_DIR"
+
 run_logged "${RUN_DIR:+$RUN_DIR/invocation.log}" \
     apptainer exec \
     --cleanenv \
@@ -85,7 +94,8 @@ run_logged "${RUN_DIR:+$RUN_DIR/invocation.log}" \
     $CONTAINER \
     nextflow run $PIPELINE_REPO/psomagen_bulk_rna_seq_pipeline.nf \
     -c $PIPELINE_CONFIG \
-    -w $SCRATCH_ROOT/nextflow_work \
+    -w "$NF_WORK_DIR" \
+    -resume \
     -with-trace "$NF_LOG_DIR/trace.txt" \
     -with-report "$NF_LOG_DIR/report.html" \
     -with-timeline "$NF_LOG_DIR/timeline.html" \
