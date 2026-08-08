@@ -78,6 +78,15 @@ mkdir -p "$NF_LOG_DIR"
 # To actually resume a timed-out run: resubmit with the SAME RUN_DIR/SCRATCH_OUTPUT_DIR
 # args as the original submission (don't regenerate via tjp-batch, which mints a new
 # timestamp and therefore a fresh, empty work dir with nothing to resume from).
+#
+# Also used as --pwd below: -w only scopes the task work dir, NOT Nextflow's
+# .nextflow/ session-lock/history dir, which defaults to the process's cwd at launch.
+# Without --pwd here that cwd is wherever the job was submitted from (typically the
+# shared $PROJECT_ROOT), so with -resume enabled every psoma run submitted from the
+# same directory fights over the same session lock -- "ERROR ~ Unable to acquire
+# lock on session ..." if another run's session is still open/active there. Pointing
+# --pwd at the per-run NF_WORK_DIR isolates .nextflow/ per run, same as -w does for
+# task outputs.
 NF_WORK_DIR="${RUN_DIR:+$SCRATCH_ROOT/pipelines/psoma/nextflow_work_$(basename "$RUN_DIR")}"
 NF_WORK_DIR="${NF_WORK_DIR:-$SCRATCH_ROOT/nextflow_work}"
 mkdir -p "$NF_WORK_DIR"
@@ -91,6 +100,7 @@ run_logged "${RUN_DIR:+$RUN_DIR/invocation.log}" \
     --bind $PROJECT_ROOT:$PROJECT_ROOT \
     --bind $SCRATCH_ROOT:$SCRATCH_ROOT \
     --bind $WORK_ROOT:$WORK_ROOT \
+    --pwd "$NF_WORK_DIR" \
     $CONTAINER \
     nextflow run $PIPELINE_REPO/psomagen_bulk_rna_seq_pipeline.nf \
     -c $PIPELINE_CONFIG \
