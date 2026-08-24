@@ -298,7 +298,24 @@ fi
 
 # ── Create timestamped run directory ─────────────────────────────────────────
 TS=$(timestamp)
-RUN_DIR="$USER_PIPELINES/$PIPELINE/runs/$TS"
+
+# Fold project_name + pipeline name into the run directory name (timestamp
+# first, so lexicographic sort still equals chronological order --
+# tjp-test-validate and its vendored copy in containers/10x both rely on
+# `sort | tail -1` to find the latest run). Falls back to just "$TS_$PIPELINE"
+# if project_name isn't set in the config -- never blocks a launch over a
+# missing/malformed field.
+RUN_LABEL="$TS"
+if yaml_has "$CONFIG_PATH" "project_name"; then
+    project_name_raw=$(yaml_get "$CONFIG_PATH" "project_name") || true
+    if [[ -n "$project_name_raw" ]]; then
+        project_name_safe=$(echo "$project_name_raw" | tr -c 'A-Za-z0-9_-' '_')
+        RUN_LABEL="${RUN_LABEL}_${project_name_safe}"
+    fi
+fi
+RUN_LABEL="${RUN_LABEL}_${PIPELINE}"
+
+RUN_DIR="$USER_PIPELINES/$PIPELINE/runs/$RUN_LABEL"
 mkdir -p "$RUN_DIR"
 info "Run directory: $RUN_DIR"
 
@@ -344,7 +361,7 @@ case "$PIPELINE" in
         ;;
     bulkrnaseq)
         # BulkRNASeq: create scratch output dir, symlink UTDal repo files into it
-        SCRATCH_OUTPUT_DIR="$SCRATCH_ROOT/pipelines/$PIPELINE/runs/$TS"
+        SCRATCH_OUTPUT_DIR="$SCRATCH_ROOT/pipelines/$PIPELINE/runs/$RUN_LABEL"
         mkdir -p "$SCRATCH_OUTPUT_DIR"
         info "Scratch output dir: $SCRATCH_OUTPUT_DIR"
 
@@ -362,7 +379,7 @@ case "$PIPELINE" in
         ;;
     psoma)
         # Psoma: create scratch output dir for pipeline outputs
-        SCRATCH_OUTPUT_DIR="$SCRATCH_ROOT/pipelines/$PIPELINE/runs/$TS"
+        SCRATCH_OUTPUT_DIR="$SCRATCH_ROOT/pipelines/$PIPELINE/runs/$RUN_LABEL"
         mkdir -p "$SCRATCH_OUTPUT_DIR"
         info "Scratch output dir: $SCRATCH_OUTPUT_DIR"
 
@@ -387,7 +404,7 @@ case "$PIPELINE" in
             SCRATCH_OUTPUT_DIR="$_config_scratch"
             info "Scratch output dir (from config): $SCRATCH_OUTPUT_DIR"
         else
-            SCRATCH_OUTPUT_DIR="$SCRATCH_ROOT/pipelines/$PIPELINE/runs/$TS"
+            SCRATCH_OUTPUT_DIR="$SCRATCH_ROOT/pipelines/$PIPELINE/runs/$RUN_LABEL"
             info "Scratch output dir: $SCRATCH_OUTPUT_DIR"
         fi
         mkdir -p "$SCRATCH_OUTPUT_DIR"

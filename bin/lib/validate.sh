@@ -74,6 +74,14 @@ _validate_bulkrnaseq() {
         fi
     done
 
+    # project_name must not be empty -- present-but-blank passes yaml_has but
+    # produces a meaningless run directory name (see tjp-launch's RUN_LABEL mint)
+    if yaml_has "$config" "project_name"; then
+        local project_name_val
+        project_name_val=$(yaml_get "$config" "project_name") || true
+        [[ -z "$project_name_val" ]] && _errs+=("project_name is present but empty")
+    fi
+
     # Paths that must exist on disk
     local path_keys=(fastq_dir samples_file star_index reference_gtf exclude_bed_file_path blacklist_bed_file_path)
     for key in "${path_keys[@]}"; do
@@ -113,6 +121,14 @@ _validate_psoma() {
             _errs+=("Missing required key: $key")
         fi
     done
+
+    # project_name must not be empty -- present-but-blank passes yaml_has but
+    # produces a meaningless run directory name (see tjp-launch's RUN_LABEL mint)
+    if yaml_has "$config" "project_name"; then
+        local project_name_val
+        project_name_val=$(yaml_get "$config" "project_name") || true
+        [[ -z "$project_name_val" ]] && _errs+=("project_name is present but empty")
+    fi
 
     # Paths that must exist on disk
     local path_keys=(fastq_dir samples_file reference_gtf exclude_bed_file_path blacklist_bed_file_path)
@@ -158,6 +174,14 @@ _validate_virome() {
             _errs+=("Missing required key: $key")
         fi
     done
+
+    # project_name must not be empty -- present-but-blank passes yaml_has but
+    # produces a meaningless run directory name (see tjp-launch's RUN_LABEL mint)
+    if yaml_has "$config" "project_name"; then
+        local project_name_val
+        project_name_val=$(yaml_get "$config" "project_name") || true
+        [[ -z "$project_name_val" ]] && _errs+=("project_name is present but empty")
+    fi
 
     # Paths that must exist on disk
     local path_keys=(samplesheet star_index kraken2_db adapters container_dir)

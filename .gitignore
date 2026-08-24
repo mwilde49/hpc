@@ -42,3 +42,8 @@ bin/.nextflow/
 
 # JVM crash logs (e.g. from Qualimap/Nextflow's own JVM)
 hs_err_pid*.log
+
+# Juno read-only inspection SSH keys (never commit — live only in ~/.ssh)
+id_ed25519_juno_inspect*
+id_ed25519_juno_pullonly*
+id_ed25519_juno_statusonly*
