@@ -118,8 +118,21 @@ if [ $PIPELINE_EXIT -ne 0 ]; then
 fi
 
 # --- Stage-out: archive results from scratch to work ---
+# PAUSED 2026-08-24: deprecated in favor of a future scratch->Titan archival
+# step (likely following the tjp-archive-one.sh / tjp-bulk-archive-to-titan.sh
+# pattern -- checksum-verified rsync from a login node, since Titan isn't
+# compute-node-mounted). Left in place, gated off by default, rather than
+# deleted, since the eventual Titan version will probably reuse this shape.
+# Known bug in this version, for whoever revives/replaces it: neither rsync
+# copy below (outputs/ or inputs/) checks its own exit code -- only the
+# separate dry-run diff after the fact does, so a copy that fails partway
+# (e.g. disk quota) can still log "Archive verification PASSED" (observed on
+# a real Astarush1 run, 2026-08-24 -- root-caused to this gap, exact diff-side
+# mechanism not fully traced). Set ARCHIVE_TO_WORK=true to re-enable the
+# current behavior as-is.
+ARCHIVE_TO_WORK=${ARCHIVE_TO_WORK:-false}
 
-if [ -n "$RUN_DIR" ] && [ -n "$SCRATCH_OUTPUT_DIR" ]; then
+if [ "$ARCHIVE_TO_WORK" = "true" ] && [ -n "$RUN_DIR" ] && [ -n "$SCRATCH_OUTPUT_DIR" ]; then
     echo "[HYPERION] Data Relays Synchronizing — Archiving results to work"
 
     echo "Copying outputs: $SCRATCH_OUTPUT_DIR/ -> $RUN_DIR/outputs/"
@@ -148,4 +161,6 @@ if [ -n "$RUN_DIR" ] && [ -n "$SCRATCH_OUTPUT_DIR" ]; then
         [ -n "${OUTPUT_DIFF:-}" ] && echo "$OUTPUT_DIFF"
         [ -n "${INPUT_DIFF:-}" ] && echo "$INPUT_DIFF"
     fi
+elif [ -n "$RUN_DIR" ] && [ -n "$SCRATCH_OUTPUT_DIR" ]; then
+    echo "[HYPERION] Archive-to-work step is paused (ARCHIVE_TO_WORK != true) -- results remain on scratch at $SCRATCH_OUTPUT_DIR"
 fi

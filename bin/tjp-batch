@@ -114,6 +114,22 @@ ROW_COUNT=$(samplesheet_row_count "$SAMPLESHEET")
 # ── Resolve base config ───────────────────────────────────────────────────────
 if [[ -z "$BASE_CONFIG" ]]; then
     BASE_CONFIG="$USER_PIPELINES/$PIPELINE/config.yaml"
+    # Convention: a samplesheet named <name>_samplesheet.csv pairs with a
+    # <name>_config.yaml in the same directory (see hpc/files_for_hpc/*).
+    # Prefer that pairing over the generic shared default -- otherwise every
+    # per-sheet launch (psoma/bulkrnaseq/virome) silently uses whatever's in
+    # the shared default config for project_name/species/params, no matter
+    # what's actually in the cohort-specific config sitting right next to the
+    # samplesheet (discovered 2026-08-24: every psoma run directory was
+    # mislabeled with the shared default's stale project_name because of
+    # exactly this).
+    if [[ "$SAMPLESHEET" == *_samplesheet.csv ]]; then
+        _paired_config="${SAMPLESHEET%_samplesheet.csv}_config.yaml"
+        if [[ -f "$_paired_config" ]]; then
+            BASE_CONFIG="$_paired_config"
+            info "Using paired config (inferred from samplesheet name): $BASE_CONFIG"
+        fi
+    fi
 fi
 [[ ! -f "$BASE_CONFIG" ]] && die "Base config not found: $BASE_CONFIG
   Run 'tjp-setup' first, or specify one with --config <path>"
