@@ -5,7 +5,7 @@
 # on $SLURM_* env vars and on the run-directory artifacts repro.sh/manifest.sh
 # already write (juno_environment.json, manifest.json, invocation.log).
 #
-# Wired into all 13 pipelines. Two templates (sqanti3, wf-transcriptomes) run
+# Wired into all 15 pipelines. Two templates (sqanti3, wf-transcriptomes) run
 # under `set -euo pipefail`; every function below that does real work is
 # either inherently pipefail-safe (pipelines ending in a command that always
 # exits 0, like `head`) or explicitly runs its body in a `set +e` subshell —
@@ -48,7 +48,7 @@ _run_guarded() {
 # Writes software_versions.txt. What <primary>/<secondary> mean depends on
 # the pipeline's architecture:
 #   - single-container (psoma, bulkrnaseq, dconvatac, dconvatac-gpu, addone,
-#     sqanti3): <primary> = path to the .sif
+#     sqanti3, dpnvisium, dpnvisium-gpu): <primary> = path to the .sif
 #   - virome (multi-container): <primary> = containers/virome dir (holds
 #     fastqc.sif, trimmomatic.sif, star.sif, kraken2.sif, python.sif,
 #     multiqc.sif — one tool per container)
@@ -74,7 +74,7 @@ capture_software_versions() {
     mkdir -p "$run_dir"
 
     case "$pipeline" in
-        psoma|bulkrnaseq|dconvatac|dconvatac-gpu|addone)
+        psoma|bulkrnaseq|dconvatac|dconvatac-gpu|addone|dpnvisium|dpnvisium-gpu)
             _run_guarded _capture_versions_container "$run_dir" "$pipeline" "$primary" ;;
         sqanti3)
             _run_guarded _capture_versions_sqanti3 "$run_dir" "$primary" ;;
@@ -169,6 +169,19 @@ _capture_versions_container() {
         addone)
             probes=(
                 "Python|python --version 2>&1"
+                "PyYAML|python -c 'import yaml; print(yaml.__version__)'"
+            )
+            ;;
+        dpnvisium|dpnvisium-gpu)
+            probes=(
+                "Python|python --version 2>&1"
+                "cell2location|python -c 'import cell2location; print(cell2location.__version__)'"
+                "scvi-tools|python -c 'import scvi; print(scvi.__version__)'"
+                "scanpy|python -c 'import scanpy; print(scanpy.__version__)'"
+                "anndata|python -c 'import anndata; print(anndata.__version__)'"
+                "torch|python -c 'import torch; print(torch.__version__)'"
+                "numpy|python -c 'import numpy; print(numpy.__version__)'"
+                "pandas|python -c 'import pandas; print(pandas.__version__)'"
                 "PyYAML|python -c 'import yaml; print(yaml.__version__)'"
             )
             ;;
@@ -376,7 +389,7 @@ _tool_invocations_section() {
 #   - any other string (multi-container virome, workflow-managed
 #     wf-transcriptomes) → shown under "Container" verbatim
 # <nextflow_work_dir> is optional — pass "" for non-Nextflow pipelines
-# (addone, dconvatac(-gpu), sqanti3, all 10x pipelines) to skip the
+# (addone, dconvatac(-gpu), dpnvisium(-gpu), sqanti3, all 10x pipelines) to skip the
 # "Per-step tool invocations" subsection entirely rather than print a
 # misleading "trace.txt not found" message for a pipeline that never uses
 # Nextflow in the first place.

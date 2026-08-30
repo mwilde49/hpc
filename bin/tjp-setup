@@ -303,6 +303,37 @@ if [[ ! -f "$dconvatac_gpu_sheet" ]]; then
     info "Created: $dconvatac_gpu_sheet"
 fi
 
+# dpnvisium config + samplesheet
+# CPU and GPU variants share the same templates/dpnvisium/ source (unlike
+# dconvatac): dpnvisium has no use_gpu config flag, GPU vs. CPU is decided
+# entirely by which SLURM template you submit, so the config content itself
+# doesn't differ between the two pipeline names.
+dpnvisium_config="$USER_PIPELINES/dpnvisium/config.yaml"
+if [[ -f "$dpnvisium_config" ]]; then
+    warn "Config already exists, skipping: $dpnvisium_config"
+else
+    _substitute_placeholders "$REPO_ROOT/templates/dpnvisium/config.yaml" > "$dpnvisium_config"
+    info "Created: $dpnvisium_config"
+fi
+dpnvisium_sheet="$USER_PIPELINES/dpnvisium/samplesheet.csv"
+if [[ ! -f "$dpnvisium_sheet" ]]; then
+    _substitute_placeholders "$REPO_ROOT/templates/dpnvisium/samplesheet.csv" > "$dpnvisium_sheet"
+    info "Created: $dpnvisium_sheet"
+fi
+
+dpnvisium_gpu_config="$USER_PIPELINES/dpnvisium-gpu/config.yaml"
+if [[ -f "$dpnvisium_gpu_config" ]]; then
+    warn "Config already exists, skipping: $dpnvisium_gpu_config"
+else
+    _substitute_placeholders "$REPO_ROOT/templates/dpnvisium/config.yaml" > "$dpnvisium_gpu_config"
+    info "Created: $dpnvisium_gpu_config"
+fi
+dpnvisium_gpu_sheet="$USER_PIPELINES/dpnvisium-gpu/samplesheet.csv"
+if [[ ! -f "$dpnvisium_gpu_sheet" ]]; then
+    _substitute_placeholders "$REPO_ROOT/templates/dpnvisium/samplesheet.csv" > "$dpnvisium_gpu_sheet"
+    info "Created: $dpnvisium_gpu_sheet"
+fi
+
 # ── Add to PATH ────────────────────────────────────────────────────────────
 PATH_LINE="export PATH=\"$REPO_ROOT/bin:\$PATH\""
 BASHRC="$HOME/.bashrc"

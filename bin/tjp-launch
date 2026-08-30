@@ -359,6 +359,13 @@ case "$PIPELINE" in
         # the SLURM template's archive-to-work step is skipped.
         SBATCH_CONFIG_ARG="$RUN_DIR/config.yaml"
         ;;
+    dpnvisium|dpnvisium-gpu)
+        # dpnvisium: writes directly to output_dir, no scratch staging (same
+        # pattern as dconvatac) — pass config.yaml directly as $1, leave
+        # SCRATCH_OUTPUT_DIR empty so the SLURM template's archive-to-work
+        # step is skipped.
+        SBATCH_CONFIG_ARG="$RUN_DIR/config.yaml"
+        ;;
     bulkrnaseq)
         # BulkRNASeq: create scratch output dir, symlink UTDal repo files into it
         SCRATCH_OUTPUT_DIR="$SCRATCH_ROOT/pipelines/$PIPELINE/runs/$RUN_LABEL"

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HPC pipeline framework for the TJP group on Juno HPC, deployed to the shared group location `/groups/tprice/pipelines`. Uses Apptainer containers + SLURM scheduling + config-driven YAML execution. Has thirteen pipelines: AddOne (inline demo), BulkRNASeq (submoduled container + external Nextflow), Psoma (submoduled combined container+pipeline), Virome (submoduled Nextflow + per-process containers), SQANTI3 (submoduled 4-stage SLURM DAG), wf-transcriptomes (submoduled Nextflow SLURM executor), five 10x Genomics native pipelines (Cell Ranger, Cell Ranger mkfastq, Cell Ranger Multi, Space Ranger, Xenium Ranger), and DeconvATAC (submoduled Python+Apptainer, spatial ATAC deconvolution via Cell2Location, CPU and GPU variants). Designed to scale horizontally by adding new pipeline directories or container submodules. Version 6.0.0 adds samplesheet-driven batch execution (`tjp-batch`), local Titan metadata prototype (`labdata`/PLR-xxxx records), and Titan integration fields in all configs.
+HPC pipeline framework for the TJP group on Juno HPC, deployed to the shared group location `/groups/tprice/pipelines`. Uses Apptainer containers + SLURM scheduling + config-driven YAML execution. Has fifteen pipelines: AddOne (inline demo), BulkRNASeq (submoduled container + external Nextflow), Psoma (submoduled combined container+pipeline), Virome (submoduled Nextflow + per-process containers), SQANTI3 (submoduled 4-stage SLURM DAG), wf-transcriptomes (submoduled Nextflow SLURM executor), five 10x Genomics native pipelines (Cell Ranger, Cell Ranger mkfastq, Cell Ranger Multi, Space Ranger, Xenium Ranger), DeconvATAC (submoduled Python+Apptainer, spatial ATAC deconvolution via Cell2Location, CPU and GPU variants), and dpnvisium (submoduled Python+Apptainer, Visium spatial deconvolution via Cell2Location for the ish_dpn project, CPU and GPU/H100 variants). Designed to scale horizontally by adding new pipeline directories or container submodules. Version 6.0.0 adds samplesheet-driven batch execution (`tjp-batch`), local Titan metadata prototype (`labdata`/PLR-xxxx records), and Titan integration fields in all configs.
 
 ## Build and Run Commands
 
@@ -339,6 +339,34 @@ tjp-launch dconvatac-gpu    # GPU (A30)
 ```
 
 See `DCONVATAC_HPC_GUIDE.md` for full setup and usage details.
+
+## dpnvisium Pipeline
+
+### Submodule
+
+Container repo `mwilde49/dpnvisium` is a git submodule at `containers/dpnvisium/`, pinned to `v1.0.0`. Like dconvatac, this is a Python pipeline (not Nextflow) — both the container definition and pipeline script live in the submodule. No separate clone needed.
+
+### Key details
+- Visium spatial transcriptomics deconvolution via Cell2Location, for the ish_dpn (Diabetic Peripheral Neuropathy) collaboration project
+- Input: snRNA-seq reference (`input_sn_counts`/`input_sn_meta` CSVs) + a directory of Visium samples (`input_visium_dir`, 10x Space Ranger output layout)
+- Pipeline script: `containers/dpnvisium/dpnvisium.py` — called inside Apptainer
+- Two registered pipelines: `dpnvisium` (CPU, `dev` partition, small/test configs only) and `dpnvisium-gpu` (H100 GPU, full production)
+- No `use_gpu` config flag (unlike dconvatac) — GPU vs. CPU is decided entirely by which SLURM template you submit; the container and script are identical either way and torch auto-detects CUDA
+- GPU template requests one NVIDIA H100 (80GB), not A30 (24GB) — production config trains Cell2location full-batch (`spatial_batch_size: null`) across all 16 concatenated Visium samples (~40,600 spots), which exceeds A30's VRAM at this scale
+- **Not wired into `tjp-batch`** — `dpnvisium.py` auto-discovers every sample directory under `input_visium_dir` and trains jointly across all of them in one job (neither the per-row nor per-sheet batching pattern fits a jointly-trained model); use `sample_subset` in `config.yaml` for cohort subsets instead
+
+### Build container (local, requires sudo)
+```bash
+cd containers/dpnvisium/container && sudo apptainer build ../dpnvisium_v1.0.0.sif apptainer.def
+```
+
+### Submit on HPC
+```bash
+tjp-launch dpnvisium        # CPU (dev partition, small configs)
+tjp-launch dpnvisium-gpu    # GPU (H100, production)
+```
+
+See `DPNVISIUM_HPC_GUIDE.md` for full setup and usage details.
 
 ## 10x Genomics Pipelines (Cell Ranger, Space Ranger, Xenium Ranger)
 

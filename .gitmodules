@@ -16,3 +16,6 @@
 [submodule "containers/dconvatac"]
 	path = containers/dconvatac
 	url = https://github.com/mwilde49/dconvatac
+[submodule "containers/dpnvisium"]
+	path = containers/dpnvisium
+	url = https://github.com/mwilde49/dpnvisium

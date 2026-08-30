@@ -23,6 +23,8 @@ validate_config() {
         wf-transcriptomes) _validate_wf_transcriptomes "$config" errors ;;
         dconvatac)     _validate_dconvatac "$config" errors ;;
         dconvatac-gpu) _validate_dconvatac_gpu "$config" errors ;;
+        dpnvisium)     _validate_dpnvisium "$config" errors ;;
+        dpnvisium-gpu) _validate_dpnvisium "$config" errors ;;
         *)              die "No validator for pipeline: $pipeline" ;;
     esac
 
@@ -703,4 +705,53 @@ _validate_dconvatac_gpu() {
     if [[ "$val" != "true" ]]; then
         _gpu_errs+=("use_gpu must be 'true' when using the dconvatac-gpu pipeline (got: '$val')")
     fi
+}
+
+# ── dpnvisium validator ──────────────────────────────────────────────────────
+_validate_dpnvisium() {
+    local config="$1"
+    local -n _errs=$2
+
+    local required_keys=(input_sn_counts input_sn_meta input_visium_dir output_dir)
+    for key in "${required_keys[@]}"; do
+        if ! yaml_has "$config" "$key"; then
+            _errs+=("Missing required key: $key")
+        fi
+    done
+
+    local path_keys=(input_sn_counts input_sn_meta input_visium_dir)
+    for key in "${path_keys[@]}"; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            if [[ -n "$val" && "$val" != __* && "$val" != /path/to/* && ! -e "$val" ]]; then
+                _errs+=("Path does not exist for $key: $val")
+            fi
+        fi
+    done
+
+    for key in run_nmf_colocation compute_expected_per_cell_type force_ref force_spatial; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            case "$val" in
+                true|false) ;;
+                *) _errs+=("$key must be 'true' or 'false', got: $val") ;;
+            esac
+        fi
+    done
+
+    for key in N_cells_per_location detection_alpha max_epochs_ref max_epochs_spatial \
+               ref_export_num_samples ref_export_batch_size spatial_train_size \
+               spatial_export_num_samples spatial_export_batch_size; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            if [[ -n "$val" && ! "$val" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+                _errs+=("$key must be a number, got: $val")
+            fi
+        fi
+    done
+    # spatial_batch_size deliberately not checked here -- null/blank is valid
+    # (full-batch production training), not just "missing".
 }

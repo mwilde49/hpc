@@ -64,6 +64,7 @@ snapshot_pipeline_source() {
         virome) submodule_dir="$REPO_ROOT/containers/virome" ;;
         sqanti3|wf-transcriptomes) submodule_dir="$REPO_ROOT/containers/sqanti3" ;;
         dconvatac|dconvatac-gpu) submodule_dir="$REPO_ROOT/containers/dconvatac" ;;
+        dpnvisium|dpnvisium-gpu) submodule_dir="$REPO_ROOT/containers/dpnvisium" ;;
         cellranger|cellranger-mkfastq|cellranger-multi|spaceranger|xeniumranger)
             submodule_dir="$REPO_ROOT/containers/10x" ;;
     esac

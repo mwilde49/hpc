@@ -25,6 +25,8 @@ declare -A PIPELINE_CONTAINERS=(
     [wf-transcriptomes]="containers/sqanti3/configs/wf_transcriptomes/juno.config"
     [dconvatac]="containers/dconvatac/dconvatac_v1.0.0.sif"
     [dconvatac-gpu]="containers/dconvatac/dconvatac_v1.0.0.sif"
+    [dpnvisium]="containers/dpnvisium/dpnvisium_v1.0.0.sif"
+    [dpnvisium-gpu]="containers/dpnvisium/dpnvisium_v1.0.0.sif"
 )
 
 # Maps pipeline name → SLURM template path (relative to REPO_ROOT)
@@ -42,6 +44,8 @@ declare -A PIPELINE_TEMPLATES=(
     [wf-transcriptomes]="slurm_templates/wf_transcriptomes_slurm_template.sh"
     [dconvatac]="slurm_templates/dconvatac_slurm_template.sh"
     [dconvatac-gpu]="slurm_templates/dconvatac_gpu_slurm_template.sh"
+    [dpnvisium]="slurm_templates/dpnvisium_cpu_slurm_template.sh"
+    [dpnvisium-gpu]="slurm_templates/dpnvisium_gpu_slurm_template.sh"
 )
 
 # Maps native pipeline name → tool install directory
@@ -61,7 +65,7 @@ NATIVE_PIPELINES=(cellranger cellranger-mkfastq cellranger-multi spaceranger xen
 NEXTFLOW_MANAGED_PIPELINES=(wf-transcriptomes)
 
 # Ordered list of known pipelines (bash 3 compat for iteration)
-KNOWN_PIPELINES=(addone bulkrnaseq psoma virome cellranger cellranger-mkfastq cellranger-multi spaceranger xeniumranger sqanti3 wf-transcriptomes dconvatac dconvatac-gpu)
+KNOWN_PIPELINES=(addone bulkrnaseq psoma virome cellranger cellranger-mkfastq cellranger-multi spaceranger xeniumranger sqanti3 wf-transcriptomes dconvatac dconvatac-gpu dpnvisium dpnvisium-gpu)
 
 # ── Color output ─────────────────────────────────────────────────────────────
 if [[ -t 1 ]]; then
