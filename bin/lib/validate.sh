@@ -14,6 +14,7 @@ validate_config() {
         bulkrnaseq) _validate_bulkrnaseq "$config" errors ;;
         psoma)          _validate_psoma "$config" errors ;;
         virome)         _validate_virome "$config" errors ;;
+        virome-telescope) _validate_virome_telescope "$config" errors ;;
         cellranger)          _validate_cellranger "$config" errors ;;
         cellranger-mkfastq) _validate_cellranger_mkfastq "$config" errors ;;
         cellranger-multi)   _validate_cellranger_multi "$config" errors ;;
@@ -225,6 +226,92 @@ _validate_virome() {
 
     # Numeric params (optional but validated if present)
     for key in trim_headcrop trim_leading trim_trailing trim_minlen min_reads_per_taxon; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            if [[ -n "$val" && ! "$val" =~ ^[0-9]+$ ]]; then
+                _errs+=("$key must be a non-negative integer, got: $val")
+            fi
+        fi
+    done
+}
+
+# ── Virome-Telescope validator ───────────────────────────────────────────────
+# Deliberately separate from _validate_virome — this offshoot's config schema
+# (assets/config_telescope_*.yaml in the submodule) has no project_name,
+# kraken2_db, or adapters, and requires star_index + telescope_annotation
+# instead. Reusing _validate_virome's required-key list would either reject
+# every valid telescope config or silently skip checking telescope-specific
+# keys.
+_validate_virome_telescope() {
+    local config="$1"
+    local -n _errs=$2
+
+    # Required keys
+    local required_keys=(samplesheet outdir star_index telescope_annotation container_dir)
+    for key in "${required_keys[@]}"; do
+        if ! yaml_has "$config" "$key"; then
+            _errs+=("Missing required key: $key")
+        fi
+    done
+
+    # Paths that must exist on disk
+    local path_keys=(samplesheet star_index telescope_annotation container_dir)
+    for key in "${path_keys[@]}"; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            if [[ -n "$val" && "$val" != /path/to/* && ! -e "$val" ]]; then
+                _errs+=("Path does not exist for $key: $val")
+            fi
+        fi
+    done
+
+    # Samplesheet format: same shape as main.nf's (sample,fastq_r1,fastq_r2 —
+    # original/trimmed reads), NOT blast_verify.nf's/pathseq_verify.nf's
+    # (those take the STAR-unmapped pool) — see telescope_verify.nf's header.
+    if yaml_has "$config" "samplesheet"; then
+        local ss
+        ss=$(yaml_get "$config" "samplesheet") || true
+        if [[ -n "$ss" && -f "$ss" ]]; then
+            local header
+            header=$(head -1 "$ss")
+            if ! grep -q "sample" <<< "$header"; then
+                _errs+=("Samplesheet missing 'sample' column header: $ss")
+            fi
+            if ! grep -q "fastq_r1" <<< "$header"; then
+                _errs+=("Samplesheet missing 'fastq_r1' column header: $ss")
+            fi
+        fi
+    fi
+
+    # container_dir: warn if directory exists but the two containers this
+    # offshoot actually uses (star.sif, telescope.sif — confirmed against
+    # modules/star_realign_multimap.nf and modules/telescope_assign.nf) aren't
+    # both present. Not the full 6-container virome list — telescope doesn't
+    # touch fastqc/trimmomatic/kraken2/python/multiqc.
+    if yaml_has "$config" "container_dir"; then
+        local cdir
+        cdir=$(yaml_get "$config" "container_dir") || true
+        if [[ -n "$cdir" && -d "$cdir" ]]; then
+            for sif in star telescope; do
+                [[ -f "$cdir/${sif}.sif" ]] || warn "Missing container in container_dir: ${sif}.sif"
+            done
+        fi
+    fi
+
+    # Optional reassign_mode: must be one of telescope's own accepted values
+    if yaml_has "$config" "telescope_reassign_mode"; then
+        local mode
+        mode=$(yaml_get "$config" "telescope_reassign_mode") || true
+        case "$mode" in
+            exclude|choose|average|conf|unique) ;;
+            *) _errs+=("telescope_reassign_mode must be one of exclude|choose|average|conf|unique, got: $mode") ;;
+        esac
+    fi
+
+    # Numeric params (optional but validated if present)
+    for key in telescope_star_multimap_nmax telescope_star_sam_mult_nmax telescope_star_anchor_multimap_nmax; do
         if yaml_has "$config" "$key"; then
             local val
             val=$(yaml_get "$config" "$key") || true

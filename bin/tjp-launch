@@ -334,8 +334,8 @@ case "$PIPELINE" in
         FASTQ_DIR=$(yaml_get "$RUN_DIR/config.yaml" "xenium_bundle" 2>/dev/null || echo "") ;;
     cellranger-mkfastq)
         FASTQ_DIR=$(yaml_get "$RUN_DIR/config.yaml" "run_dir" 2>/dev/null || echo "") ;;
-    virome)
-        # virome uses a samplesheet CSV — no single fastq_dir to archive
+    virome|virome-telescope)
+        # virome / virome-telescope use a samplesheet CSV — no single fastq_dir to archive
         FASTQ_DIR="" ;;
     sqanti3)
         # sqanti3 takes a collapsed GTF — no fastq_dir
@@ -400,6 +400,19 @@ case "$PIPELINE" in
         SCRATCH_OUTPUT_DIR=$(yaml_get "$RUN_DIR/config.yaml" "outdir" 2>/dev/null || echo "")
         if [[ -z "$SCRATCH_OUTPUT_DIR" ]]; then
             die "virome config missing required key: outdir"
+        fi
+        info "Output dir: $SCRATCH_OUTPUT_DIR"
+        SBATCH_CONFIG_ARG="$RUN_DIR/config.yaml"
+        ;;
+    virome-telescope)
+        # Virome-Telescope offshoot: same outdir-from-config passthrough as
+        # virome, but a separate entry point (telescope_verify.nf) and a
+        # dedicated lightweight-head-job SLURM template (-profile slurm —
+        # Nextflow submits its own per-process child jobs, unlike main
+        # virome's single -profile standard job).
+        SCRATCH_OUTPUT_DIR=$(yaml_get "$RUN_DIR/config.yaml" "outdir" 2>/dev/null || echo "")
+        if [[ -z "$SCRATCH_OUTPUT_DIR" ]]; then
+            die "virome-telescope config missing required key: outdir"
         fi
         info "Output dir: $SCRATCH_OUTPUT_DIR"
         SBATCH_CONFIG_ARG="$RUN_DIR/config.yaml"

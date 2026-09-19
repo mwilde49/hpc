@@ -5,7 +5,7 @@
 # on $SLURM_* env vars and on the run-directory artifacts repro.sh/manifest.sh
 # already write (juno_environment.json, manifest.json, invocation.log).
 #
-# Wired into all 15 pipelines. Two templates (sqanti3, wf-transcriptomes) run
+# Wired into all 16 pipelines. Two templates (sqanti3, wf-transcriptomes) run
 # under `set -euo pipefail`; every function below that does real work is
 # either inherently pipefail-safe (pipelines ending in a command that always
 # exits 0, like `head`) or explicitly runs its body in a `set +e` subshell —
@@ -52,6 +52,10 @@ _run_guarded() {
 #   - virome (multi-container): <primary> = containers/virome dir (holds
 #     fastqc.sif, trimmomatic.sif, star.sif, kraken2.sif, python.sif,
 #     multiqc.sif — one tool per container)
+#   - virome-telescope (multi-container offshoot, same submodule dir as
+#     virome): <primary> = containers/virome dir, but only star.sif and
+#     telescope.sif are probed — the other 4 containers aren't used by this
+#     entry point (telescope_verify.nf)
 #   - wf-transcriptomes: <primary> = path to the nextflow binary. It runs
 #     natively (not in a container); per-process containers are pulled and
 #     managed by the external epi2me-labs/wf-transcriptomes workflow itself
@@ -80,6 +84,8 @@ capture_software_versions() {
             _run_guarded _capture_versions_sqanti3 "$run_dir" "$primary" ;;
         virome)
             _run_guarded _capture_versions_virome "$run_dir" "$primary" ;;
+        virome-telescope)
+            _run_guarded _capture_versions_virome_telescope "$run_dir" "$primary" ;;
         wf-transcriptomes)
             _run_guarded _capture_versions_wf_transcriptomes "$run_dir" "$primary" ;;
         cellranger|cellranger-mkfastq|cellranger-multi|spaceranger|xeniumranger)
@@ -230,6 +236,30 @@ _capture_versions_virome() {
             printf '%s: (container not found: %s)\n' "$name" "$sif" >> "$run_dir/software_versions.txt"
         fi
     done
+}
+
+_capture_versions_virome_telescope() {
+    local run_dir="$1" repo_dir="$2"
+    _write_versions_header "$run_dir" "per-process containers ($repo_dir/{star,telescope}.sif)"
+    local name cmd sif
+    for name in star telescope; do
+        case "$name" in
+            star)      cmd="STAR --version" ;;
+            telescope) cmd="telescope --version" ;;
+        esac
+        sif="$repo_dir/${name}.sif"
+        if [[ -f "$sif" ]]; then
+            printf '%s: %s\n' "$name" "$(_apptainer_probe "$sif" "$cmd")" >> "$run_dir/software_versions.txt"
+        else
+            printf '%s: (container not found: %s)\n' "$name" "$sif" >> "$run_dir/software_versions.txt"
+        fi
+    done
+    {
+        echo ""
+        echo "# Only star.sif and telescope.sif are used by this offshoot"
+        echo "# (STAR_REALIGN_MULTIMAP, TELESCOPE_ASSIGN, AGGREGATE_TELESCOPE)."
+        echo "# fastqc/trimmomatic/kraken2/python/multiqc are main.nf-only."
+    } >> "$run_dir/software_versions.txt"
 }
 
 _capture_versions_wf_transcriptomes() {

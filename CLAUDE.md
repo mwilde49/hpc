@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HPC pipeline framework for the TJP group on Juno HPC, deployed to the shared group location `/groups/tprice/pipelines`. Uses Apptainer containers + SLURM scheduling + config-driven YAML execution. Has fifteen pipelines: AddOne (inline demo), BulkRNASeq (submoduled container + external Nextflow), Psoma (submoduled combined container+pipeline), Virome (submoduled Nextflow + per-process containers), SQANTI3 (submoduled 4-stage SLURM DAG), wf-transcriptomes (submoduled Nextflow SLURM executor), five 10x Genomics native pipelines (Cell Ranger, Cell Ranger mkfastq, Cell Ranger Multi, Space Ranger, Xenium Ranger), DeconvATAC (submoduled Python+Apptainer, spatial ATAC deconvolution via Cell2Location, CPU and GPU variants), and dpnvisium (submoduled Python+Apptainer, Visium spatial deconvolution via Cell2Location for the ish_dpn project, CPU and GPU/H100 variants). Designed to scale horizontally by adding new pipeline directories or container submodules. Version 6.0.0 adds samplesheet-driven batch execution (`tjp-batch`), local Titan metadata prototype (`labdata`/PLR-xxxx records), and Titan integration fields in all configs.
+HPC pipeline framework for the TJP group on Juno HPC, deployed to the shared group location `/groups/tprice/pipelines`. Uses Apptainer containers + SLURM scheduling + config-driven YAML execution. Has sixteen pipelines: AddOne (inline demo), BulkRNASeq (submoduled container + external Nextflow), Psoma (submoduled combined container+pipeline), Virome (submoduled Nextflow + per-process containers), Virome-Telescope (submoduled Nextflow offshoot of Virome — locus-level HERV-K quantification via Telescope, its own lightweight-head-job SLURM template since it runs under `-profile slurm` rather than Virome's `-profile standard`), SQANTI3 (submoduled 4-stage SLURM DAG), wf-transcriptomes (submoduled Nextflow SLURM executor), five 10x Genomics native pipelines (Cell Ranger, Cell Ranger mkfastq, Cell Ranger Multi, Space Ranger, Xenium Ranger), DeconvATAC (submoduled Python+Apptainer, spatial ATAC deconvolution via Cell2Location, CPU and GPU variants), and dpnvisium (submoduled Python+Apptainer, Visium spatial deconvolution via Cell2Location for the ish_dpn project, CPU and GPU/H100 variants). Designed to scale horizontally by adding new pipeline directories or container submodules. Version 6.0.0 adds samplesheet-driven batch execution (`tjp-batch`), local Titan metadata prototype (`labdata`/PLR-xxxx records), and Titan integration fields in all configs.
 
 ## Build and Run Commands
 
@@ -178,12 +178,12 @@ Per-stage node/resource capture for SQANTI3's 4 sub-jobs is out of scope here �
 
 ### Provenance README (v7.2.0, full rollout v7.3.0)
 
-`bin/lib/provenance.sh` builds on `repro.sh` to add three more things, wired into **all thirteen pipelines**:
+`bin/lib/provenance.sh` builds on `repro.sh` to add three more things, wired into **all sixteen pipelines**:
 
 - **`CONSOLE_LOG.txt`** — `start_console_log` tees all subsequent stdout/stderr through `exec > >(tee -a ...) 2>&1`, called right after `capture_juno_env` so pre-flight failures are captured too. This duplicates SLURM's own `slurm_<jobid>.out`/`.err` split logs, intentionally — `CONSOLE_LOG.txt` is the single chronologically-interleaved transcript.
 - **`software_versions.txt`** — `capture_software_versions` dispatches by pipeline architecture, since not every pipeline has a single container to probe:
-  - Single-container pipelines (psoma, bulkrnaseq, dconvatac(-gpu), addone, sqanti3) — real per-tool version strings queried live via `apptainer exec`, reusing the exact commands each container's own `.def` `%test` block already runs where one exists. Necessary, not cosmetic: several of these containers install tools via `mamba install`/`pip install` with no version pins, so the built `.sif` is the only source of truth for what actually ran.
-  - Multi-container (virome) — loops over each per-process `.sif` (`fastqc.sif`, `star.sif`, etc.), probing each one's own primary tool.
+  - Single-container pipelines (psoma, bulkrnaseq, dconvatac(-gpu), dpnvisium(-gpu), addone, sqanti3) — real per-tool version strings queried live via `apptainer exec`, reusing the exact commands each container's own `.def` `%test` block already runs where one exists. Necessary, not cosmetic: several of these containers install tools via `mamba install`/`pip install` with no version pins, so the built `.sif` is the only source of truth for what actually ran.
+  - Multi-container (virome) — loops over each per-process `.sif` (`fastqc.sif`, `star.sif`, etc.), probing each one's own primary tool. virome-telescope shares the same submodule dir but only probes `star.sif`/`telescope.sif`, the two containers that offshoot actually uses.
   - Native 10x pipelines (cellranger, cellranger-mkfastq, cellranger-multi, spaceranger, xeniumranger) — sources `containers/10x/lib/10x_common.sh`'s own `find_10x_binary`/`get_10x_version` in a `set +e` subshell (that file sets `-euo pipefail` itself) to resolve the exact binary the wrapper script would use, honoring a config-level `tool_path:` override.
   - wf-transcriptomes — captures only the `nextflow` binary's own version; per-process containers are pulled and managed by the external `epi2me-labs/wf-transcriptomes` workflow at run time, not declared anywhere in this repo, so probing them directly is out of scope (`nextflow_logs/report.html` shows what each process actually used).
   - sqanti3 — probes the shared container the orchestrator and its 4 stage jobs all use, but only from the orchestrator job (see below).
@@ -281,6 +281,31 @@ Model C — native Nextflow on host with per-process Apptainer containers. Unlik
 cd /groups/tprice/pipelines
 mkdir -p logs
 sbatch slurm_templates/virome_slurm_template.sh
+```
+
+## Virome-Telescope Pipeline
+
+Registers the Telescope locus-level HERV-K quantification offshoot (`telescope_verify.nf`, added to the `containers/virome` submodule alongside the existing `blast_verify.nf`/`pathseq_verify.nf` offshoots) as its own framework pipeline, `virome-telescope` — same submodule/container repo as `virome`, different entry point and execution model, following this framework's existing same-codebase-variant precedent (`dconvatac`/`dconvatac-gpu`, `dpnvisium`/`dpnvisium-gpu`).
+
+### Why a separate pipeline instead of an entry-point flag on `tjp-launch virome`
+
+Telescope needs a genuinely different execution model, not just a different Nextflow script name:
+- **Main virome** (`virome_slurm_template.sh`) runs `-profile standard` — everything happens inside one SLURM job, so the job itself requests the full 16 CPU / 128 GB.
+- **Virome-Telescope** (`virome_telescope_slurm_template.sh`) runs `-profile slurm` — Nextflow submits its own per-process child SLURM jobs (sized via `containers/virome/conf/base.config`), so the head job itself only needs a light 2 CPU / 4 GB allocation, mirroring the submodule's own manual per-config launcher pattern (`scripts/run_pathseq_config.sbatch`, `scripts/run_virome_config.sbatch`).
+
+A single `--entry-point` flag can't reconcile that resource-shape mismatch; a dedicated template can, with zero risk to the already-working main virome path.
+
+### Key details
+- Two containers only: `star.sif` (dedicated multi-mapper-permissive STAR re-alignment — cannot reuse main.nf's host-removal BAM, see `modules/star_realign_multimap.nf`) and `telescope.sif` (EM-based locus reassignment). Confirmed directly against `modules/star_realign_multimap.nf`, `modules/telescope_assign.nf`, `modules/aggregate_telescope.nf` — not the full 6-container list `virome` uses.
+- Config schema is entirely different from main virome's (no `project_name`/`kraken2_db`/`adapters`; requires `samplesheet`, `outdir`, `star_index`, `telescope_annotation`, `container_dir`) — has its own validator, `_validate_virome_telescope` in `bin/lib/validate.sh`, rather than reusing `_validate_virome`.
+- Samplesheet is the **same shape as `main.nf`'s** (`sample,fastq_r1,fastq_r2`, original/trimmed reads) — NOT `blast_verify.nf`'s/`pathseq_verify.nf`'s (STAR-unmapped pool). HML-2 reads map to GRCh38 and are exactly what main.nf's unique-mapper-only host removal discards, so this offshoot re-aligns the original reads itself.
+- Uses a separate Nextflow `workDir` (`$SCRATCH_ROOT/nextflow_work/virome_telescope`) from main virome's, so concurrent runs of the two entry points don't collide on a shared work/session directory.
+- **Not wired into `tjp-batch`** — same reasoning as `blast_verify.nf`/`pathseq_verify.nf`: one cohort/atlas at a time via a hand-picked config, not a per-row/per-sheet batch shape. There is also no `templates/virome-telescope/` starter config for `tjp-setup` — users pass `--config` pointing directly at a cohort config under `containers/virome/assets/config_telescope_*.yaml`, matching the existing rollout-plan documented in `assets/config_telescope_template.yaml`.
+- **Submodule pin must be bumped before deploying this pipeline** — `containers/virome` is currently pinned to `d005289` (the commit that added `telescope_verify.nf`/the modules this registration depends on), but `conf/base.config` at that commit has no `withName` resource override for `STAR_REALIGN_MULTIMAP`/`TELESCOPE_ASSIGN` (would fall back to the generic 2 CPU / 8 GB / 4h default — not enough to load the 33 GB GRCh38 index). This is already fixed one commit later, at `1e8553d` ("fix: give STAR_REALIGN_MULTIMAP/TELESCOPE_ASSIGN real resource allocations" — `STAR_REALIGN_MULTIMAP` → 16 CPU/64 GB/24h/symlink stage-in, matching `STAR_HOST_REMOVAL`; `TELESCOPE_ASSIGN` → 8 CPU/32 GB/4h, an unmeasured ceiling pending the TG12 pilot's real trace). That same commit also adds `scripts/run_telescope_config.sbatch`, the manual-launch sibling script this whole registration was built to replace. Bump the pin (`cd containers/virome && git checkout 1e8553d` or later, then commit the updated gitlink) before running anything past the synthetic smoke test.
+
+### Submit on HPC
+```bash
+tjp-launch virome-telescope --config /groups/tprice/pipelines/containers/virome/assets/config_telescope_<cohort>.yaml
 ```
 
 ## Long-Read Pipelines (SQANTI3 and wf-transcriptomes)

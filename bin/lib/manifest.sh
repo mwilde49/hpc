@@ -61,7 +61,7 @@ snapshot_pipeline_source() {
     case "$pipeline" in
         bulkrnaseq) submodule_dir="$REPO_ROOT/containers/bulkrnaseq" ;;
         psoma) submodule_dir="$REPO_ROOT/containers/psoma" ;;
-        virome) submodule_dir="$REPO_ROOT/containers/virome" ;;
+        virome|virome-telescope) submodule_dir="$REPO_ROOT/containers/virome" ;;
         sqanti3|wf-transcriptomes) submodule_dir="$REPO_ROOT/containers/sqanti3" ;;
         dconvatac|dconvatac-gpu) submodule_dir="$REPO_ROOT/containers/dconvatac" ;;
         dpnvisium|dpnvisium-gpu) submodule_dir="$REPO_ROOT/containers/dpnvisium" ;;

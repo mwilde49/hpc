@@ -19,6 +19,7 @@ declare -A PIPELINE_CONTAINERS=(
     [bulkrnaseq]="containers/bulkrnaseq/bulkrnaseq_v1.0.0.sif"
     [psoma]="containers/psoma/psomagen_v1.0.0.sif"
     [virome]="containers/virome"
+    [virome-telescope]="containers/virome"
     [sqanti3]="containers/sqanti3/sqanti3_v5.5.4.sif"
     # wf-transcriptomes: Nextflow pulls per-process containers automatically.
     # The "container" entry points to the Nextflow config that controls this.
@@ -35,6 +36,7 @@ declare -A PIPELINE_TEMPLATES=(
     [bulkrnaseq]="slurm_templates/bulkrnaseq_slurm_template.sh"
     [psoma]="slurm_templates/psoma_slurm_template.sh"
     [virome]="slurm_templates/virome_slurm_template.sh"
+    [virome-telescope]="slurm_templates/virome_telescope_slurm_template.sh"
     [cellranger]="slurm_templates/cellranger_slurm_template.sh"
     [cellranger-mkfastq]="slurm_templates/cellranger_mkfastq_slurm_template.sh"
     [cellranger-multi]="slurm_templates/cellranger_multi_slurm_template.sh"
@@ -65,7 +67,7 @@ NATIVE_PIPELINES=(cellranger cellranger-mkfastq cellranger-multi spaceranger xen
 NEXTFLOW_MANAGED_PIPELINES=(wf-transcriptomes)
 
 # Ordered list of known pipelines (bash 3 compat for iteration)
-KNOWN_PIPELINES=(addone bulkrnaseq psoma virome cellranger cellranger-mkfastq cellranger-multi spaceranger xeniumranger sqanti3 wf-transcriptomes dconvatac dconvatac-gpu dpnvisium dpnvisium-gpu)
+KNOWN_PIPELINES=(addone bulkrnaseq psoma virome virome-telescope cellranger cellranger-mkfastq cellranger-multi spaceranger xeniumranger sqanti3 wf-transcriptomes dconvatac dconvatac-gpu dpnvisium dpnvisium-gpu)
 
 # ── Color output ─────────────────────────────────────────────────────────────
 if [[ -t 1 ]]; then
@@ -124,7 +126,7 @@ is_native_pipeline() {
 }
 
 # Multi-container pipelines use a directory of .sif files rather than one monolithic container.
-MULTICONTAINER_PIPELINES=(virome)
+MULTICONTAINER_PIPELINES=(virome virome-telescope)
 
 is_multicontainer_pipeline() {
     local n="$1"
