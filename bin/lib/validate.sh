@@ -26,6 +26,7 @@ validate_config() {
         dconvatac-gpu) _validate_dconvatac_gpu "$config" errors ;;
         dpnvisium)     _validate_dpnvisium "$config" errors ;;
         dpnvisium-gpu) _validate_dpnvisium "$config" errors ;;
+        painrrf)        _validate_painrrf "$config" errors ;;
         *)              die "No validator for pipeline: $pipeline" ;;
     esac
 
@@ -841,4 +842,63 @@ _validate_dpnvisium() {
     done
     # spatial_batch_size deliberately not checked here -- null/blank is valid
     # (full-batch production training), not just "missing".
+}
+
+# ── painrrf validator ────────────────────────────────────────────────────────
+_validate_painrrf() {
+    local config="$1"
+    local -n _errs=$2
+
+    local required_keys=(input_h5ad output_dir stage)
+    for key in "${required_keys[@]}"; do
+        if ! yaml_has "$config" "$key"; then
+            _errs+=("Missing required key: $key")
+        fi
+    done
+
+    if yaml_has "$config" "input_h5ad"; then
+        local val
+        val=$(yaml_get "$config" "input_h5ad") || true
+        if [[ -n "$val" && "$val" != __* && "$val" != /path/to/* && ! -e "$val" ]]; then
+            _errs+=("Path does not exist for input_h5ad: $val")
+        fi
+    fi
+
+    if yaml_has "$config" "stage"; then
+        local val
+        val=$(yaml_get "$config" "stage") || true
+        case "$val" in
+            discovery|tier_filter|validate|external_check|transfer|all) ;;
+            *) _errs+=("stage must be one of discovery/tier_filter/validate/external_check/transfer/all, got: $val") ;;
+        esac
+    fi
+
+    for key in force_discovery force_tier_filter force_validate; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            case "$val" in
+                true|false) ;;
+                *) _errs+=("$key must be 'true' or 'false', got: $val") ;;
+            esac
+        fi
+    done
+
+    local numeric_keys=(seed n_hvgs min_cells view_auc_threshold
+        min_global_prevalence min_ct_prevalence min_within_batch_auc
+        min_batches_with_auc consensus_n_subsamples consensus_sample_frac
+        consensus_threshold top_k_per_view n_bootstrap bootstrap_top_n
+        bootstrap_seeds_start core_stability_threshold max_panel_size
+        min_batch_n batch_dir_consistency min_batches_tested
+        qc_strata_min_dist lobo_resid_min_auc lobo_max_drop
+        tier1_top30_inclusion corr_flag)
+    for key in "${numeric_keys[@]}"; do
+        if yaml_has "$config" "$key"; then
+            local val
+            val=$(yaml_get "$config" "$key") || true
+            if [[ -n "$val" && ! "$val" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+                _errs+=("$key must be a number, got: $val")
+            fi
+        fi
+    done
 }

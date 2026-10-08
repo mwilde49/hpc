@@ -27,6 +27,7 @@ Fifteen pipelines are currently supported across three architecture patterns:
 | **DeconvATAC GPU** | Submoduled (mwilde49/dconvatac @ v1.0.0, +4 commits untagged) | Spatial ATAC deconvolution — Cell2Location (A30 GPU). |
 | **dpnvisium** | Submoduled (mwilde49/dpnvisium @ v1.0.0) | Visium spatial deconvolution — Cell2Location, ish_dpn project (CPU, dev partition). |
 | **dpnvisium GPU** | Submoduled (mwilde49/dpnvisium @ v1.0.0) | Visium spatial deconvolution — Cell2Location, ish_dpn project (H100 GPU, production). |
+| **painrrf** | Submoduled (mwilde49/painrrf @ v0.1.0) | DRG pain-state prediction — logistic regression, LOBO-CV, mlandi project (CPU only, dev partition). |
 
 **Architecture patterns:**
 - **Inline** — pipeline code lives directly in this repo (`pipelines/<name>/`)
@@ -52,6 +53,7 @@ hpc/
 │   ├── sqanti3/              # submodule: mwilde49/longreads @ v1.1.0, +6 commits untagged (SQANTI3 + wf-transcriptomes)
 │   ├── dconvatac/            # submodule: mwilde49/dconvatac @ v1.0.0, +4 commits untagged (spatial ATAC deconvolution)
 │   ├── dpnvisium/            # submodule: mwilde49/dpnvisium @ v1.0.0 (Visium spatial deconvolution, ish_dpn project)
+│   ├── painrrf/               # submodule: mwilde49/painrrf @ v0.1.0 (DRG pain-state prediction, mlandi project)
 │   └── 10x/                  # submodule: mwilde49/10x @ v1.2.0, +1 commit untagged (Cell Ranger / Space Ranger / Xenium Ranger wrappers)
 ├── pipelines/
 │   └── addone/               # AddOne pipeline code

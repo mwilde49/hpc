@@ -78,7 +78,7 @@ capture_software_versions() {
     mkdir -p "$run_dir"
 
     case "$pipeline" in
-        psoma|bulkrnaseq|dconvatac|dconvatac-gpu|addone|dpnvisium|dpnvisium-gpu)
+        psoma|bulkrnaseq|dconvatac|dconvatac-gpu|addone|dpnvisium|dpnvisium-gpu|painrrf)
             _run_guarded _capture_versions_container "$run_dir" "$pipeline" "$primary" ;;
         sqanti3)
             _run_guarded _capture_versions_sqanti3 "$run_dir" "$primary" ;;
@@ -186,6 +186,18 @@ _capture_versions_container() {
                 "scanpy|python -c 'import scanpy; print(scanpy.__version__)'"
                 "anndata|python -c 'import anndata; print(anndata.__version__)'"
                 "torch|python -c 'import torch; print(torch.__version__)'"
+                "numpy|python -c 'import numpy; print(numpy.__version__)'"
+                "pandas|python -c 'import pandas; print(pandas.__version__)'"
+                "PyYAML|python -c 'import yaml; print(yaml.__version__)'"
+            )
+            ;;
+        painrrf)
+            probes=(
+                "Python|python --version 2>&1"
+                "scanpy|python -c 'import scanpy; print(scanpy.__version__)'"
+                "anndata|python -c 'import anndata; print(anndata.__version__)'"
+                "scikit-learn|python -c 'import sklearn; print(sklearn.__version__)'"
+                "statsmodels|python -c 'import statsmodels; print(statsmodels.__version__)'"
                 "numpy|python -c 'import numpy; print(numpy.__version__)'"
                 "pandas|python -c 'import pandas; print(pandas.__version__)'"
                 "PyYAML|python -c 'import yaml; print(yaml.__version__)'"

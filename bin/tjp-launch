@@ -366,6 +366,14 @@ case "$PIPELINE" in
         # step is skipped.
         SBATCH_CONFIG_ARG="$RUN_DIR/config.yaml"
         ;;
+    painrrf)
+        # painrrf: writes directly under the container's V41/ tree (no
+        # scratch staging — same pattern as dconvatac/dpnvisium), pass
+        # config.yaml directly as $1. SCRATCH_OUTPUT_DIR left empty; the
+        # SLURM template collects its own run_* outputs into $RUN_DIR/outputs
+        # itself rather than relying on this variable.
+        SBATCH_CONFIG_ARG="$RUN_DIR/config.yaml"
+        ;;
     bulkrnaseq)
         # BulkRNASeq: create scratch output dir, symlink UTDal repo files into it
         SCRATCH_OUTPUT_DIR="$SCRATCH_ROOT/pipelines/$PIPELINE/runs/$RUN_LABEL"

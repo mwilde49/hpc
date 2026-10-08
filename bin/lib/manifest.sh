@@ -65,6 +65,7 @@ snapshot_pipeline_source() {
         sqanti3|wf-transcriptomes) submodule_dir="$REPO_ROOT/containers/sqanti3" ;;
         dconvatac|dconvatac-gpu) submodule_dir="$REPO_ROOT/containers/dconvatac" ;;
         dpnvisium|dpnvisium-gpu) submodule_dir="$REPO_ROOT/containers/dpnvisium" ;;
+        painrrf) submodule_dir="$REPO_ROOT/containers/painrrf" ;;
         cellranger|cellranger-mkfastq|cellranger-multi|spaceranger|xeniumranger)
             submodule_dir="$REPO_ROOT/containers/10x" ;;
     esac

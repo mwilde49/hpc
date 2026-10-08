@@ -1,0 +1,54 @@
+# Schema for painrrf config validation
+# Mirrors firebase2/dpnvisium/templates/dpnvisium_schema.yaml's shape.
+# Used by bin/lib/validate.sh _validate_painrrf() once registered on Juno
+# (see docs/PRODUCTION_PACKAGING_PLAN.md item 6 -- JUNO_REGISTRATION.md not
+# written yet, this schema is prepared ahead of that step).
+required:
+  - input_h5ad
+  - output_dir
+  - stage
+path_exists:
+  - input_h5ad
+boolean:
+  - force_discovery
+  - force_tier_filter
+  - force_validate
+  - run_external_validation
+numeric:
+  - seed
+  - n_hvgs
+  - min_cells
+  - view_auc_threshold
+  - min_global_prevalence
+  - min_ct_prevalence
+  - min_within_batch_auc
+  - min_batches_with_auc
+  - consensus_n_subsamples
+  - consensus_sample_frac
+  - consensus_threshold
+  - top_k_per_view
+  - n_bootstrap
+  - bootstrap_top_n
+  - bootstrap_seeds_start
+  - core_stability_threshold
+  - max_panel_size
+  - min_batch_n
+  - batch_dir_consistency
+  - min_batches_tested
+  - qc_strata_min_dist
+  - lobo_resid_min_auc
+  - lobo_max_drop
+  - tier1_top30_inclusion
+  - corr_flag
+enum:
+  stage:
+    - discovery
+    - tier_filter
+    - validate
+    - external_check
+    - transfer
+    - all
+# C_range, seeds, feature_versions are lists, not scalars -- not represented
+# in this flat numeric/boolean schema shape (same limitation dpnvisium's
+# schema has for spatial_batch_size-like fields); validate.sh would need a
+# list-aware check added if strict validation of those is wanted later.

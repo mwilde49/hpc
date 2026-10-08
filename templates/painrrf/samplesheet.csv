@@ -1,0 +1,15 @@
+# painrrf is a "per-sheet" pipeline in the tjp-batch sense (like bulkrnaseq/
+# psoma/virome), but unlike those it does not actually read a samplesheet at
+# all: painrrf.py operates on the whole Cody atlas as a single unit (sample-
+# level pseudobulk across all 85 clean donor samples in one LOBO-CV job), not
+# per-sample. This file exists mainly for registry-convention parity
+# (bin/lib/samplesheet.sh expects every pipeline to have a samplesheet
+# template) -- the real primary launch path is `tjp-launch painrrf` with a
+# single config.yaml, not `tjp-batch`. See JUNO_REGISTRATION.md (not yet
+# written -- see docs/PRODUCTION_PACKAGING_PLAN.md item 6).
+#
+# If per-cohort batch launches are ever needed (e.g. running discovery on a
+# donor sub-cohort separately), one row per cohort works: point input_h5ad
+# at a different pre-filtered atlas subset per row.
+sample,input_h5ad,stage
+cody_full_cohort,/scratch/juno/__USER__/painrrf/5_final_adata_neuron_v23.h5ad,all

@@ -19,3 +19,6 @@
 [submodule "containers/dpnvisium"]
 	path = containers/dpnvisium
 	url = https://github.com/mwilde49/dpnvisium
+[submodule "containers/painrrf"]
+	path = containers/painrrf
+	url = https://github.com/mwilde49/painrrf

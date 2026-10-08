@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HPC pipeline framework for the TJP group on Juno HPC, deployed to the shared group location `/groups/tprice/pipelines`. Uses Apptainer containers + SLURM scheduling + config-driven YAML execution. Has sixteen pipelines: AddOne (inline demo), BulkRNASeq (submoduled container + external Nextflow), Psoma (submoduled combined container+pipeline), Virome (submoduled Nextflow + per-process containers), Virome-Telescope (submoduled Nextflow offshoot of Virome — locus-level HERV-K quantification via Telescope, its own lightweight-head-job SLURM template since it runs under `-profile slurm` rather than Virome's `-profile standard`), SQANTI3 (submoduled 4-stage SLURM DAG), wf-transcriptomes (submoduled Nextflow SLURM executor), five 10x Genomics native pipelines (Cell Ranger, Cell Ranger mkfastq, Cell Ranger Multi, Space Ranger, Xenium Ranger), DeconvATAC (submoduled Python+Apptainer, spatial ATAC deconvolution via Cell2Location, CPU and GPU variants), and dpnvisium (submoduled Python+Apptainer, Visium spatial deconvolution via Cell2Location for the ish_dpn project, CPU and GPU/H100 variants). Designed to scale horizontally by adding new pipeline directories or container submodules. Version 6.0.0 adds samplesheet-driven batch execution (`tjp-batch`), local Titan metadata prototype (`labdata`/PLR-xxxx records), and Titan integration fields in all configs.
+HPC pipeline framework for the TJP group on Juno HPC, deployed to the shared group location `/groups/tprice/pipelines`. Uses Apptainer containers + SLURM scheduling + config-driven YAML execution. Has seventeen pipelines: AddOne (inline demo), BulkRNASeq (submoduled container + external Nextflow), Psoma (submoduled combined container+pipeline), Virome (submoduled Nextflow + per-process containers), Virome-Telescope (submoduled Nextflow offshoot of Virome — locus-level HERV-K quantification via Telescope, its own lightweight-head-job SLURM template since it runs under `-profile slurm` rather than Virome's `-profile standard`), SQANTI3 (submoduled 4-stage SLURM DAG), wf-transcriptomes (submoduled Nextflow SLURM executor), five 10x Genomics native pipelines (Cell Ranger, Cell Ranger mkfastq, Cell Ranger Multi, Space Ranger, Xenium Ranger), DeconvATAC (submoduled Python+Apptainer, spatial ATAC deconvolution via Cell2Location, CPU and GPU variants), dpnvisium (submoduled Python+Apptainer, Visium spatial deconvolution via Cell2Location for the ish_dpn project, CPU and GPU/H100 variants), and painrrf (submoduled Python+Apptainer, DRG pain-state prediction via logistic regression for the mlandi project, CPU-only). Designed to scale horizontally by adding new pipeline directories or container submodules. Version 6.0.0 adds samplesheet-driven batch execution (`tjp-batch`), local Titan metadata prototype (`labdata`/PLR-xxxx records), and Titan integration fields in all configs.
 
 ## Build and Run Commands
 
@@ -392,6 +392,31 @@ tjp-launch dpnvisium-gpu    # GPU (H100, production)
 ```
 
 See `DPNVISIUM_HPC_GUIDE.md` for full setup and usage details.
+
+## painrrf Pipeline
+
+### Submodule
+
+Container repo `mwilde49/painrrf` is a git submodule at `containers/painrrf/`, pinned to `v0.1.0`. Like dconvatac/dpnvisium, this is a Python pipeline (not Nextflow) — the container definition, pipeline entry point, and the vendored V41 research scripts it wraps all live in the submodule. No separate clone or sibling `mlandi/` checkout needed; the submodule is self-contained.
+
+### Key details
+- DRG pain-state prediction from human single-nucleus RNA-seq (V41 "Representation Robustness Framework"), from the `mlandi` research project
+- Wraps the real, unmodified V41 discovery scripts (`04_pain_stable_panel.py` → `05_gene_evidence_tiers.py` → `06_tier1_panel_validation.py`, plus external-validation scripts `07`-`10`) via `containers/painrrf/pipeline/painrrf.py`, rather than reimplementing their logic
+- Model: sample-level pseudobulk features → `StandardScaler` → `LogisticRegressionCV`, evaluated via Leave-One-Batch-Out CV — plain logistic regression, **no neural network, no GPU variant** (explicitly ruled out for this work by the project lead)
+- `config['output_dir']` not yet honored — outputs land in timestamped `run_*/` dirs under `containers/painrrf/V41/V41_Framework_Development/`; the SLURM template collects them into `$RUN_DIR/outputs` after each run
+- **Not wired into `tjp-batch`** — same reasoning as `dpnvisium`: LOBO-CV runs jointly across the whole sample set, no per-row/per-sheet batching unit fits
+
+### Build container (local, fakeroot or sudo)
+```bash
+cd containers/painrrf/pipeline/container && apptainer build --fakeroot ../../../containers/painrrf_v0.1.0.sif apptainer.def
+```
+
+### Submit on HPC
+```bash
+tjp-launch painrrf
+```
+
+See `PAINRRF_HPC_GUIDE.md` for full setup and usage details.
 
 ## 10x Genomics Pipelines (Cell Ranger, Space Ranger, Xenium Ranger)
 
