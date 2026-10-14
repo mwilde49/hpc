@@ -21,4 +21,9 @@
 	url = https://github.com/mwilde49/dpnvisium
 [submodule "containers/painrrf"]
 	path = containers/painrrf
-	url = https://github.com/mwilde49/painrrf
+	# SSH host alias (not HTTPS, unlike every other submodule here) --
+	# painrrf is the only private repo in this framework, so it needs the
+	# dedicated read-only deploy key via an SSH config Host alias
+	# ("github-painrrf-deploy") rather than anonymous HTTPS, which works
+	# for the public submodules above with zero credential setup.
+	url = git@github-painrrf-deploy:mwilde49/painrrf.git
